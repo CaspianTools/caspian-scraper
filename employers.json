@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Aramco",
+    "url": "https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch=",
+    "ats": "successfactors",
+    "active": true
+  },
+  {
+    "name": "Halliburton",
+    "url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
+    "ats": "successfactors",
+    "active": true
+  }
+]
