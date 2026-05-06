@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "scraper_repo": "CaspianTools/caspian-scraper",
+  "last_updated": "2026-05-06T16:59:46Z",
+  "employers": [
+    {
+      "name": "Aramco",
+      "ats": "successfactors",
+      "active": true
+    },
+    {
+      "name": "Halliburton",
+      "ats": "successfactors",
+      "active": true
+    }
+  ],
+  "totals": {
+    "runs": 1,
+    "found_alltime": 5,
+    "published_alltime": 0,
+    "errors_alltime": 0
+  },
+  "runs": [
+    {
+      "started_at": "2026-05-06T16:58:23Z",
+      "finished_at": "2026-05-06T16:59:46Z",
+      "duration_seconds": 82,
+      "status": "ok",
+      "checked": 2,
+      "skipped_inactive": 0,
+      "found": 5,
+      "published": 0,
+      "skipped_duplicate": 5,
+      "errors": [],
+      "published_roles": [],
+      "by_employer": [
+        {
+          "name": "Aramco",
+          "ats": "successfactors",
+          "active": true,
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Halliburton",
+          "ats": "successfactors",
+          "active": true,
+          "found": 5,
+          "published": 0,
+          "skipped_duplicate": 5,
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "recent_published": []
+}

@@ -19,6 +19,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urljoin
@@ -33,7 +34,16 @@ from playwright.sync_api import (
 
 API_BASE = "https://entirelysafe.com/api/v1"
 RATE_LIMIT_FLOOR = 10
-EMPLOYERS_FILE = Path(__file__).parent / "employers.json"
+REPO_ROOT = Path(__file__).parent
+EMPLOYERS_FILE = REPO_ROOT / "employers.json"
+DATA_FILE = REPO_ROOT / "docs" / "data.json"
+RUN_HISTORY_LIMIT = 30
+RECENT_PUBLISHED_LIMIT = 50
+DATA_SCHEMA_VERSION = 1
+
+# Firebase Auth UID of the user that scraped vacancies are attributed to.
+# Override via ENTIRELYSAFE_POSTED_BY env var if a different account should own them.
+DEFAULT_POSTED_BY = "zFuwetFo6HhHVG9hXmPt28wQFRA2"
 
 HSE_KEYWORDS = [
     "hse", "hsse", "ehs", "qhse", "sheq",
@@ -46,21 +56,53 @@ HSE_KEYWORDS = [
 ]
 
 # Order matters — first match wins.
+# Values must match the entirelysafe schema: 'full-time' | 'part-time' | 'contract' | 'temporary'.
 EMPLOYMENT_TYPE_MAP: list[tuple[str, str]] = [
-    ("full time", "FULL_TIME"),
-    ("full-time", "FULL_TIME"),
-    ("permanent", "FULL_TIME"),
-    ("part time", "PART_TIME"),
-    ("part-time", "PART_TIME"),
-    ("contract", "CONTRACT"),
-    ("contractor", "CONTRACT"),
-    ("fixed term", "CONTRACT"),
-    ("temporary", "TEMPORARY"),
-    ("temp", "TEMPORARY"),
-    ("intern", "INTERNSHIP"),
-    ("internship", "INTERNSHIP"),
-    ("graduate", "INTERNSHIP"),
+    ("full time", "full-time"),
+    ("full-time", "full-time"),
+    ("permanent", "full-time"),
+    ("part time", "part-time"),
+    ("part-time", "part-time"),
+    ("contract", "contract"),
+    ("contractor", "contract"),
+    ("fixed term", "contract"),
+    ("temporary", "temporary"),
+    ("temp", "temporary"),
 ]
+
+# Country-name → ISO-2 code (lowercase, matches src/data/countries.ts in entirelysafe).
+# Longest names match first in infer_country() so "united states" beats "states".
+COUNTRY_NAME_TO_CODE: dict[str, str] = {
+    "united states": "us", "usa": "us", "u.s.": "us", "u.s.a.": "us",
+    "united kingdom": "gb", "uk": "gb", "england": "gb", "scotland": "gb",
+    "wales": "gb", "northern ireland": "gb",
+    "united arab emirates": "ae", "uae": "ae",
+    "saudi arabia": "sa", "ksa": "sa",
+    "azerbaijan": "az", "kazakhstan": "kz", "qatar": "qa", "oman": "om",
+    "kuwait": "kw", "iraq": "iq", "iran": "ir", "egypt": "eg", "norway": "no",
+    "canada": "ca", "australia": "au", "india": "in", "malaysia": "my",
+    "singapore": "sg", "indonesia": "id", "nigeria": "ng", "germany": "de",
+    "france": "fr", "italy": "it", "spain": "es", "netherlands": "nl",
+    "belgium": "be", "switzerland": "ch", "denmark": "dk", "sweden": "se",
+    "finland": "fi", "ireland": "ie", "portugal": "pt", "poland": "pl",
+    "turkey": "tr", "greece": "gr", "russia": "ru", "ukraine": "ua",
+    "china": "cn", "japan": "jp", "south korea": "kr", "korea": "kr",
+    "thailand": "th", "vietnam": "vn", "philippines": "ph", "pakistan": "pk",
+    "bangladesh": "bd", "south africa": "za", "kenya": "ke", "ghana": "gh",
+    "morocco": "ma", "algeria": "dz", "tunisia": "tn", "libya": "ly",
+    "mexico": "mx", "brazil": "br", "argentina": "ar", "chile": "cl",
+    "colombia": "co", "peru": "pe", "venezuela": "ve", "ecuador": "ec",
+    "trinidad and tobago": "tt", "trinidad": "tt",
+    "new zealand": "nz", "papua new guinea": "pg",
+    "georgia": "ge", "armenia": "am", "uzbekistan": "uz", "turkmenistan": "tm",
+    "tajikistan": "tj", "kyrgyzstan": "kg",
+    "bahrain": "bh", "jordan": "jo", "lebanon": "lb", "syria": "sy",
+    "yemen": "ye", "afghanistan": "af",
+    "angola": "ao", "mozambique": "mz", "tanzania": "tz", "uganda": "ug",
+    "ethiopia": "et", "senegal": "sn", "ivory coast": "ci", "cote d'ivoire": "ci",
+    "guyana": "gy", "suriname": "sr",
+}
+_COUNTRY_NAMES_BY_LENGTH: list[str] = sorted(COUNTRY_NAME_TO_CODE, key=len, reverse=True)
 
 
 # ---------------------------------------------------------------------------
@@ -72,9 +114,10 @@ class Role:
     employer: str
     title: str
     location: str = ""
+    country: str = ""                # ISO-2 code, lowercase (e.g. "us")
     description: str = ""           # HTML preferred
     application_url: str = ""
-    employment_type: str = "FULL_TIME"
+    employment_type: str = "full-time"
     closing_date: str = ""           # ISO YYYY-MM-DD if known
 
 
@@ -88,7 +131,15 @@ def infer_employment_type(*texts: str) -> str:
     for needle, value in EMPLOYMENT_TYPE_MAP:
         if needle in blob:
             return value
-    return "FULL_TIME"
+    return "full-time"
+
+
+def infer_country(*texts: str) -> str:
+    blob = " ".join(t.lower() for t in texts if t)
+    for name in _COUNTRY_NAMES_BY_LENGTH:
+        if name in blob:
+            return COUNTRY_NAME_TO_CODE[name]
+    return ""
 
 
 def make_slug(title: str, company: str) -> str:
@@ -272,6 +323,7 @@ class SuccessFactorsParser:
             employer=employer,
             title=title,
             location=location,
+            country=infer_country(location, description_text),
             description=description_html or description_text,
             application_url=url,
             employment_type=infer_employment_type(title, description_text),
@@ -482,12 +534,117 @@ def build_payload(role: Role, slug: str) -> dict:
         "employmentType": role.employment_type,
         "applicationUrl": role.application_url,
         "status": "published",
+        "postedBy": os.environ.get("ENTIRELYSAFE_POSTED_BY", "").strip() or DEFAULT_POSTED_BY,
     }
-    if role.location:
-        payload["location"] = role.location
+    if role.country:
+        payload["location"] = {"country": role.country, "remote": False}
     if role.closing_date:
         payload["closingDate"] = role.closing_date
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Dashboard data file (docs/data.json)
+# ---------------------------------------------------------------------------
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def repo_full_name() -> str:
+    return os.environ.get("GITHUB_REPOSITORY", "CaspianTools/caspian-scraper")
+
+
+def load_data_file() -> dict:
+    if not DATA_FILE.exists():
+        return {}
+    try:
+        loaded = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def employer_meta(employers: list[dict]) -> list[dict]:
+    return [
+        {
+            "name": str(e.get("name") or "").strip(),
+            "ats": str(e.get("ats") or "").strip(),
+            "active": bool(e.get("active")),
+        }
+        for e in employers
+    ]
+
+
+def update_data_json(run_record: dict, employers_meta: list[dict]) -> None:
+    """Append the run to docs/data.json, trimming history and updating totals."""
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    existing = load_data_file()
+
+    runs = list(existing.get("runs") or [])
+    runs.append(run_record)
+    runs = runs[-RUN_HISTORY_LIMIT:]
+
+    recent = list(existing.get("recent_published") or [])
+    role_ts = run_record.get("finished_at") or run_record.get("started_at")
+    for role in run_record.get("published_roles") or []:
+        recent.append({"ts": role_ts, **role})
+    recent = recent[-RECENT_PUBLISHED_LIMIT:]
+
+    prev_totals = existing.get("totals") or {}
+    totals = {
+        "runs": int(prev_totals.get("runs") or 0) + 1,
+        "found_alltime": int(prev_totals.get("found_alltime") or 0)
+                         + int(run_record.get("found") or 0),
+        "published_alltime": int(prev_totals.get("published_alltime") or 0)
+                             + int(run_record.get("published") or 0),
+        "errors_alltime": int(prev_totals.get("errors_alltime") or 0)
+                          + len(run_record.get("errors") or []),
+    }
+
+    payload = {
+        "schema_version": DATA_SCHEMA_VERSION,
+        "scraper_repo": repo_full_name(),
+        "last_updated": run_record.get("finished_at") or utc_now_iso(),
+        "employers": employers_meta,
+        "totals": totals,
+        "runs": runs,
+        "recent_published": recent,
+    }
+
+    DATA_FILE.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def finalize_run(
+    summary: dict,
+    by_employer: list[dict],
+    employers: list[dict],
+    started_at: str,
+    started_mono: float,
+    auth_halt: bool,
+) -> None:
+    finished_at = utc_now_iso()
+    duration = max(0, int(time.monotonic() - started_mono))
+    run_record = {
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "duration_seconds": duration,
+        "status": "auth_halt" if auth_halt else (
+            "error" if summary["errors"] else "ok"
+        ),
+        **summary,
+        "by_employer": by_employer,
+    }
+    try:
+        update_data_json(run_record, employer_meta(employers))
+    except Exception as e:
+        print(
+            f"failed to update {DATA_FILE}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -495,18 +652,8 @@ def build_payload(role: Role, slug: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    api_key = os.environ.get("ENTIRELYSAFE_API_KEY", "").strip()
-    if not api_key:
-        print("ENTIRELYSAFE_API_KEY is not set", file=sys.stderr)
-        return 1
-
-    try:
-        employers = load_employers()
-    except (FileNotFoundError, ValueError) as e:
-        print(f"config error: {e}", file=sys.stderr)
-        return 1
-
-    client = EntirelySafeClient(api_key)
+    started_at = utc_now_iso()
+    started_mono = time.monotonic()
 
     summary: dict = {
         "checked": 0,
@@ -517,123 +664,180 @@ def main() -> int:
         "errors": [],
         "published_roles": [],
     }
+    by_employer: list[dict] = []
+    employers: list[dict] = []
+    auth_halt = False
+    exit_code = 0
 
     try:
-        existing = client.list_vacancies()
-    except AuthHaltError as e:
-        print(f"auth failure listing vacancies (halting): {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(
-            f"failed to list existing vacancies: {type(e).__name__}: {e}",
-            file=sys.stderr,
-        )
-        return 1
-
-    existing_slugs: set[str] = set()
-    existing_title_company: set[tuple[str, str]] = set()
-    for v in existing:
-        slug = (v.get("slug") or "").strip()
-        if slug:
-            existing_slugs.add(slug)
-        title = (v.get("title") or "").strip().lower()
-        company = (v.get("company") or "").strip().lower()
-        if title and company:
-            existing_title_company.add((title, company))
-
-    auth_halt = False
-
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (compatible; HSE-Scraper/1.0)"
-        )
-        page = context.new_page()
+        api_key = os.environ.get("ENTIRELYSAFE_API_KEY", "").strip()
+        if not api_key:
+            msg = "ENTIRELYSAFE_API_KEY is not set"
+            print(msg, file=sys.stderr)
+            summary["errors"].append(msg)
+            exit_code = 1
+            return exit_code
 
         try:
-            for emp in employers:
-                name = str(emp.get("name") or "").strip()
-                url = str(emp.get("url") or "").strip()
-                ats = str(emp.get("ats") or "").strip().lower()
-                active = bool(emp.get("active"))
-                if not name or not url or not ats:
-                    summary["errors"].append(
-                        f"employer entry missing name/url/ats: {emp!r}"
-                    )
-                    continue
-                if not active:
-                    summary["skipped_inactive"] += 1
-                    continue
+            employers = load_employers()
+        except (FileNotFoundError, ValueError) as e:
+            msg = f"config error: {e}"
+            print(msg, file=sys.stderr)
+            summary["errors"].append(msg)
+            exit_code = 1
+            return exit_code
 
-                summary["checked"] += 1
-                parser_cls = PARSERS.get(ats)
-                if parser_cls is None:
-                    summary["errors"].append(
-                        f"{name}: no parser registered for ATS '{ats}'"
-                    )
-                    continue
+        client = EntirelySafeClient(api_key)
 
-                try:
-                    parser = parser_cls(page)
-                    roles = parser.parse(name, url)
-                except Exception as e:
-                    summary["errors"].append(
-                        f"{name}: {type(e).__name__}: {e}"
-                    )
-                    continue
+        try:
+            existing = client.list_vacancies()
+        except AuthHaltError as e:
+            msg = f"auth failure listing vacancies (halting): {e}"
+            print(msg, file=sys.stderr)
+            summary["errors"].append(msg)
+            exit_code = 1
+            return exit_code
+        except Exception as e:
+            msg = f"failed to list existing vacancies: {type(e).__name__}: {e}"
+            print(msg, file=sys.stderr)
+            summary["errors"].append(msg)
+            exit_code = 1
+            return exit_code
 
-                summary["found"] += len(roles)
+        existing_slugs: set[str] = set()
+        existing_title_company: set[tuple[str, str]] = set()
+        for v in existing:
+            slug = (v.get("slug") or "").strip()
+            if slug:
+                existing_slugs.add(slug)
+            title = (v.get("title") or "").strip().lower()
+            company = (v.get("company") or "").strip().lower()
+            if title and company:
+                existing_title_company.add((title, company))
 
-                for role in roles:
-                    slug = make_slug(role.title, role.employer)
-                    title_company = (
-                        role.title.strip().lower(),
-                        role.employer.strip().lower(),
-                    )
-                    if (
-                        not slug
-                        or slug in existing_slugs
-                        or title_company in existing_title_company
-                    ):
-                        summary["skipped_duplicate"] += 1
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (compatible; HSE-Scraper/1.0)"
+            )
+            page = context.new_page()
+
+            try:
+                for emp in employers:
+                    name = str(emp.get("name") or "").strip()
+                    url = str(emp.get("url") or "").strip()
+                    ats = str(emp.get("ats") or "").strip().lower()
+                    active = bool(emp.get("active"))
+
+                    emp_record = {
+                        "name": name or "(unnamed)",
+                        "ats": ats,
+                        "active": active,
+                        "found": 0,
+                        "published": 0,
+                        "skipped_duplicate": 0,
+                        "errors": [],
+                    }
+                    by_employer.append(emp_record)
+
+                    if not name or not url or not ats:
+                        emp_record["errors"].append(
+                            "employer entry missing name/url/ats"
+                        )
+                        summary["errors"].append(
+                            f"employer entry missing name/url/ats: {emp!r}"
+                        )
+                        continue
+                    if not active:
+                        summary["skipped_inactive"] += 1
                         continue
 
-                    payload = build_payload(role, slug)
-                    status, data, message = client.post_vacancy(payload)
+                    summary["checked"] += 1
+                    parser_cls = PARSERS.get(ats)
+                    if parser_cls is None:
+                        msg = f"no parser registered for ATS '{ats}'"
+                        emp_record["errors"].append(msg)
+                        summary["errors"].append(f"{name}: {msg}")
+                        continue
 
-                    if status == "ok":
-                        existing_slugs.add(slug)
-                        existing_title_company.add(title_company)
-                        summary["published"] += 1
-                        summary["published_roles"].append({
-                            "employer": role.employer,
-                            "title": role.title,
-                            "location": role.location,
-                            "slug": slug,
-                            "id": (data or {}).get("id", ""),
-                            "url": role.application_url,
-                        })
-                    elif status == "auth":
-                        summary["errors"].append(
-                            f"auth halt during POST: {message}"
+                    try:
+                        parser = parser_cls(page)
+                        roles = parser.parse(name, url)
+                    except Exception as e:
+                        msg = f"{type(e).__name__}: {e}"
+                        emp_record["errors"].append(msg)
+                        summary["errors"].append(f"{name}: {msg}")
+                        continue
+
+                    emp_record["found"] = len(roles)
+                    summary["found"] += len(roles)
+
+                    for role in roles:
+                        slug = make_slug(role.title, role.employer)
+                        title_company = (
+                            role.title.strip().lower(),
+                            role.employer.strip().lower(),
                         )
-                        auth_halt = True
+                        if (
+                            not slug
+                            or slug in existing_slugs
+                            or title_company in existing_title_company
+                        ):
+                            summary["skipped_duplicate"] += 1
+                            emp_record["skipped_duplicate"] += 1
+                            continue
+
+                        payload = build_payload(role, slug)
+                        status, data, message = client.post_vacancy(payload)
+
+                        if status == "ok":
+                            existing_slugs.add(slug)
+                            existing_title_company.add(title_company)
+                            summary["published"] += 1
+                            emp_record["published"] += 1
+                            summary["published_roles"].append({
+                                "employer": role.employer,
+                                "title": role.title,
+                                "location": role.location,
+                                "country": role.country,
+                                "employment_type": role.employment_type,
+                                "slug": slug,
+                                "id": (data or {}).get("id", ""),
+                                "url": role.application_url,
+                            })
+                        elif status == "auth":
+                            summary["errors"].append(
+                                f"auth halt during POST: {message}"
+                            )
+                            emp_record["errors"].append(
+                                f"auth halt during POST: {message}"
+                            )
+                            auth_halt = True
+                            break
+                        else:
+                            summary["errors"].append(
+                                f"{name} / {role.title}: {message}"
+                            )
+                            emp_record["errors"].append(
+                                f"{role.title}: {message}"
+                            )
+
+                    if auth_halt:
                         break
-                    else:
-                        summary["errors"].append(
-                            f"{name} / {role.title}: {message}"
-                        )
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
 
-                if auth_halt:
-                    break
-        finally:
-            try:
-                browser.close()
-            except Exception:
-                pass
-
-    print(json.dumps(summary, indent=2))
-    return 1 if auth_halt else 0
+        if auth_halt:
+            exit_code = 1
+        return exit_code
+    finally:
+        finalize_run(
+            summary, by_employer, employers, started_at, started_mono, auth_halt
+        )
+        print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

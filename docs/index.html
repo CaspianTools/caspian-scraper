@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HSE Scraper Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E🛡%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🛡</span>
+      <h1>HSE Scraper</h1>
+    </div>
+    <div id="user-bar" class="user-bar"></div>
+  </header>
+
+  <main id="root">
+    <div class="loading">Loading…</div>
+  </main>
+
+  <footer class="footer">
+    <span id="footer-meta"></span>
+    <span class="sep">·</span>
+    <a href="https://github.com/CaspianTools/caspian-scraper" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
