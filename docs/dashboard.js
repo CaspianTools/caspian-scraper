@@ -11,7 +11,6 @@
   // ---------- config ----------
   const UPSTREAM = { owner: 'CaspianTools', repo: 'caspian-scraper' };
   const PAT_KEY  = 'hse_dashboard_pat';
-  const FORK_KEY = 'hse_dashboard_fork_owner';
   const RUNS_TO_SHOW = 10;
   const ERRORS_TO_SHOW = 20;
   // Minimum gap between auto-refreshes triggered by tab regaining focus.
@@ -25,6 +24,26 @@
       href: 'https://github.com/CaspianTools/caspian-scraper/blob/main/docs/sops/onboard-employer.md',
     },
   ];
+
+  // Repository-level GitHub Actions secrets the scraper reads.
+  // Users enter their own values here; encrypted client-side (libsodium
+  // sealed box) before being PUT to their fork via the GitHub API.
+  const REPO_SECRETS = [
+    {
+      name: 'ENTIRELYSAFE_API_KEY',
+      label: 'EntirelySafe API key',
+      help: 'Required. Used by the scraper to publish vacancies to entirelysafe.com.',
+      placeholder: 'es_live_…',
+    },
+    {
+      name: 'ENTIRELYSAFE_POSTED_BY',
+      label: 'EntirelySafe "posted by" UID',
+      help: 'Optional. Firebase Auth UID attributed as the poster. Defaults to a built-in account if unset.',
+      placeholder: 'firebase uid',
+    },
+  ];
+
+  const SODIUM_ESM_URL = 'https://esm.sh/libsodium-wrappers@0.7.13';
 
   // ---------- DOM helpers ----------
   const root      = document.getElementById('root');
@@ -41,9 +60,6 @@
     return node;
   };
   const empty = (n) => { while (n.firstChild) n.removeChild(n.firstChild); };
-  const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
-  );
 
   // ---------- formatters ----------
   const fmtNum = (n) => (n == null ? '—' : Number(n).toLocaleString());
@@ -76,10 +92,8 @@
   }
 
   // ---------- auth state ----------
-  const getPat   = () => localStorage.getItem(PAT_KEY) || '';
-  const setPat   = (v) => v ? localStorage.setItem(PAT_KEY, v) : localStorage.removeItem(PAT_KEY);
-  const getFork  = () => localStorage.getItem(FORK_KEY) || '';
-  const setFork  = (v) => v ? localStorage.setItem(FORK_KEY, v) : localStorage.removeItem(FORK_KEY);
+  const getPat = () => localStorage.getItem(PAT_KEY) || '';
+  const setPat = (v) => v ? localStorage.setItem(PAT_KEY, v) : localStorage.removeItem(PAT_KEY);
 
   // ---------- GitHub API ----------
   async function gh(path, opts = {}) {
@@ -181,6 +195,51 @@
     });
   }
 
+  async function getSecretStatus(owner, name) {
+    try {
+      await gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/${encodeURIComponent(name)}`);
+      return 'set';
+    } catch (e) {
+      if (e.status === 404) return 'unset';
+      throw e;
+    }
+  }
+
+  async function getRepoPublicKey(owner) {
+    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/public-key`);
+  }
+
+  async function putRepoSecret(owner, name, encryptedValue, keyId) {
+    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encrypted_value: encryptedValue, key_id: keyId }),
+    });
+  }
+
+  // ---------- secret encryption (libsodium sealed box, lazy-loaded) ----------
+  let _sodiumPromise = null;
+  function loadSodium() {
+    if (_sodiumPromise) return _sodiumPromise;
+    _sodiumPromise = import(SODIUM_ESM_URL).then(async (m) => {
+      const sodium = m.default || m;
+      await sodium.ready;
+      return sodium;
+    }).catch((e) => {
+      _sodiumPromise = null;
+      throw new Error(`Could not load libsodium: ${e.message || e}`);
+    });
+    return _sodiumPromise;
+  }
+
+  async function encryptForGithub(plaintext, base64PublicKey) {
+    const sodium = await loadSodium();
+    const pk = sodium.from_base64(base64PublicKey, sodium.base64_variants.ORIGINAL);
+    const messageBytes = sodium.from_string(plaintext);
+    const sealed = sodium.crypto_box_seal(messageBytes, pk);
+    return sodium.to_base64(sealed, sodium.base64_variants.ORIGINAL);
+  }
+
   // ---------- views ----------
   function renderLogin(message) {
     empty(root);
@@ -232,7 +291,6 @@
           `Fork it first at https://github.com/${UPSTREAM.owner}/${UPSTREAM.repo}.`
         );
       }
-      setFork(user.login);
       await loadDashboard({ user, fork });
     } catch (e) {
       setPat('');
@@ -293,7 +351,6 @@
 
   function signOut() {
     setPat('');
-    setFork('');
     renderLogin('');
   }
 
