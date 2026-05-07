@@ -104,6 +104,64 @@ COUNTRY_NAME_TO_CODE: dict[str, str] = {
 }
 _COUNTRY_NAMES_BY_LENGTH: list[str] = sorted(COUNTRY_NAME_TO_CODE, key=len, reverse=True)
 
+# Common oil-and-gas / industrial cities → ISO-2 country codes. Used as a
+# fallback when the location string omits the country name (e.g. "Dhahran"
+# alone rather than "Dhahran, Saudi Arabia"). Lowercase keys; longest-first
+# match in infer_country so "abu dhabi" beats "dhabi".
+CITY_TO_COUNTRY: dict[str, str] = {
+    # Saudi Arabia
+    "dhahran": "sa", "riyadh": "sa", "al-khobar": "sa", "khobar": "sa",
+    "jeddah": "sa", "yanbu": "sa", "jubail": "sa", "tabuk": "sa",
+    # UAE
+    "abu dhabi": "ae", "dubai": "ae", "sharjah": "ae", "ruwais": "ae",
+    # Qatar
+    "ras laffan": "qa", "mesaieed": "qa", "doha": "qa", "lusail": "qa",
+    "al-shaheen": "qa", "al shaheen": "qa", "idd el-shargi": "qa",
+    # Oman / Bahrain / Kuwait
+    "muscat": "om", "sohar": "om",
+    "manama": "bh",
+    "kuwait city": "kw", "ahmadi": "kw",
+    # Iraq
+    "basra": "iq", "baghdad": "iq", "erbil": "iq", "kurdistan": "iq",
+    # Iran
+    "tehran": "ir",
+    # Norway / UK / Netherlands
+    "stavanger": "no", "bergen": "no", "trondheim": "no", "oslo": "no",
+    "aberdeen": "gb", "london": "gb", "great yarmouth": "gb",
+    "amsterdam": "nl", "rotterdam": "nl", "the hague": "nl",
+    # USA
+    "houston": "us", "midland": "us", "odessa": "us", "denver": "us",
+    "anchorage": "us", "new orleans": "us", "lafayette": "us",
+    # Canada
+    "calgary": "ca", "edmonton": "ca", "fort mcmurray": "ca",
+    "halifax": "ca", "st. john's": "ca", "st johns": "ca",
+    # Caspian
+    "baku": "az",
+    "atyrau": "kz", "almaty": "kz", "astana": "kz", "aktau": "kz",
+    # Asia-Pacific
+    "perth": "au", "brisbane": "au", "darwin": "au", "melbourne": "au",
+    "kuala lumpur": "my", "miri": "my", "bintulu": "my",
+    "jakarta": "id", "balikpapan": "id",
+    "mumbai": "in", "chennai": "in", "new delhi": "in",
+    # Africa
+    "lagos": "ng", "abuja": "ng", "port harcourt": "ng",
+    "cairo": "eg", "alexandria": "eg",
+    # Europe
+    "paris": "fr", "pau": "fr",
+    "milan": "it", "rome": "it",
+    "madrid": "es", "barcelona": "es",
+    "moscow": "ru", "saint petersburg": "ru", "sakhalin": "ru",
+    "istanbul": "tr",
+    # Latin America
+    "mexico city": "mx", "ciudad del carmen": "mx", "villahermosa": "mx",
+    "rio de janeiro": "br", "macae": "br",
+    "neuquen": "ar", "neuquén": "ar",
+    "bogota": "co", "barranquilla": "co",
+    "paramaribo": "sr",
+    "georgetown": "gy",
+}
+_CITY_NAMES_BY_LENGTH: list[str] = sorted(CITY_TO_COUNTRY, key=len, reverse=True)
+
 
 # ---------------------------------------------------------------------------
 # Domain types
@@ -139,6 +197,9 @@ def infer_country(*texts: str) -> str:
     for name in _COUNTRY_NAMES_BY_LENGTH:
         if name in blob:
             return COUNTRY_NAME_TO_CODE[name]
+    for city in _CITY_NAMES_BY_LENGTH:
+        if city in blob:
+            return CITY_TO_COUNTRY[city]
     return ""
 
 
