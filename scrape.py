@@ -152,6 +152,11 @@ def make_slug(title: str, company: str) -> str:
 # Parser registry
 # ---------------------------------------------------------------------------
 
+class ScrapeTimeoutError(RuntimeError):
+    """Raised when a parser can't load a search page — surfaced as a
+    per-employer error rather than swallowed into a silent `found: 0`."""
+
+
 class Parser(Protocol):
     def __init__(self, page: Page) -> None: ...
     def parse(self, employer_name: str, search_url: str) -> list[Role]: ...
@@ -232,16 +237,10 @@ class SuccessFactorsParser:
         page = self.page
         try:
             page.goto(search_url, wait_until="networkidle", timeout=45000)
-        except PWTimeout:
-            print(f"timeout loading search page {search_url}", file=sys.stderr)
-            return []
-        except Exception as e:
-            print(
-                f"error loading search page {search_url}: "
-                f"{type(e).__name__}: {e}",
-                file=sys.stderr,
-            )
-            return []
+        except PWTimeout as e:
+            raise ScrapeTimeoutError(
+                f"search page timed out: {search_url}"
+            ) from e
 
         seen: list[str] = []
         for page_idx in range(max_pages):
@@ -345,8 +344,217 @@ class SuccessFactorsParser:
         return roles
 
 
+class JibeParser:
+    """
+    Jibe (iCIMS recruitment marketing) career-site parser.
+    Used by QatarEnergy and other employers whose sites are served via
+    cms.jibecdn.com. Job detail URLs follow /jobs/<numeric-id>?lang=en-us.
+    """
+
+    LIST_LINK_SELECTORS = [
+        "a[href*='/jobs/'][href*='lang=']",
+        "a.job-tile-link",
+        "a[data-job-id]",
+    ]
+    DETAIL_TITLE_SELECTORS = [
+        "h1.job-title",
+        "h1[itemprop='title']",
+        "h1",
+    ]
+    DETAIL_LOCATION_SELECTORS = [
+        "[itemprop='jobLocation']",
+        "span.job-location",
+        "[class*='location' i]",
+    ]
+    DETAIL_DESCRIPTION_SELECTORS = [
+        "div[itemprop='description']",
+        "div.job-description",
+        "[class*='description' i]",
+        "main",
+    ]
+    NEXT_PAGE_SELECTORS = [
+        "a[rel='next']",
+        "a[aria-label='Next']",
+        "button[aria-label='Next']",
+    ]
+
+    # Drop nav links that share /jobs/ prefix (e.g. /jobs/categories/...).
+    _DETAIL_HREF_RE = re.compile(r"/jobs/\d+")
+
+    def __init__(self, page: Page) -> None:
+        self.page = page
+
+    @staticmethod
+    def _first_text(scope, selectors: list[str]) -> str:
+        for sel in selectors:
+            try:
+                el = scope.query_selector(sel)
+            except Exception:
+                continue
+            if not el:
+                continue
+            try:
+                txt = (el.inner_text() or "").strip()
+            except Exception:
+                continue
+            if txt:
+                return txt
+        return ""
+
+    @staticmethod
+    def _first_html(scope, selectors: list[str]) -> str:
+        for sel in selectors:
+            try:
+                el = scope.query_selector(sel)
+            except Exception:
+                continue
+            if not el:
+                continue
+            try:
+                html = (el.inner_html() or "").strip()
+            except Exception:
+                continue
+            if html:
+                return html
+        return ""
+
+    def _gather_links_on_current_page(self, search_url: str) -> list[str]:
+        page = self.page
+        out: list[str] = []
+        for sel in self.LIST_LINK_SELECTORS:
+            try:
+                els = page.query_selector_all(sel)
+            except Exception:
+                els = []
+            if not els:
+                continue
+            for el in els:
+                try:
+                    href = el.get_attribute("href") or ""
+                except Exception:
+                    href = ""
+                if not href or not self._DETAIL_HREF_RE.search(href):
+                    continue
+                out.append(urljoin(search_url, href))
+            if out:
+                break
+        return out
+
+    def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
+        page = self.page
+        try:
+            page.goto(search_url, wait_until="networkidle", timeout=45000)
+        except PWTimeout as e:
+            raise ScrapeTimeoutError(
+                f"search page timed out: {search_url}"
+            ) from e
+
+        seen: list[str] = []
+
+        # Trigger Jibe's lazy-load by scrolling. Stop early if scrolling stops
+        # producing new links.
+        prev_count = -1
+        for _ in range(3):
+            for link in self._gather_links_on_current_page(search_url):
+                if link not in seen:
+                    seen.append(link)
+            if len(seen) == prev_count:
+                break
+            prev_count = len(seen)
+            try:
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                break
+
+        # Click-next pagination fallback for skins that paginate instead of
+        # infinite-scroll.
+        for _ in range(max_pages - 1):
+            advanced = False
+            for sel in self.NEXT_PAGE_SELECTORS:
+                try:
+                    nxt = page.query_selector(sel)
+                except Exception:
+                    nxt = None
+                if not nxt:
+                    continue
+                try:
+                    nxt.click()
+                    page.wait_for_load_state("networkidle", timeout=20000)
+                    advanced = True
+                    break
+                except Exception:
+                    continue
+            if not advanced:
+                break
+            for link in self._gather_links_on_current_page(search_url):
+                if link not in seen:
+                    seen.append(link)
+
+        if not seen:
+            print(
+                f"no list-link selector matched on {page.url}",
+                file=sys.stderr,
+            )
+        return seen
+
+    def parse_detail(self, employer: str, url: str) -> Role | None:
+        page = self.page
+        try:
+            page.goto(url, wait_until="networkidle", timeout=45000)
+        except PWTimeout:
+            print(f"timeout loading detail {url}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(
+                f"error loading detail {url}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return None
+
+        title = self._first_text(page, self.DETAIL_TITLE_SELECTORS)
+        if not title:
+            print(f"no title selector matched on {url}", file=sys.stderr)
+            return None
+
+        location = self._first_text(page, self.DETAIL_LOCATION_SELECTORS)
+        description_html = self._first_html(page, self.DETAIL_DESCRIPTION_SELECTORS)
+        description_text = self._first_text(page, self.DETAIL_DESCRIPTION_SELECTORS)
+        if not description_html and not description_text:
+            print(f"no description selector matched on {url}", file=sys.stderr)
+
+        if not is_hse(title):
+            return None
+
+        return Role(
+            employer=employer,
+            title=title,
+            location=location,
+            country=infer_country(location, description_text),
+            description=description_html or description_text,
+            application_url=url,
+            employment_type=infer_employment_type(title, description_text),
+        )
+
+    def parse(self, employer_name: str, search_url: str) -> list[Role]:
+        roles: list[Role] = []
+        for link in self.collect_links(search_url):
+            try:
+                role = self.parse_detail(employer_name, link)
+            except Exception as e:
+                print(
+                    f"error parsing detail {link}: {type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            if role:
+                roles.append(role)
+        return roles
+
+
 PARSERS: dict[str, type] = {
     "successfactors": SuccessFactorsParser,
+    "jibe": JibeParser,
 }
 
 
