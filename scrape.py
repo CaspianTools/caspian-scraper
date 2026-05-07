@@ -162,7 +162,178 @@ class Parser(Protocol):
     def parse(self, employer_name: str, search_url: str) -> list[Role]: ...
 
 
-class SuccessFactorsParser:
+class BaseHtmlParser:
+    """
+    Shared scaffolding for HTML-scraping parsers. Concrete subclasses
+    declare five class-level selector chains plus an optional
+    ``DETAIL_HREF_RE`` filter; they may override ``collect_links`` if
+    their site uses something other than click-Next pagination.
+    """
+
+    LIST_LINK_SELECTORS: list[str] = []
+    DETAIL_TITLE_SELECTORS: list[str] = []
+    DETAIL_LOCATION_SELECTORS: list[str] = []
+    DETAIL_DESCRIPTION_SELECTORS: list[str] = []
+    NEXT_PAGE_SELECTORS: list[str] = []
+    DETAIL_HREF_RE: "re.Pattern[str] | None" = None
+
+    def __init__(self, page: Page) -> None:
+        self.page = page
+
+    @staticmethod
+    def _first_text(scope, selectors: list[str]) -> str:
+        for sel in selectors:
+            try:
+                el = scope.query_selector(sel)
+            except Exception:
+                continue
+            if not el:
+                continue
+            try:
+                txt = (el.inner_text() or "").strip()
+            except Exception:
+                continue
+            if txt:
+                return txt
+        return ""
+
+    @staticmethod
+    def _first_html(scope, selectors: list[str]) -> str:
+        for sel in selectors:
+            try:
+                el = scope.query_selector(sel)
+            except Exception:
+                continue
+            if not el:
+                continue
+            try:
+                html = (el.inner_html() or "").strip()
+            except Exception:
+                continue
+            if html:
+                return html
+        return ""
+
+    def _goto_search(self, search_url: str) -> None:
+        try:
+            self.page.goto(search_url, wait_until="networkidle", timeout=45000)
+        except PWTimeout as e:
+            raise ScrapeTimeoutError(
+                f"search page timed out: {search_url}"
+            ) from e
+
+    def _gather_links(self, search_url: str) -> list[str]:
+        out: list[str] = []
+        for sel in self.LIST_LINK_SELECTORS:
+            try:
+                els = self.page.query_selector_all(sel)
+            except Exception:
+                els = []
+            if not els:
+                continue
+            for el in els:
+                try:
+                    href = el.get_attribute("href") or ""
+                except Exception:
+                    href = ""
+                if not href:
+                    continue
+                if self.DETAIL_HREF_RE and not self.DETAIL_HREF_RE.search(href):
+                    continue
+                out.append(urljoin(search_url, href))
+            if out:
+                break
+        return out
+
+    def _click_next(self) -> bool:
+        for sel in self.NEXT_PAGE_SELECTORS:
+            try:
+                nxt = self.page.query_selector(sel)
+            except Exception:
+                nxt = None
+            if not nxt:
+                continue
+            try:
+                nxt.click()
+                self.page.wait_for_load_state("networkidle", timeout=20000)
+                return True
+            except Exception:
+                continue
+        return False
+
+    def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
+        """Default: load search page, gather links, click Next, repeat."""
+        self._goto_search(search_url)
+        seen: list[str] = []
+        for page_idx in range(max_pages):
+            page_links = self._gather_links(search_url)
+            if not page_links:
+                print(
+                    f"no list-link selector matched on {self.page.url} "
+                    f"(page index {page_idx})",
+                    file=sys.stderr,
+                )
+            for link in page_links:
+                if link not in seen:
+                    seen.append(link)
+            if not self._click_next():
+                break
+        return seen
+
+    def parse_detail(self, employer: str, url: str) -> Role | None:
+        try:
+            self.page.goto(url, wait_until="networkidle", timeout=45000)
+        except PWTimeout:
+            print(f"timeout loading detail {url}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(
+                f"error loading detail {url}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return None
+
+        title = self._first_text(self.page, self.DETAIL_TITLE_SELECTORS)
+        if not title:
+            print(f"no title selector matched on {url}", file=sys.stderr)
+            return None
+
+        location = self._first_text(self.page, self.DETAIL_LOCATION_SELECTORS)
+        description_html = self._first_html(self.page, self.DETAIL_DESCRIPTION_SELECTORS)
+        description_text = self._first_text(self.page, self.DETAIL_DESCRIPTION_SELECTORS)
+        if not description_html and not description_text:
+            print(f"no description selector matched on {url}", file=sys.stderr)
+
+        if not is_hse(title):
+            return None
+
+        return Role(
+            employer=employer,
+            title=title,
+            location=location,
+            country=infer_country(location, description_text),
+            description=description_html or description_text,
+            application_url=url,
+            employment_type=infer_employment_type(title, description_text),
+        )
+
+    def parse(self, employer_name: str, search_url: str) -> list[Role]:
+        roles: list[Role] = []
+        for link in self.collect_links(search_url):
+            try:
+                role = self.parse_detail(employer_name, link)
+            except Exception as e:
+                print(
+                    f"error parsing detail {link}: {type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            if role:
+                roles.append(role)
+        return roles
+
+
+class SuccessFactorsParser(BaseHtmlParser):
     """
     SAP SuccessFactors career-site parser. Aramco, Halliburton, and many
     other large employers use SF; skin-level differences between tenants
@@ -196,155 +367,8 @@ class SuccessFactorsParser:
         "li.next > a",
     ]
 
-    def __init__(self, page: Page) -> None:
-        self.page = page
 
-    @staticmethod
-    def _first_text(scope, selectors: list[str]) -> str:
-        for sel in selectors:
-            try:
-                el = scope.query_selector(sel)
-            except Exception:
-                continue
-            if not el:
-                continue
-            try:
-                txt = (el.inner_text() or "").strip()
-            except Exception:
-                continue
-            if txt:
-                return txt
-        return ""
-
-    @staticmethod
-    def _first_html(scope, selectors: list[str]) -> str:
-        for sel in selectors:
-            try:
-                el = scope.query_selector(sel)
-            except Exception:
-                continue
-            if not el:
-                continue
-            try:
-                html = (el.inner_html() or "").strip()
-            except Exception:
-                continue
-            if html:
-                return html
-        return ""
-
-    def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
-        page = self.page
-        try:
-            page.goto(search_url, wait_until="networkidle", timeout=45000)
-        except PWTimeout as e:
-            raise ScrapeTimeoutError(
-                f"search page timed out: {search_url}"
-            ) from e
-
-        seen: list[str] = []
-        for page_idx in range(max_pages):
-            page_links: list[str] = []
-            for sel in self.LIST_LINK_SELECTORS:
-                try:
-                    els = page.query_selector_all(sel)
-                except Exception:
-                    els = []
-                if not els:
-                    continue
-                for el in els:
-                    try:
-                        href = el.get_attribute("href") or ""
-                    except Exception:
-                        href = ""
-                    if href:
-                        page_links.append(urljoin(search_url, href))
-                break
-            if not page_links:
-                print(
-                    f"no list-link selector matched on {page.url} "
-                    f"(page index {page_idx})",
-                    file=sys.stderr,
-                )
-
-            for link in page_links:
-                if link not in seen:
-                    seen.append(link)
-
-            advanced = False
-            for sel in self.NEXT_PAGE_SELECTORS:
-                try:
-                    nxt = page.query_selector(sel)
-                except Exception:
-                    nxt = None
-                if not nxt:
-                    continue
-                try:
-                    nxt.click()
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                    advanced = True
-                    break
-                except Exception:
-                    continue
-            if not advanced:
-                break
-        return seen
-
-    def parse_detail(self, employer: str, url: str) -> Role | None:
-        page = self.page
-        try:
-            page.goto(url, wait_until="networkidle", timeout=45000)
-        except PWTimeout:
-            print(f"timeout loading detail {url}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(
-                f"error loading detail {url}: {type(e).__name__}: {e}",
-                file=sys.stderr,
-            )
-            return None
-
-        title = self._first_text(page, self.DETAIL_TITLE_SELECTORS)
-        if not title:
-            print(f"no title selector matched on {url}", file=sys.stderr)
-            return None
-
-        location = self._first_text(page, self.DETAIL_LOCATION_SELECTORS)
-        description_html = self._first_html(page, self.DETAIL_DESCRIPTION_SELECTORS)
-        description_text = self._first_text(page, self.DETAIL_DESCRIPTION_SELECTORS)
-        if not description_html and not description_text:
-            print(f"no description selector matched on {url}", file=sys.stderr)
-
-        if not is_hse(title):
-            return None
-
-        return Role(
-            employer=employer,
-            title=title,
-            location=location,
-            country=infer_country(location, description_text),
-            description=description_html or description_text,
-            application_url=url,
-            employment_type=infer_employment_type(title, description_text),
-        )
-
-    def parse(self, employer_name: str, search_url: str) -> list[Role]:
-        roles: list[Role] = []
-        for link in self.collect_links(search_url):
-            try:
-                role = self.parse_detail(employer_name, link)
-            except Exception as e:
-                print(
-                    f"error parsing detail {link}: {type(e).__name__}: {e}",
-                    file=sys.stderr,
-                )
-                continue
-            if role:
-                roles.append(role)
-        return roles
-
-
-class JibeParser:
+class JibeParser(BaseHtmlParser):
     """
     Jibe (iCIMS recruitment marketing) career-site parser.
     Used by QatarEnergy and other employers whose sites are served via
@@ -377,179 +401,43 @@ class JibeParser:
         "a[aria-label='Next']",
         "button[aria-label='Next']",
     ]
-
     # Drop nav links that share /jobs/ prefix (e.g. /jobs/categories/...).
-    _DETAIL_HREF_RE = re.compile(r"/jobs/\d+")
-
-    def __init__(self, page: Page) -> None:
-        self.page = page
-
-    @staticmethod
-    def _first_text(scope, selectors: list[str]) -> str:
-        for sel in selectors:
-            try:
-                el = scope.query_selector(sel)
-            except Exception:
-                continue
-            if not el:
-                continue
-            try:
-                txt = (el.inner_text() or "").strip()
-            except Exception:
-                continue
-            if txt:
-                return txt
-        return ""
-
-    @staticmethod
-    def _first_html(scope, selectors: list[str]) -> str:
-        for sel in selectors:
-            try:
-                el = scope.query_selector(sel)
-            except Exception:
-                continue
-            if not el:
-                continue
-            try:
-                html = (el.inner_html() or "").strip()
-            except Exception:
-                continue
-            if html:
-                return html
-        return ""
-
-    def _gather_links_on_current_page(self, search_url: str) -> list[str]:
-        page = self.page
-        out: list[str] = []
-        for sel in self.LIST_LINK_SELECTORS:
-            try:
-                els = page.query_selector_all(sel)
-            except Exception:
-                els = []
-            if not els:
-                continue
-            for el in els:
-                try:
-                    href = el.get_attribute("href") or ""
-                except Exception:
-                    href = ""
-                if not href or not self._DETAIL_HREF_RE.search(href):
-                    continue
-                out.append(urljoin(search_url, href))
-            if out:
-                break
-        return out
+    DETAIL_HREF_RE = re.compile(r"/jobs/\d+")
 
     def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
-        page = self.page
-        try:
-            page.goto(search_url, wait_until="networkidle", timeout=45000)
-        except PWTimeout as e:
-            raise ScrapeTimeoutError(
-                f"search page timed out: {search_url}"
-            ) from e
-
+        """Jibe lazy-loads via scroll, with click-Next fallback."""
+        self._goto_search(search_url)
         seen: list[str] = []
 
-        # Trigger Jibe's lazy-load by scrolling. Stop early if scrolling stops
-        # producing new links.
         prev_count = -1
         for _ in range(3):
-            for link in self._gather_links_on_current_page(search_url):
+            for link in self._gather_links(search_url):
                 if link not in seen:
                     seen.append(link)
             if len(seen) == prev_count:
                 break
             prev_count = len(seen)
             try:
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                page.wait_for_load_state("networkidle", timeout=10000)
+                self.page.evaluate(
+                    "window.scrollTo(0, document.body.scrollHeight)"
+                )
+                self.page.wait_for_load_state("networkidle", timeout=10000)
             except Exception:
                 break
 
-        # Click-next pagination fallback for skins that paginate instead of
-        # infinite-scroll.
         for _ in range(max_pages - 1):
-            advanced = False
-            for sel in self.NEXT_PAGE_SELECTORS:
-                try:
-                    nxt = page.query_selector(sel)
-                except Exception:
-                    nxt = None
-                if not nxt:
-                    continue
-                try:
-                    nxt.click()
-                    page.wait_for_load_state("networkidle", timeout=20000)
-                    advanced = True
-                    break
-                except Exception:
-                    continue
-            if not advanced:
+            if not self._click_next():
                 break
-            for link in self._gather_links_on_current_page(search_url):
+            for link in self._gather_links(search_url):
                 if link not in seen:
                     seen.append(link)
 
         if not seen:
             print(
-                f"no list-link selector matched on {page.url}",
+                f"no list-link selector matched on {self.page.url}",
                 file=sys.stderr,
             )
         return seen
-
-    def parse_detail(self, employer: str, url: str) -> Role | None:
-        page = self.page
-        try:
-            page.goto(url, wait_until="networkidle", timeout=45000)
-        except PWTimeout:
-            print(f"timeout loading detail {url}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(
-                f"error loading detail {url}: {type(e).__name__}: {e}",
-                file=sys.stderr,
-            )
-            return None
-
-        title = self._first_text(page, self.DETAIL_TITLE_SELECTORS)
-        if not title:
-            print(f"no title selector matched on {url}", file=sys.stderr)
-            return None
-
-        location = self._first_text(page, self.DETAIL_LOCATION_SELECTORS)
-        description_html = self._first_html(page, self.DETAIL_DESCRIPTION_SELECTORS)
-        description_text = self._first_text(page, self.DETAIL_DESCRIPTION_SELECTORS)
-        if not description_html and not description_text:
-            print(f"no description selector matched on {url}", file=sys.stderr)
-
-        if not is_hse(title):
-            return None
-
-        return Role(
-            employer=employer,
-            title=title,
-            location=location,
-            country=infer_country(location, description_text),
-            description=description_html or description_text,
-            application_url=url,
-            employment_type=infer_employment_type(title, description_text),
-        )
-
-    def parse(self, employer_name: str, search_url: str) -> list[Role]:
-        roles: list[Role] = []
-        for link in self.collect_links(search_url):
-            try:
-                role = self.parse_detail(employer_name, link)
-            except Exception as e:
-                print(
-                    f"error parsing detail {link}: {type(e).__name__}: {e}",
-                    file=sys.stderr,
-                )
-                continue
-            if role:
-                roles.append(role)
-        return roles
 
 
 PARSERS: dict[str, type] = {
