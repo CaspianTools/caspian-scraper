@@ -1061,6 +1061,10 @@ def main() -> int:
 
         if auth_halt:
             exit_code = 1
+        elif summary["errors"]:
+            # Surface non-empty error list to the workflow so cron failures
+            # turn the run red and the issue-on-failure step fires.
+            exit_code = 2
         return exit_code
     finally:
         finalize_run(

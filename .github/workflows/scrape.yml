@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write              # required to push docs/data.json back to main
+  issues: write                # required to open an issue on failure
 
 jobs:
   scrape:
@@ -43,3 +44,23 @@ jobs:
             git commit -m "scraper: update dashboard data [skip ci]"
             git push
           fi
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh issue create \
+            --title "HSE scrape failed: run #${RUN_NUMBER}" \
+            --body "The scheduled HSE scrape workflow failed.
+
+          - Run: ${RUN_URL}
+          - Triggered by: \`${EVENT}\`
+          - Commit: \`${SHA}\`
+
+          Inspect the run logs and the latest \`docs/data.json\` for the per-employer error breakdown." \
+            || echo "::warning::failed to open issue; check workflow permissions"
