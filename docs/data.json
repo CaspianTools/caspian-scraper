@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scraper_repo": "CaspianTools/caspian-scraper",
-  "last_updated": "2026-05-06T16:59:46Z",
+  "last_updated": "2026-05-07T04:53:22Z",
   "employers": [
     {
       "name": "Aramco",
@@ -12,13 +12,23 @@
       "name": "Halliburton",
       "ats": "successfactors",
       "active": true
+    },
+    {
+      "name": "QatarEnergy",
+      "ats": "jibe",
+      "active": true
+    },
+    {
+      "name": "QatarEnergy",
+      "ats": "jibe",
+      "active": true
     }
   ],
   "totals": {
-    "runs": 1,
-    "found_alltime": 5,
-    "published_alltime": 0,
-    "errors_alltime": 0
+    "runs": 2,
+    "found_alltime": 13,
+    "published_alltime": 3,
+    "errors_alltime": 1
   },
   "runs": [
     {
@@ -53,7 +63,127 @@
           "errors": []
         }
       ]
+    },
+    {
+      "started_at": "2026-05-07T04:52:07Z",
+      "finished_at": "2026-05-07T04:53:22Z",
+      "duration_seconds": 74,
+      "status": "error",
+      "checked": 4,
+      "skipped_inactive": 0,
+      "found": 8,
+      "published": 3,
+      "skipped_duplicate": 5,
+      "errors": [
+        "Aramco: ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+      ],
+      "published_roles": [
+        {
+          "employer": "QatarEnergy",
+          "title": "SR. HSE TRANSFORMATION OFFICER",
+          "location": "",
+          "country": "qa",
+          "employment_type": "full-time",
+          "slug": "sr-hse-transformation-officer-qatarenergy",
+          "id": "Pw8YypfT4tf3px1aLYbH",
+          "url": "https://careerportal.qatarenergy.qa/jobs/5392?lang=en-us"
+        },
+        {
+          "employer": "QatarEnergy",
+          "title": "SAFETY OFFICER (CHEMICAL PLANT)",
+          "location": "",
+          "country": "",
+          "employment_type": "contract",
+          "slug": "safety-officer-chemical-plant-qatarenergy",
+          "id": "868wQsbuu8fDTA7G2vTQ",
+          "url": "https://careerportal.qatarenergy.qa/jobs/4923?lang=en-us"
+        },
+        {
+          "employer": "QatarEnergy",
+          "title": "HEAD, PROCESS SAFETY (OFFSHORE)",
+          "location": "",
+          "country": "",
+          "employment_type": "full-time",
+          "slug": "head-process-safety-offshore-qatarenergy",
+          "id": "2izmnMpT40CCHseIfGdE",
+          "url": "https://careerportal.qatarenergy.qa/jobs/5221?lang=en-us"
+        }
+      ],
+      "by_employer": [
+        {
+          "name": "Aramco",
+          "ats": "successfactors",
+          "active": true,
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": [
+            "ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+          ]
+        },
+        {
+          "name": "Halliburton",
+          "ats": "successfactors",
+          "active": true,
+          "found": 5,
+          "published": 0,
+          "skipped_duplicate": 5,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "found": 2,
+          "published": 2,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "found": 1,
+          "published": 1,
+          "skipped_duplicate": 0,
+          "errors": []
+        }
+      ]
     }
   ],
-  "recent_published": []
+  "recent_published": [
+    {
+      "ts": "2026-05-07T04:53:22Z",
+      "employer": "QatarEnergy",
+      "title": "SR. HSE TRANSFORMATION OFFICER",
+      "location": "",
+      "country": "qa",
+      "employment_type": "full-time",
+      "slug": "sr-hse-transformation-officer-qatarenergy",
+      "id": "Pw8YypfT4tf3px1aLYbH",
+      "url": "https://careerportal.qatarenergy.qa/jobs/5392?lang=en-us"
+    },
+    {
+      "ts": "2026-05-07T04:53:22Z",
+      "employer": "QatarEnergy",
+      "title": "SAFETY OFFICER (CHEMICAL PLANT)",
+      "location": "",
+      "country": "",
+      "employment_type": "contract",
+      "slug": "safety-officer-chemical-plant-qatarenergy",
+      "id": "868wQsbuu8fDTA7G2vTQ",
+      "url": "https://careerportal.qatarenergy.qa/jobs/4923?lang=en-us"
+    },
+    {
+      "ts": "2026-05-07T04:53:22Z",
+      "employer": "QatarEnergy",
+      "title": "HEAD, PROCESS SAFETY (OFFSHORE)",
+      "location": "",
+      "country": "",
+      "employment_type": "full-time",
+      "slug": "head-process-safety-offshore-qatarenergy",
+      "id": "2izmnMpT40CCHseIfGdE",
+      "url": "https://careerportal.qatarenergy.qa/jobs/5221?lang=en-us"
+    }
+  ]
 }
