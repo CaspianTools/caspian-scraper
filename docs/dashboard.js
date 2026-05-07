@@ -14,7 +14,10 @@
   const FORK_KEY = 'hse_dashboard_fork_owner';
   const RUNS_TO_SHOW = 10;
   const ERRORS_TO_SHOW = 20;
-  const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+  // Minimum gap between auto-refreshes triggered by tab regaining focus.
+  // The underlying scraper runs once a day, so polling more often than this
+  // is wasted GitHub API quota.
+  const VISIBILITY_REFRESH_DEBOUNCE_MS = 30 * 1000;
 
   const SOPS = [
     {
@@ -749,9 +752,14 @@
     }
   }
 
-  setInterval(() => {
-    if (document.visibilityState === 'visible') refreshDashboard();
-  }, REFRESH_INTERVAL_MS);
+  let lastAutoRefresh = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if (now - lastAutoRefresh < VISIBILITY_REFRESH_DEBOUNCE_MS) return;
+    lastAutoRefresh = now;
+    refreshDashboard().catch(() => {});
+  });
 
   boot();
 })();
