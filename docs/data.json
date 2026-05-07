@@ -1,34 +1,13 @@
 {
   "schema_version": 1,
   "scraper_repo": "CaspianTools/caspian-scraper",
-  "last_updated": "2026-05-07T04:53:22Z",
-  "employers": [
-    {
-      "name": "Aramco",
-      "ats": "successfactors",
-      "active": true
-    },
-    {
-      "name": "Halliburton",
-      "ats": "successfactors",
-      "active": true
-    },
-    {
-      "name": "QatarEnergy",
-      "ats": "jibe",
-      "active": true
-    },
-    {
-      "name": "QatarEnergy",
-      "ats": "jibe",
-      "active": true
-    }
-  ],
+  "last_updated": "2026-05-07T05:40:22Z",
+  "employers": [],
   "totals": {
-    "runs": 2,
+    "runs": 3,
     "found_alltime": 13,
     "published_alltime": 3,
-    "errors_alltime": 1
+    "errors_alltime": 2
   },
   "runs": [
     {
@@ -149,6 +128,22 @@
           "errors": []
         }
       ]
+    },
+    {
+      "started_at": "2026-05-07T05:40:22Z",
+      "finished_at": "2026-05-07T05:40:22Z",
+      "duration_seconds": 0,
+      "status": "error",
+      "checked": 0,
+      "skipped_inactive": 0,
+      "found": 0,
+      "published": 0,
+      "skipped_duplicate": 0,
+      "errors": [
+        "ENTIRELYSAFE_API_KEY is not set"
+      ],
+      "published_roles": [],
+      "by_employer": []
     }
   ],
   "recent_published": [
