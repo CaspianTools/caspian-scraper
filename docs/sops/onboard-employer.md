@@ -34,21 +34,29 @@ Use DevTools (Elements panel) and the URL itself to figure out the vendor:
 | Vendor | Tells |
 |---|---|
 | **SAP SuccessFactors** | `data-careersite-propertyid="..."` attributes; `careers.<company>.com`; `*.successfactors.com` |
+| **Jibe / iCIMS** | URLs contain `cms.jibecdn.com` or `icims.com`; job detail paths look like `/jobs/<numeric-id>?lang=en-us` |
 | **Workday** | URLs contain `myworkdayjobs.com`; `data-automation-id` attributes |
 | **Greenhouse** | `boards.greenhouse.io/<company>`; `<div class="opening">` rows |
 | **Lever** | `jobs.lever.co/<company>`; `<a class="posting-title">` |
-| **iCIMS** | URLs contain `icims.com`; iframe-heavy |
 | **Taleo** | URLs contain `taleo.net` |
 
-Most large oil-and-gas / industrial employers are on SuccessFactors.
+Most large oil-and-gas / industrial employers are on SuccessFactors. GCC
+national oil companies often use Jibe.
+
+**Before writing a parser, check for an RSS or JSON endpoint.** Many ATSs
+expose one (e.g. SF often has `/search/rss/?q=...`; Jibe often has
+`/api/job-search/...`). When available, that path is faster and far less
+fragile than headless browsing — worth a few minutes of DevTools-Network
+inspection on the live site.
 
 ## Step 4 — Check parser support
 
-Open `scrape.py`, find the `PARSERS` dict (around line 348):
+Open `scrape.py`, find the `PARSERS` dict:
 
 ```python
 PARSERS: dict[str, type] = {
     "successfactors": SuccessFactorsParser,
+    "jibe": JibeParser,
 }
 ```
 
@@ -59,23 +67,41 @@ PARSERS: dict[str, type] = {
 
 Skip this entire step if Step 4 already matched.
 
-1. Copy the `SuccessFactorsParser` class as a template (around `scrape.py` lines 160–346).
-2. Rename it (e.g. `WorkdayParser`).
-3. Replace the five selector chains with selectors discovered via DevTools on the live careers site:
-   - `LIST_LINK_SELECTORS` — anchors to job detail pages on the search results.
-   - `DETAIL_TITLE_SELECTORS` — the job title heading on a detail page.
-   - `DETAIL_LOCATION_SELECTORS` — the location element on a detail page.
-   - `DETAIL_DESCRIPTION_SELECTORS` — the job description body.
-   - `NEXT_PAGE_SELECTORS` — pagination "next" link.
-   List multiple selectors per chain — the parser tries them in order until one matches.
-4. Register the new class in the `PARSERS` dict:
+A new parser is a subclass of `BaseHtmlParser` that declares five
+selector chains and (only if the site doesn't paginate by clicking
+"Next") overrides `collect_links`. The base class handles Playwright
+boot, page navigation, link gathering, detail-page extraction, the
+HSE title gate, country/employment-type inference, and per-role error
+isolation.
+
+1. Pick a class name (e.g. `WorkdayParser`).
+2. Subclass `BaseHtmlParser` and declare the selector chains:
+   ```python
+   class WorkdayParser(BaseHtmlParser):
+       LIST_LINK_SELECTORS = ["a[data-automation-id='jobTitle']"]
+       DETAIL_TITLE_SELECTORS = ["h2[data-automation-id='jobPostingHeader']"]
+       DETAIL_LOCATION_SELECTORS = ["[data-automation-id='locations']"]
+       DETAIL_DESCRIPTION_SELECTORS = ["[data-automation-id='jobPostingDescription']"]
+       NEXT_PAGE_SELECTORS = ["button[data-uxi-element-id='next']"]
+   ```
+   List multiple candidates per chain — the base parser tries them in
+   order until one matches. Add a `DETAIL_HREF_RE` (compiled regex) if
+   the list page contains noisy `/jobs/categories/...` style links you
+   want filtered out (see `JibeParser` for an example).
+3. **Only if** the site uses scroll-to-load or non-standard pagination,
+   override `collect_links` (compare `JibeParser.collect_links` to the
+   base default).
+4. Register the new class in `PARSERS`:
    ```python
    PARSERS: dict[str, type] = {
        "successfactors": SuccessFactorsParser,
+       "jibe": JibeParser,
        "workday": WorkdayParser,
    }
    ```
-5. Use the new key (e.g. `"workday"`) as the `ats` value in Step 6.
+5. Add a fixture under `tests/fixtures/` and a parser test in
+   `tests/test_parsers.py` so future selector drift gets caught on PR.
+6. Use the new key (e.g. `"workday"`) as the `ats` value in Step 6.
 
 ## Step 6 — Add the entry to `employers.json`
 
