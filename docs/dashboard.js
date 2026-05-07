@@ -16,6 +16,13 @@
   const ERRORS_TO_SHOW = 20;
   const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
+  const SOPS = [
+    {
+      title: 'Onboard a new employer and its website',
+      href: 'https://github.com/CaspianTools/caspian-scraper/blob/main/docs/sops/onboard-employer.md',
+    },
+  ];
+
   // ---------- DOM helpers ----------
   const root      = document.getElementById('root');
   const userBar   = document.getElementById('user-bar');
@@ -149,6 +156,26 @@
     } catch {
       return [];
     }
+  }
+
+  async function dispatchWorkflow(owner, ref = 'main') {
+    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/workflows/scrape.yml/dispatches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref }),
+    });
+  }
+
+  async function rerunFailedJobs(owner, runId) {
+    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/runs/${runId}/rerun-failed-jobs`, {
+      method: 'POST',
+    });
+  }
+
+  async function cancelWorkflowRun(owner, runId) {
+    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/runs/${runId}/cancel`, {
+      method: 'POST',
+    });
   }
 
   // ---------- views ----------
@@ -299,17 +326,104 @@
     const runsHistory = data.runs || [];
     const lastRun = runsHistory[runsHistory.length - 1];
 
+    root.append(buildControls(runs, fork, isDemo));
     root.append(buildHero(data, lastRun));
     if ((data.employers || []).length) root.append(buildEmployers(data, lastRun));
     if (runsHistory.length)             root.append(buildTrendChart(runsHistory));
     if ((data.recent_published || []).length) root.append(buildRecentPublished(data.recent_published));
     if (runs.length)                    root.append(buildWorkflowRuns(runs, fork));
     root.append(buildErrorsTimeline(runsHistory));
+    if (SOPS.length)                    root.append(buildSOPs(SOPS));
 
     const lu = data.last_updated || (lastRun && lastRun.finished_at);
     footerEl.textContent = lu
       ? `data: ${fmtAbsolute(lu)} (${fmtRelative(lu)})`
       : 'no run yet';
+  }
+
+  function buildControls(runs, fork, isDemo) {
+    const sec = el('section', {});
+    sec.append(el('h2', {}, 'Controls'));
+    const card = el('div', { className: 'card' });
+    const row = el('div', { className: 'row wrap' });
+
+    const latest = runs[0];
+    const latestActive = latest && (latest.status === 'queued' || latest.status === 'in_progress');
+    const latestFailed = latest && latest.status === 'completed' && latest.conclusion && latest.conclusion !== 'success';
+
+    const status = el('div', { className: 'control-status muted-text' }, isDemo ? 'Sign in to use controls.' : '');
+
+    const setStatus = (msg, cls = '') => {
+      status.className = 'control-status muted-text' + (cls ? ' ' + cls : '');
+      status.textContent = msg;
+    };
+
+    const wrap = (btn, action, busyLabel) => {
+      const original = btn.textContent;
+      btn.onclick = async () => {
+        if (btn.disabled) return;
+        const siblings = row.querySelectorAll('button');
+        siblings.forEach((b) => { b.disabled = true; });
+        btn.textContent = busyLabel;
+        try {
+          await action();
+        } catch (e) {
+          setStatus(e.message || String(e), 'err-text');
+        } finally {
+          btn.textContent = original;
+          siblings.forEach((b) => { b.disabled = false; });
+          applyDisabledRules();
+        }
+      };
+    };
+
+    const runBtn = el('button', { className: 'primary' }, 'Run scrape now');
+    const refreshBtn = el('button', {}, 'Refresh');
+    const rerunBtn = el('button', {}, 'Re-run last failed');
+    const cancelBtn = el('button', {}, 'Cancel current run');
+    const openBtn = el('a', {
+      className: 'btn-link',
+      href: `https://github.com/${fork || (UPSTREAM.owner + '/' + UPSTREAM.repo)}/actions`,
+      target: '_blank', rel: 'noopener',
+    }, 'Open in GitHub ↗');
+
+    function applyDisabledRules() {
+      runBtn.disabled    = isDemo;
+      refreshBtn.disabled = false;
+      rerunBtn.disabled  = isDemo || !latestFailed;
+      cancelBtn.disabled = isDemo || !latestActive;
+    }
+    applyDisabledRules();
+
+    wrap(runBtn, async () => {
+      await dispatchWorkflow(fork || `${UPSTREAM.owner}/${UPSTREAM.repo}`);
+      setStatus('Workflow dispatched. New run will appear in a few seconds…', 'ok-text');
+      setTimeout(() => { refreshDashboard().catch(() => {}); }, 3500);
+    }, 'Dispatching…');
+
+    wrap(refreshBtn, async () => {
+      await refreshDashboard();
+      setStatus('Refreshed.', 'ok-text');
+    }, 'Refreshing…');
+
+    wrap(rerunBtn, async () => {
+      if (!latest) return;
+      await rerunFailedJobs(fork || `${UPSTREAM.owner}/${UPSTREAM.repo}`, latest.id);
+      setStatus(`Re-running failed jobs for run #${latest.run_number || latest.id}…`, 'ok-text');
+      setTimeout(() => { refreshDashboard().catch(() => {}); }, 3500);
+    }, 'Re-running…');
+
+    wrap(cancelBtn, async () => {
+      if (!latest) return;
+      await cancelWorkflowRun(fork || `${UPSTREAM.owner}/${UPSTREAM.repo}`, latest.id);
+      setStatus(`Cancellation requested for run #${latest.run_number || latest.id}.`, 'ok-text');
+      setTimeout(() => { refreshDashboard().catch(() => {}); }, 2500);
+    }, 'Cancelling…');
+
+    row.append(runBtn, refreshBtn, rerunBtn, cancelBtn, openBtn);
+    card.append(row, status);
+    sec.append(card);
+    return sec;
   }
 
   function statusBadge(run) {
@@ -552,6 +666,26 @@
       }
       card.append(ul);
     }
+    sec.append(card);
+    return sec;
+  }
+
+  function buildSOPs(sops) {
+    const sec = el('section', {});
+    sec.append(el('h2', {}, 'SOPs'));
+    const card = el('div', { className: 'card' });
+    const ul = el('ul', { className: 'role-list' });
+    for (const s of sops) {
+      const li = el('li');
+      const left = el('div');
+      const titleNode = s.href
+        ? el('a', { href: s.href, target: '_blank', rel: 'noopener' }, s.title)
+        : document.createTextNode(s.title);
+      left.append(el('div', { className: 'title' }, titleNode));
+      li.append(left);
+      ul.append(li);
+    }
+    card.append(ul);
     sec.append(card);
     return sec;
   }
