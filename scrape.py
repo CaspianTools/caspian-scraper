@@ -214,13 +214,32 @@ class BaseHtmlParser:
                 return html
         return ""
 
+    SEARCH_GOTO_TIMEOUT_MS = 45_000
+    SEARCH_SELECTOR_TIMEOUT_MS = 8_000
+    DETAIL_GOTO_TIMEOUT_MS = 30_000
+    DETAIL_SELECTOR_TIMEOUT_MS = 6_000
+
     def _goto_search(self, search_url: str) -> None:
         try:
-            self.page.goto(search_url, wait_until="networkidle", timeout=45000)
+            self.page.goto(
+                search_url,
+                wait_until="domcontentloaded",
+                timeout=self.SEARCH_GOTO_TIMEOUT_MS,
+            )
         except PWTimeout as e:
             raise ScrapeTimeoutError(
                 f"search page timed out: {search_url}"
             ) from e
+        # Give SPA-style careers sites a chance to render their list before we
+        # gather. Failures here are non-fatal — _gather_links logs its own miss.
+        if self.LIST_LINK_SELECTORS:
+            try:
+                self.page.wait_for_selector(
+                    ", ".join(self.LIST_LINK_SELECTORS),
+                    timeout=self.SEARCH_SELECTOR_TIMEOUT_MS,
+                )
+            except PWTimeout:
+                pass
 
     def _gather_links(self, search_url: str) -> list[str]:
         out: list[str] = []
@@ -282,7 +301,11 @@ class BaseHtmlParser:
 
     def parse_detail(self, employer: str, url: str) -> Role | None:
         try:
-            self.page.goto(url, wait_until="networkidle", timeout=45000)
+            self.page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=self.DETAIL_GOTO_TIMEOUT_MS,
+            )
         except PWTimeout:
             print(f"timeout loading detail {url}", file=sys.stderr)
             return None
@@ -292,6 +315,15 @@ class BaseHtmlParser:
                 file=sys.stderr,
             )
             return None
+
+        if self.DETAIL_TITLE_SELECTORS:
+            try:
+                self.page.wait_for_selector(
+                    ", ".join(self.DETAIL_TITLE_SELECTORS),
+                    timeout=self.DETAIL_SELECTOR_TIMEOUT_MS,
+                )
+            except PWTimeout:
+                pass
 
         title = self._first_text(self.page, self.DETAIL_TITLE_SELECTORS)
         if not title:
