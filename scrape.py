@@ -330,14 +330,17 @@ class BaseHtmlParser:
             print(f"no title selector matched on {url}", file=sys.stderr)
             return None
 
+        # Gate on title BEFORE extracting the description — most jobs on a
+        # search page that lacks an HSE filter will fail this check, so
+        # skipping description extraction is a 50%+ saving on per-page work.
+        if not is_hse(title):
+            return None
+
         location = self._first_text(self.page, self.DETAIL_LOCATION_SELECTORS)
         description_html = self._first_html(self.page, self.DETAIL_DESCRIPTION_SELECTORS)
         description_text = self._first_text(self.page, self.DETAIL_DESCRIPTION_SELECTORS)
         if not description_html and not description_text:
             print(f"no description selector matched on {url}", file=sys.stderr)
-
-        if not is_hse(title):
-            return None
 
         return Role(
             employer=employer,
