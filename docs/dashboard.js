@@ -498,15 +498,37 @@
     ));
     table.append(thead);
 
-    const lastByName = new Map(
-      ((lastRun && lastRun.by_employer) || []).map((e) => [e.name, e])
+    const keyOf = (e) => `${e.name || ''}|${e.url || ''}`;
+    const lastByKey = new Map(
+      ((lastRun && lastRun.by_employer) || []).map((e) => [keyOf(e), e])
     );
+    // Append a URL-tail disambiguator only where the same display name
+    // appears more than once.
+    const nameCounts = new Map();
+    for (const emp of data.employers) {
+      nameCounts.set(emp.name, (nameCounts.get(emp.name) || 0) + 1);
+    }
+    const urlTail = (u) => {
+      if (!u) return '';
+      try {
+        const p = new URL(u).pathname.replace(/\/+$/, '');
+        return decodeURIComponent(p.split('/').pop() || '').replace(/\+/g, ' ');
+      } catch {
+        return u;
+      }
+    };
+
     const tbody = el('tbody');
     for (const emp of data.employers) {
-      const stats = lastByName.get(emp.name) || {};
+      const stats = lastByKey.get(keyOf(emp)) || {};
       const tr = el('tr');
+      const nameCell = el('td');
+      nameCell.append(emp.name || '(unnamed)');
+      if ((nameCounts.get(emp.name) || 0) > 1 && emp.url) {
+        nameCell.append(el('div', { className: 'meta' }, urlTail(emp.url)));
+      }
       tr.append(
-        el('td', {}, emp.name || '(unnamed)'),
+        nameCell,
         el('td', { className: 'muted' }, emp.ats || '—'),
         el('td', {}, emp.active
           ? el('span', { className: 'badge ok' }, 'active')

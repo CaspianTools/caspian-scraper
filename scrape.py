@@ -702,6 +702,7 @@ def employer_meta(employers: list[dict]) -> list[dict]:
             "name": str(e.get("name") or "").strip(),
             "ats": str(e.get("ats") or "").strip(),
             "active": bool(e.get("active")),
+            "url": str(e.get("url") or "").strip(),
         }
         for e in employers
     ]
@@ -864,6 +865,7 @@ def main() -> int:
                         "name": name or "(unnamed)",
                         "ats": ats,
                         "active": active,
+                        "url": url,
                         "found": 0,
                         "published": 0,
                         "skipped_duplicate": 0,
