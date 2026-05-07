@@ -271,9 +271,10 @@
     card.append(el('div', { className: 'help' },
       el('strong', {}, 'Token scopes: '),
       'For a public fork, ',
-      el('a', { href: 'https://github.com/settings/tokens/new?scopes=public_repo&description=caspian-scraper-dashboard', target: '_blank', rel: 'noopener' },
-        'create a classic token with public_repo'),
-      '. For a private fork, use ', el('code', {}, 'repo'), ' instead.'
+      el('a', { href: 'https://github.com/settings/tokens/new?scopes=public_repo,workflow&description=caspian-scraper-dashboard', target: '_blank', rel: 'noopener' },
+        'create a classic token with public_repo + workflow'),
+      '. For a private fork, use ', el('code', {}, 'repo'), ' + ', el('code', {}, 'workflow'), '. ',
+      'The ', el('code', {}, 'workflow'), ' scope is needed to dispatch runs and save secrets from this page.'
     ));
 
     root.append(card);
@@ -387,6 +388,7 @@
     const lastRun = runsHistory[runsHistory.length - 1];
 
     root.append(buildControls(runs, fork, isDemo));
+    root.append(buildSettings(fork, isDemo));
     root.append(buildHero(data, lastRun));
     if ((data.employers || []).length) root.append(buildEmployers(data, lastRun));
     if (runsHistory.length)             root.append(buildTrendChart(runsHistory));
@@ -399,6 +401,114 @@
     footerEl.textContent = lu
       ? `data: ${fmtAbsolute(lu)} (${fmtRelative(lu)})`
       : 'no run yet';
+  }
+
+  function buildSettings(fork, isDemo) {
+    const sec = el('section', {});
+    sec.append(el('h2', {}, 'Settings'));
+    const card = el('div', { className: 'card' });
+
+    if (isDemo) {
+      card.append(el('div', { className: 'muted-text' }, 'Sign in to manage repository secrets.'));
+      sec.append(card);
+      return sec;
+    }
+    if (!fork) {
+      card.append(el('div', { className: 'muted-text' },
+        'No fork detected. ',
+        el('a', { href: `https://github.com/${UPSTREAM.owner}/${UPSTREAM.repo}/fork`, target: '_blank', rel: 'noopener' }, 'Create a fork'),
+        ' to manage secrets.'));
+      sec.append(card);
+      return sec;
+    }
+
+    card.append(el('div', { className: 'muted-text' },
+      'Repository secrets for ', el('code', {}, fork),
+      '. Values are encrypted in your browser before being sent to GitHub.'));
+
+    for (const s of REPO_SECRETS) {
+      card.append(buildSecretRow(fork, s));
+    }
+    sec.append(card);
+    return sec;
+  }
+
+  function buildSecretRow(fork, spec) {
+    const wrap = el('div', { className: 'settings-block' });
+
+    const header = el('div', { className: 'settings-header' });
+    const label = el('div', { className: 'settings-label' });
+    label.append(el('strong', {}, spec.label), document.createTextNode(' '), el('code', {}, spec.name));
+    const status = el('span', { className: 'badge muted' }, '…');
+    header.append(label, status);
+
+    const formRow = el('div', { className: 'settings-row' });
+    const input = el('input', { type: 'password', placeholder: spec.placeholder || '', autocomplete: 'off' });
+    const showBtn = el('button', { type: 'button' }, 'Show');
+    const saveBtn = el('button', { className: 'primary', type: 'button' }, 'Save');
+    const msg = el('div', { className: 'control-status muted-text' });
+
+    showBtn.onclick = () => {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      showBtn.textContent = showing ? 'Show' : 'Hide';
+    };
+
+    saveBtn.onclick = async () => {
+      const value = input.value.trim();
+      if (!value) {
+        msg.className = 'control-status err-text';
+        msg.textContent = 'Empty value.';
+        return;
+      }
+      saveBtn.disabled = true;
+      showBtn.disabled = true;
+      const orig = saveBtn.textContent;
+      saveBtn.textContent = 'Saving…';
+      msg.className = 'control-status muted-text';
+      msg.textContent = 'Encrypting…';
+      try {
+        const pk = await getRepoPublicKey(fork);
+        msg.textContent = 'Uploading encrypted secret…';
+        const encrypted = await encryptForGithub(value, pk.key);
+        await putRepoSecret(fork, spec.name, encrypted, pk.key_id);
+        input.value = '';
+        if (input.type === 'text') {
+          input.type = 'password';
+          showBtn.textContent = 'Show';
+        }
+        msg.className = 'control-status ok-text';
+        msg.textContent = 'Saved.';
+        status.className = 'badge ok';
+        status.textContent = 'set';
+      } catch (e) {
+        msg.className = 'control-status err-text';
+        msg.textContent = e.message || String(e);
+      } finally {
+        saveBtn.disabled = false;
+        showBtn.disabled = false;
+        saveBtn.textContent = orig;
+      }
+    };
+
+    formRow.append(input, showBtn, saveBtn);
+    wrap.append(header, formRow, msg);
+    if (spec.help) wrap.append(el('div', { className: 'settings-help' }, spec.help));
+
+    getSecretStatus(fork, spec.name).then((st) => {
+      if (st === 'set') {
+        status.className = 'badge ok';
+        status.textContent = 'set';
+      } else {
+        status.className = 'badge muted';
+        status.textContent = 'not set';
+      }
+    }).catch(() => {
+      status.className = 'badge muted';
+      status.textContent = '?';
+    });
+
+    return wrap;
   }
 
   function buildControls(runs, fork, isDemo) {
