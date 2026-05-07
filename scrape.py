@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Protocol
 from urllib.parse import urljoin
 
+import bleach
 import requests
 from playwright.sync_api import (
     Page,
@@ -40,6 +41,18 @@ DATA_FILE = REPO_ROOT / "docs" / "data.json"
 RUN_HISTORY_LIMIT = 30
 RECENT_PUBLISHED_LIMIT = 50
 DATA_SCHEMA_VERSION = 1
+
+# HTML sanitization allow-lists for description content sent to entirelysafe.
+# Anything outside these is stripped (including scripts, styles, inline
+# event handlers, javascript: URLs).
+ALLOWED_HTML_TAGS = {
+    "p", "br", "hr",
+    "ul", "ol", "li",
+    "strong", "b", "em", "i", "u",
+    "h2", "h3", "h4", "h5", "h6",
+    "a",
+}
+ALLOWED_HTML_ATTRS = {"a": ["href", "rel", "title"]}
 
 # Firebase Auth UID of the user that scraped vacancies are attributed to.
 # Override via ENTIRELYSAFE_POSTED_BY env var if a different account should own them.
@@ -717,12 +730,34 @@ def load_employers() -> list[dict]:
     return data
 
 
+_SCRIPT_STYLE_RE = re.compile(
+    r"<(script|style|noscript|iframe)\b[^>]*>.*?</\1\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def sanitize_description(html_or_text: str) -> str:
+    """Strip <script>/<style>/inline-handlers and unknown tags before publishing."""
+    if not html_or_text:
+        return ""
+    # Bleach with strip=True removes the *tags* but keeps *inner text*; for
+    # <script>/<style>/<iframe>/<noscript> we want both gone, so pre-strip them.
+    cleaned = _SCRIPT_STYLE_RE.sub("", html_or_text)
+    return bleach.clean(
+        cleaned,
+        tags=ALLOWED_HTML_TAGS,
+        attributes=ALLOWED_HTML_ATTRS,
+        strip=True,
+        strip_comments=True,
+    )
+
+
 def build_payload(role: Role, slug: str) -> dict:
     payload: dict = {
         "title": role.title,
         "slug": slug,
         "company": role.employer,
-        "description": role.description,
+        "description": sanitize_description(role.description),
         "employmentType": role.employment_type,
         "applicationUrl": role.application_url,
         "status": "published",
