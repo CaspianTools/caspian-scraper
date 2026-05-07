@@ -10,5 +10,17 @@
     "url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
     "ats": "successfactors",
     "active": true
+  },
+  {
+    "name": "QatarEnergy",
+    "url": "https://careerportal.qatarenergy.qa/jobs/categories/Health+Safety+Environment+%26+Security",
+    "ats": "jibe",
+    "active": true
+  },
+  {
+    "name": "QatarEnergy",
+    "url": "https://careerportal.qatarenergy.qa/jobs/categories/Idd+El-Shargi+-+Health%2C+Safety++%26+Envr",
+    "ats": "jibe",
+    "active": true
   }
 ]
