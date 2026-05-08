@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "scraper_repo": "CaspianTools/caspian-scraper",
-  "last_updated": "2026-05-07T05:40:22Z",
+  "last_updated": "2026-05-08T05:19:14Z",
   "employers": [],
   "totals": {
-    "runs": 3,
+    "runs": 4,
     "found_alltime": 13,
     "published_alltime": 3,
-    "errors_alltime": 2
+    "errors_alltime": 3
   },
   "runs": [
     {
@@ -132,6 +132,22 @@
     {
       "started_at": "2026-05-07T05:40:22Z",
       "finished_at": "2026-05-07T05:40:22Z",
+      "duration_seconds": 0,
+      "status": "error",
+      "checked": 0,
+      "skipped_inactive": 0,
+      "found": 0,
+      "published": 0,
+      "skipped_duplicate": 0,
+      "errors": [
+        "ENTIRELYSAFE_API_KEY is not set"
+      ],
+      "published_roles": [],
+      "by_employer": []
+    },
+    {
+      "started_at": "2026-05-08T05:19:14Z",
+      "finished_at": "2026-05-08T05:19:14Z",
       "duration_seconds": 0,
       "status": "error",
       "checked": 0,
