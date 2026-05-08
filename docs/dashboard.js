@@ -125,8 +125,8 @@
     }
   }
 
-  async function fetchDataJsonAuthed(owner) {
-    const path = `/repos/${owner}/${UPSTREAM.repo}/contents/docs/data.json`;
+  async function fetchDataJsonAuthed(slug) {
+    const path = `/repos/${slug}/contents/docs/data.json`;
     try {
       const blob = await gh(`${path}?ref=main`);
       if (blob && blob.encoding === 'base64' && blob.content) {
@@ -146,17 +146,17 @@
     return null;
   }
 
-  async function fetchDataJsonRaw(owner) {
-    const url = `https://raw.githubusercontent.com/${owner}/${UPSTREAM.repo}/main/docs/data.json`;
+  async function fetchDataJsonRaw(slug) {
+    const url = `https://raw.githubusercontent.com/${slug}/main/docs/data.json`;
     const r = await fetch(url, { cache: 'no-store' });
     if (r.status === 404) return null;
-    if (!r.ok) throw new Error(`raw ${owner}/data.json → ${r.status}`);
+    if (!r.ok) throw new Error(`raw ${slug}/data.json → ${r.status}`);
     return r.json();
   }
 
-  async function fetchWorkflowRuns(owner) {
+  async function fetchWorkflowRuns(slug) {
     try {
-      const data = await gh(`/repos/${owner}/${UPSTREAM.repo}/actions/runs?per_page=${RUNS_TO_SHOW}`);
+      const data = await gh(`/repos/${slug}/actions/runs?per_page=${RUNS_TO_SHOW}`);
       return data.workflow_runs || [];
     } catch (e) {
       console.warn('workflow runs fetch failed:', e.message);
@@ -164,9 +164,9 @@
     }
   }
 
-  async function fetchEmployers(owner) {
+  async function fetchEmployers(slug) {
     try {
-      const url = `https://raw.githubusercontent.com/${owner}/${UPSTREAM.repo}/main/employers.json`;
+      const url = `https://raw.githubusercontent.com/${slug}/main/employers.json`;
       const r = await fetch(url, { cache: 'no-store' });
       if (!r.ok) return [];
       return r.json();
@@ -175,29 +175,29 @@
     }
   }
 
-  async function dispatchWorkflow(owner, ref = 'main') {
-    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/workflows/scrape.yml/dispatches`, {
+  async function dispatchWorkflow(slug, ref = 'main') {
+    return gh(`/repos/${slug}/actions/workflows/scrape.yml/dispatches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref }),
     });
   }
 
-  async function rerunFailedJobs(owner, runId) {
-    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/runs/${runId}/rerun-failed-jobs`, {
+  async function rerunFailedJobs(slug, runId) {
+    return gh(`/repos/${slug}/actions/runs/${runId}/rerun-failed-jobs`, {
       method: 'POST',
     });
   }
 
-  async function cancelWorkflowRun(owner, runId) {
-    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/runs/${runId}/cancel`, {
+  async function cancelWorkflowRun(slug, runId) {
+    return gh(`/repos/${slug}/actions/runs/${runId}/cancel`, {
       method: 'POST',
     });
   }
 
-  async function getSecretStatus(owner, name) {
+  async function getSecretStatus(slug, name) {
     try {
-      await gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/${encodeURIComponent(name)}`);
+      await gh(`/repos/${slug}/actions/secrets/${encodeURIComponent(name)}`);
       return 'set';
     } catch (e) {
       if (e.status === 404) return 'unset';
@@ -205,12 +205,12 @@
     }
   }
 
-  async function getRepoPublicKey(owner) {
-    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/public-key`);
+  async function getRepoPublicKey(slug) {
+    return gh(`/repos/${slug}/actions/secrets/public-key`);
   }
 
-  async function putRepoSecret(owner, name, encryptedValue, keyId) {
-    return gh(`/repos/${owner}/${UPSTREAM.repo}/actions/secrets/${encodeURIComponent(name)}`, {
+  async function putRepoSecret(slug, name, encryptedValue, keyId) {
+    return gh(`/repos/${slug}/actions/secrets/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ encrypted_value: encryptedValue, key_id: keyId }),
@@ -311,7 +311,7 @@
       const r = await fetch('./data.json', { cache: 'no-store' });
       if (r.ok) data = await r.json();
     } catch {}
-    if (!data) data = await fetchDataJsonRaw(UPSTREAM.owner);
+    if (!data) data = await fetchDataJsonRaw(`${UPSTREAM.owner}/${UPSTREAM.repo}`);
     let runs = [];
     if (getPat()) runs = await fetchWorkflowRuns(`${UPSTREAM.owner}/${UPSTREAM.repo}`);
     renderDashboard({ data, runs, fork: `${UPSTREAM.owner}/${UPSTREAM.repo}`, isDemo: true });
@@ -332,7 +332,7 @@
     }
     const runs = await fetchWorkflowRuns(fork);
     const employers = (!data || !data.employers || !data.employers.length)
-      ? await fetchEmployers(fork.split('/')[0])
+      ? await fetchEmployers(fork)
       : data.employers;
 
     renderUserBar({ user, fork });
