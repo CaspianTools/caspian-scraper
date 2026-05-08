@@ -26,6 +26,7 @@ from urllib.parse import urljoin
 
 import bleach
 import requests
+from bs4 import BeautifulSoup
 from playwright.sync_api import (
     Page,
     TimeoutError as PWTimeout,
@@ -288,6 +289,58 @@ class BaseHtmlParser:
                 return html
         return ""
 
+    def _post_extract_html(self, html: str) -> str:
+        """Subclass hook: site-specific scrub of the extracted detail HTML
+        before generic sanitization. Default is a no-op.
+        """
+        return html
+
+    @staticmethod
+    def _strip_leading_title_dupe(description_html: str, title: str) -> str:
+        """If the description opens with a heading whose text matches the role
+        title, decompose it. The page wrapper renders the title separately as
+        an <h1>, so an in-body repeat (often as <h1>...</h1> or
+        <p><u>...</u></p> on Angular sites) is duplicate noise.
+
+        Gated on heading-shaped elements only — never strips arbitrary <p>
+        prose that happens to start with the role name.
+        """
+        if not description_html or not title:
+            return description_html
+        target = _normalize_phrase(title)
+        if not target:
+            return description_html
+
+        soup = BeautifulSoup(description_html, "html.parser")
+        for el in soup.descendants:
+            # Stop scanning after the first 500 chars of the document.
+            if getattr(el, "sourcepos", None) is not None and el.sourcepos > 500:
+                break
+            if not getattr(el, "name", None):
+                continue
+            if el.name in ("h1", "h2", "h3"):
+                if _normalize_phrase(el.get_text(" ", strip=True)) == target:
+                    el.decompose()
+                    return str(soup)
+                # First heading isn't a match — leave further headings alone;
+                # they're real content.
+                break
+            if el.name == "p":
+                # Match <p><u>Title</u></p>, <p><strong>Title</strong></p>,
+                # <p><a>Title</a></p> shapes used in lieu of headings.
+                children = [c for c in el.children if not (
+                    isinstance(c, str) and not c.strip()
+                )]
+                if (
+                    len(children) == 1
+                    and getattr(children[0], "name", None) in ("u", "strong", "a", "b")
+                    and _normalize_phrase(el.get_text(" ", strip=True)) == target
+                ):
+                    el.decompose()
+                    return str(soup)
+                break
+        return str(soup)
+
     SEARCH_GOTO_TIMEOUT_MS = 45_000
     SEARCH_SELECTOR_TIMEOUT_MS = 8_000
     DETAIL_GOTO_TIMEOUT_MS = 30_000
@@ -415,6 +468,9 @@ class BaseHtmlParser:
         description_text = self._first_text(self.page, self.DETAIL_DESCRIPTION_SELECTORS)
         if not description_html and not description_text:
             print(f"no description selector matched on {url}", file=sys.stderr)
+        if description_html:
+            description_html = self._post_extract_html(description_html)
+            description_html = self._strip_leading_title_dupe(description_html, title)
 
         return Role(
             employer=employer,
@@ -477,12 +533,45 @@ class SuccessFactorsParser(BaseHtmlParser):
     ]
 
 
+_JIBE_CHROME_SELECTORS = (
+    "[class*='share' i]",
+    "[class*='social' i]",
+    "[class*='carousel' i]",
+    "[class*='apply-' i]",
+    "[class*='apply_' i]",
+    "[class*='login' i]",
+    "[class*='broken-link' i]",
+    "[class*='report-' i]",
+    "[class*='back-' i]",
+    "[class*='alert' i]",
+    "[class*='subscribe' i]",
+    "[class*='cta' i]",
+)
+
+
 class JibeParser(BaseHtmlParser):
     """
     Jibe (iCIMS recruitment marketing) career-site parser.
     Used by QatarEnergy and other employers whose sites are served via
     cms.jibecdn.com. Job detail URLs follow /jobs/<numeric-id>?lang=en-us.
     """
+
+    def _post_extract_html(self, html: str) -> str:
+        """Strip Jibe/Angular-specific UI containers (share buttons, carousels,
+        apply CTAs, login prompts, "report broken link", subscribe widgets)
+        that the generic sanitizer can't reliably target by tag/text alone.
+        """
+        if not html:
+            return html
+        soup = BeautifulSoup(html, "html.parser")
+        for sel in _JIBE_CHROME_SELECTORS:
+            for el in soup.select(sel):
+                el.decompose()
+        # Unwrap (keep content) for ng-* Angular wrappers — they almost never
+        # carry semantic value but their children may contain prose.
+        for el in soup.select("[class*='ng-' i]"):
+            el.unwrap()
+        return str(soup)
 
     LIST_LINK_SELECTORS = [
         "a[href*='/jobs/'][href*='lang=']",
@@ -735,14 +824,111 @@ _SCRIPT_STYLE_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Subtrees we never want any text from. Bleach's strip=True removes tags but
+# keeps inner text — for nav/footer/svg etc. that means UI labels and glyph
+# names leak as plain text. We decompose the whole subtree first.
+_CHROME_DROP_TAGS = (
+    "svg", "button", "form", "input", "select",
+    "nav", "header", "footer", "aside",
+)
 
-def sanitize_description(html_or_text: str) -> str:
-    """Strip <script>/<style>/inline-handlers and unknown tags before publishing."""
+# Material-icon ligature elements: when CSS fails to load (or the consumer
+# strips classes), the inner text "mail_outline" / "share" renders as plain
+# text. Drop the element entirely.
+_MATERIAL_ICON_SELECTORS = (
+    "i.material-icons",
+    "span.material-icons",
+    "[class*='material-icons' i]",
+    "[class*='material-symbols' i]",
+    "[class*='mat-icon' i]",
+)
+
+# All-caps i18n placeholder keys that show through when an Angular/React app's
+# translations don't compile (e.g. JOB_DESCRIPTION.SHARE.HTML, CAROUSEL_PARAGRAPH).
+# Lowercase letters in prose break this pattern, so it won't match real text.
+_I18N_KEY_RE = re.compile(
+    r"^[\s•·]*([A-Z][A-Z0-9_]{2,}(?:\.[A-Z][A-Z0-9_]+)+|[A-Z][A-Z0-9_]{6,})[\s.]*$"
+)
+
+# Normalized chrome phrases (lowercased, alphanumerics-only). Any leaf element
+# whose entire text matches one of these is decomposed.
+_CHROME_PHRASES = frozenset({
+    "apply", "applynow", "applyhere", "applyforthisjob", "applyforthisrole",
+    "applyonline", "submitapplication", "startyourapplication",
+    "loginorregister", "back", "go",
+    "authorsvacancies", "getfuturejobsmatchingthissearch",
+    "reportbrokenlink", "sharethisjob", "printjob",
+    "skiptocontent", "skipnavigation",
+})
+
+_APPLY_HREF_RE = re.compile(r"(apply|application)", re.IGNORECASE)
+
+
+def _normalize_phrase(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def _scrub_chrome(html: str, application_url: str | None = None) -> str:
+    """Decompose UI chrome (nav/footer subtrees, material-icon glyphs, i18n keys,
+    apply-link anchors, chrome-phrase leaves) before bleach takes its allowlist
+    pass. The renderer page already provides the title and Apply button, so we
+    keep prose only.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag_name in _CHROME_DROP_TAGS:
+        for el in soup.find_all(tag_name):
+            el.decompose()
+
+    for sel in _MATERIAL_ICON_SELECTORS:
+        for el in soup.select(sel):
+            el.decompose()
+
+    norm_app_url = (application_url or "").strip()
+    for a in list(soup.find_all("a")):
+        href = (a.get("href") or "").strip()
+        text = a.get_text(" ", strip=True)
+        normalized = _normalize_phrase(text)
+        if normalized.startswith("apply") and normalized in _CHROME_PHRASES:
+            a.decompose()
+            continue
+        if href and norm_app_url and href == norm_app_url:
+            a.decompose()
+            continue
+        if href and _APPLY_HREF_RE.search(href) and len(text) <= 40:
+            a.decompose()
+            continue
+
+    for el in list(soup.find_all(["p", "div", "span", "li", "a"])):
+        if el.find(["p", "div", "ul", "ol", "table"]):
+            continue
+        text = el.get_text(" ", strip=True)
+        if not text:
+            continue
+        if len(text) <= 80 and _normalize_phrase(text) in _CHROME_PHRASES:
+            el.decompose()
+            continue
+        if _I18N_KEY_RE.match(text):
+            el.decompose()
+
+    for el in list(soup.find_all(["p", "div", "span", "li", "ul", "ol"])):
+        if not el.get_text(strip=True) and not el.find(["img", "br"]):
+            el.decompose()
+
+    return str(soup)
+
+
+def sanitize_description(html_or_text: str, application_url: str | None = None) -> str:
+    """Strip <script>/<style>/inline-handlers, UI chrome, and unknown tags before
+    publishing. ``application_url`` lets the chrome scrubber drop in-body anchors
+    that duplicate the role's apply link.
+    """
     if not html_or_text:
         return ""
     # Bleach with strip=True removes the *tags* but keeps *inner text*; for
     # <script>/<style>/<iframe>/<noscript> we want both gone, so pre-strip them.
     cleaned = _SCRIPT_STYLE_RE.sub("", html_or_text)
+    cleaned = _scrub_chrome(cleaned, application_url=application_url)
     return bleach.clean(
         cleaned,
         tags=ALLOWED_HTML_TAGS,
@@ -757,7 +943,9 @@ def build_payload(role: Role, slug: str) -> dict:
         "title": role.title,
         "slug": slug,
         "company": role.employer,
-        "description": sanitize_description(role.description),
+        "description": sanitize_description(
+            role.description, application_url=role.application_url
+        ),
         "employmentType": role.employment_type,
         "applicationUrl": role.application_url,
         "status": "published",
