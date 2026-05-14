@@ -38,6 +38,7 @@ RATE_LIMIT_FLOOR = 10
 REPO_ROOT = Path(__file__).parent
 EMPLOYERS_FILE = REPO_ROOT / "employers.json"
 DATA_FILE = REPO_ROOT / "docs" / "data.json"
+LESSONS_FILE = REPO_ROOT / "state" / "lessons.jsonl"
 RUN_HISTORY_LIMIT = 30
 RECENT_PUBLISHED_LIMIT = 50
 DATA_SCHEMA_VERSION = 1
@@ -856,13 +857,14 @@ def finalize_run(
 ) -> None:
     finished_at = utc_now_iso()
     duration = max(0, int(time.monotonic() - started_mono))
+    run_status = "auth_halt" if auth_halt else (
+        "error" if summary["errors"] else "ok"
+    )
     run_record = {
         "started_at": started_at,
         "finished_at": finished_at,
         "duration_seconds": duration,
-        "status": "auth_halt" if auth_halt else (
-            "error" if summary["errors"] else "ok"
-        ),
+        "status": run_status,
         **summary,
         "by_employer": by_employer,
     }
@@ -873,6 +875,63 @@ def finalize_run(
             f"failed to update {DATA_FILE}: {type(e).__name__}: {e}",
             file=sys.stderr,
         )
+    try:
+        append_lessons(by_employer, started_at, finished_at, run_status)
+    except Exception as e:
+        print(
+            f"failed to update {LESSONS_FILE}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+
+def _verdict(emp: dict) -> str:
+    """Classify a per-employer run outcome for LLM filtering."""
+    if emp.get("errors"):
+        return "errors"
+    if emp.get("published", 0) > 0:
+        return "ok"
+    if emp.get("found", 0) == 0:
+        # Silent failure: page loaded fine, no HSE roles matched. Most
+        # actionable — usually means selectors drifted or HSE_KEYWORDS too narrow.
+        return "zero_found"
+    # found > 0 but published == 0 — every role was a duplicate of an existing
+    # entirelysafe.com vacancy. Informational, not an error.
+    return "no_new"
+
+
+def append_lessons(
+    by_employer: list[dict],
+    run_started: str,
+    run_finished: str,
+    run_status: str,
+) -> None:
+    """Append one JSONL line per *active* employer for downstream LLM analysis.
+
+    The state file is bot-owned and append-only. Each line is self-contained
+    context so the LLM can reason about a single (employer, run) pair without
+    cross-referencing other lines.
+    """
+    if not by_employer:
+        return
+    LESSONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with LESSONS_FILE.open("a", encoding="utf-8") as f:
+        for emp in by_employer:
+            if not emp.get("active"):
+                continue
+            entry = {
+                "run_started": run_started,
+                "run_finished": run_finished,
+                "run_status": run_status,
+                "employer": emp.get("name", ""),
+                "ats": emp.get("ats", ""),
+                "careers_url": emp.get("url", ""),
+                "verdict": _verdict(emp),
+                "found": emp.get("found", 0),
+                "published": emp.get("published", 0),
+                "skipped_duplicate": emp.get("skipped_duplicate", 0),
+                "errors": list(emp.get("errors", [])),
+            }
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------
