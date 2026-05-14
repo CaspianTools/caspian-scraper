@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scraper_repo": "CaspianTools/caspian-scraper",
-  "last_updated": "2026-05-14T01:52:49Z",
+  "last_updated": "2026-05-14T02:03:07Z",
   "employers": [
     {
       "name": "Aramco",
@@ -29,10 +29,10 @@
     }
   ],
   "totals": {
-    "runs": 11,
-    "found_alltime": 16,
+    "runs": 12,
+    "found_alltime": 22,
     "published_alltime": 3,
-    "errors_alltime": 11
+    "errors_alltime": 12
   },
   "runs": [
     {
@@ -321,6 +321,65 @@
           "errors": [
             "ScrapeTimeoutError: search page timed out: https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch="
           ]
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "url": "https://careerportal.qatarenergy.qa/jobs/categories/Health+Safety+Environment+%26+Security",
+          "found": 2,
+          "published": 0,
+          "skipped_duplicate": 2,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "url": "https://careerportal.qatarenergy.qa/jobs/categories/Idd+El-Shargi+-+Health%2C+Safety++%26+Envr",
+          "found": 1,
+          "published": 0,
+          "skipped_duplicate": 1,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "started_at": "2026-05-14T01:59:34Z",
+      "finished_at": "2026-05-14T02:03:07Z",
+      "duration_seconds": 213,
+      "status": "error",
+      "checked": 4,
+      "skipped_inactive": 0,
+      "found": 6,
+      "published": 0,
+      "skipped_duplicate": 6,
+      "errors": [
+        "Aramco: ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+      ],
+      "published_roles": [],
+      "by_employer": [
+        {
+          "name": "Aramco",
+          "ats": "successfactors",
+          "active": true,
+          "url": "https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch=",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": [
+            "ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+          ]
+        },
+        {
+          "name": "Halliburton",
+          "ats": "successfactors",
+          "active": true,
+          "url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
+          "found": 3,
+          "published": 0,
+          "skipped_duplicate": 3,
+          "errors": []
         },
         {
           "name": "QatarEnergy",
