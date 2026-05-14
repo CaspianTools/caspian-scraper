@@ -49,19 +49,31 @@ with a JSON summary of the run.
 
 ## Adding an employer
 
-Edit `employers.json` and append an entry:
+`employers.json` is the master list of ME oil-and-gas employers and
+recruitment agencies. Most are staged as `"active": false` /
+`"ats": "unknown"` until classified. To start scraping a new one, either
+flip an existing entry or append a fresh object:
 
 ```json
 {
   "name": "Schlumberger",
-  "url": "https://careers.slb.com/search/?q=hse&locationsearch=",
+  "kind": "employer",
+  "type": "Oilfield Services",
+  "countries": ["UAE", "Saudi Arabia"],
+  "headquarters": "Abu Dhabi",
+  "segment": "Drilling, Well Services, Digital",
+  "website": "https://www.slb.com",
+  "careers_url": "https://careers.slb.com/search/?q=hse&locationsearch=",
+  "linkedin": "https://www.linkedin.com/company/slb/",
   "ats": "successfactors",
-  "active": true
+  "active": true,
+  "notes": ""
 }
 ```
 
-Set `"active": false` to temporarily skip an employer without deleting the
-entry.
+Required for the scraper: `name`, `careers_url`, `ats`, `active`. Other
+fields are metadata (used by the dashboard / tracking, ignored at scrape
+time). Set `"active": false` to keep an entry staged without scraping it.
 
 If the employer's careers site uses an ATS the scraper already supports
 (see `PARSERS` in `scrape.py`), no code change is needed. Most large

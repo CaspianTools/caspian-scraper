@@ -722,7 +722,7 @@ def load_employers() -> list[dict]:
     for i, entry in enumerate(data):
         if not isinstance(entry, dict):
             raise ValueError(f"employers.json[{i}] must be an object")
-        for key in ("name", "url", "ats", "active"):
+        for key in ("name", "careers_url", "ats", "active"):
             if key not in entry:
                 raise ValueError(
                     f"employers.json[{i}] missing required key '{key}'"
@@ -953,7 +953,7 @@ def main() -> int:
             try:
                 for emp in employers:
                     name = str(emp.get("name") or "").strip()
-                    url = str(emp.get("url") or "").strip()
+                    url = str(emp.get("careers_url") or "").strip()
                     ats = str(emp.get("ats") or "").strip().lower()
                     active = bool(emp.get("active"))
 
@@ -969,16 +969,16 @@ def main() -> int:
                     }
                     by_employer.append(emp_record)
 
-                    if not name or not url or not ats:
-                        emp_record["errors"].append(
-                            "employer entry missing name/url/ats"
-                        )
-                        summary["errors"].append(
-                            f"employer entry missing name/url/ats: {emp!r}"
-                        )
-                        continue
                     if not active:
                         summary["skipped_inactive"] += 1
+                        continue
+                    if not name or not url or not ats:
+                        emp_record["errors"].append(
+                            "active employer entry missing name/careers_url/ats"
+                        )
+                        summary["errors"].append(
+                            f"active employer entry missing name/careers_url/ats: {emp!r}"
+                        )
                         continue
 
                     summary["checked"] += 1
