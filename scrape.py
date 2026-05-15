@@ -1051,6 +1051,16 @@ def main() -> int:
                     try:
                         parser = parser_cls(page)
                         roles = parser.parse(name, url)
+                    except ScrapeTimeoutError as e:
+                        # Transient: the employer's site was slow/unreachable
+                        # on this run. Surface on the dashboard, but don't add
+                        # to summary["errors"] — cron retries tomorrow and we
+                        # don't want a red workflow + new GitHub issue every
+                        # time one careers site has a bad afternoon.
+                        msg = f"ScrapeTimeoutError: {e}"
+                        emp_record["errors"].append(msg)
+                        print(f"{name}: {msg}", file=sys.stderr)
+                        continue
                     except Exception as e:
                         msg = f"{type(e).__name__}: {e}"
                         emp_record["errors"].append(msg)
