@@ -3,7 +3,7 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
-  GoogleAuthProvider,
+  GithubAuthProvider,
   signInWithPopup,
   signOut as fbSignOut,
   type User,
@@ -26,12 +26,38 @@ export function firebaseAuth() {
   return getAuth(app());
 }
 
-export async function signInWithGoogle(): Promise<User> {
-  const provider = new GoogleAuthProvider();
+export interface GithubSignInResult {
+  user: User;
+  /** GitHub OAuth user access token. Use to call api.github.com on behalf of the user. */
+  ghToken: string;
+}
+
+/**
+ * Sign in via Firebase Auth's built-in GitHub provider. Returns the
+ * Firebase user AND the GitHub access token Firebase received during the
+ * OAuth dance. We only get this token at sign-in time — it must be
+ * stashed server-side before this function's caller forgets it.
+ */
+export async function signInWithGithub(): Promise<GithubSignInResult> {
+  const provider = new GithubAuthProvider();
+  // Scopes we need to manage the scraper repo. `repo` covers both
+  // contents read/write and Actions for public+private repos.
+  provider.addScope("repo");
+  provider.addScope("workflow");
   const result = await signInWithPopup(firebaseAuth(), provider);
-  return result.user;
+  const credential = GithubAuthProvider.credentialFromResult(result);
+  if (!credential?.accessToken) {
+    throw new Error(
+      "Sign-in succeeded but Firebase did not return a GitHub access token. " +
+        "Make sure the GitHub provider is enabled in Firebase Auth and the " +
+        "OAuth App has access to the repo."
+    );
+  }
+  return { user: result.user, ghToken: credential.accessToken };
 }
 
 export async function signOut() {
   await fbSignOut(firebaseAuth());
+  // Server-side cookie cleanup too.
+  await fetch("/api/auth/session-logout", { method: "POST" });
 }

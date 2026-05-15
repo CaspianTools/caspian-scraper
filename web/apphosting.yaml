@@ -13,23 +13,6 @@ runConfig:
   memoryMiB: 512
 
 env:
-  # GitHub App identity. SLUG is public (used to build install URLs).
-  - variable: NEXT_PUBLIC_GITHUB_APP_SLUG
-    value: caspian-scraper-app
-    availability:
-      - BUILD
-      - RUNTIME
-
-  - variable: GITHUB_APP_ID
-    secret: GITHUB_APP_ID
-    availability:
-      - RUNTIME
-
-  - variable: GITHUB_APP_PRIVATE_KEY
-    secret: GITHUB_APP_PRIVATE_KEY
-    availability:
-      - RUNTIME
-
   # Firebase Admin SDK service-account credentials.
   - variable: FIREBASE_PROJECT_ID
     secret: FIREBASE_PROJECT_ID

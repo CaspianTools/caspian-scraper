@@ -6,9 +6,6 @@ const PUBLIC_PATHS = [
   "/signin",
   "/api/auth/session-login",
   "/api/auth/session-logout",
-  // GitHub install callback verifies the session cookie internally and
-  // redirects to /signin if missing — let it pass the proxy.
-  "/api/auth/github/callback",
 ];
 
 function isPublic(pathname: string): boolean {
