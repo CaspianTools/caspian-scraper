@@ -1,0 +1,72 @@
+# Firebase App Hosting backend config.
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+#
+# Secrets referenced here must be created in Google Secret Manager and
+# granted to the App Hosting backend service account. See web/README.md
+# for one-time setup steps.
+
+runConfig:
+  minInstances: 1
+  maxInstances: 3
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # GitHub App identity. SLUG is public (used to build install URLs).
+  - variable: NEXT_PUBLIC_GITHUB_APP_SLUG
+    value: caspian-scraper-app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: GITHUB_APP_ID
+    secret: GITHUB_APP_ID
+    availability:
+      - RUNTIME
+
+  - variable: GITHUB_APP_PRIVATE_KEY
+    secret: GITHUB_APP_PRIVATE_KEY
+    availability:
+      - RUNTIME
+
+  # Firebase Admin SDK service-account credentials.
+  - variable: FIREBASE_PROJECT_ID
+    secret: FIREBASE_PROJECT_ID
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_CLIENT_EMAIL
+    secret: FIREBASE_CLIENT_EMAIL
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_PRIVATE_KEY
+    secret: FIREBASE_PRIVATE_KEY
+    availability:
+      - RUNTIME
+
+  # Firebase client SDK config (public, baked into the bundle).
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: NEXT_PUBLIC_FIREBASE_API_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    secret: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    secret: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: NEXT_PUBLIC_FIREBASE_APP_ID
+    availability:
+      - BUILD
+      - RUNTIME
