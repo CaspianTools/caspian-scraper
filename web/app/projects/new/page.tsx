@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
+import { humanizeCron } from "@/lib/cron/humanize";
 
 interface FieldErr {
   field?: string;
@@ -11,10 +12,12 @@ interface FieldErr {
 }
 
 const CRON_PRESETS = [
-  { label: "Daily at 04:30 UTC", value: "30 4 * * *" },
-  { label: "Daily at 09:00 UTC", value: "0 9 * * *" },
+  { label: "Every day, early morning (04:30 UTC)", value: "30 4 * * *" },
+  { label: "Every day, working hours (09:00 UTC)", value: "0 9 * * *" },
   { label: "Every 6 hours", value: "0 */6 * * *" },
-  { label: "Weekly (Mon 04:00 UTC)", value: "0 4 * * 1" },
+  { label: "Every Monday morning", value: "0 4 * * 1" },
+  { label: "Every weekday at 09:00 UTC", value: "0 9 * * 1-5" },
+  { label: "Once a month, on the 1st", value: "0 4 1 * *" },
 ];
 
 export default function NewProjectPage() {
@@ -125,37 +128,74 @@ export default function NewProjectPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Schedule</label>
-            <p className="text-xs text-zinc-500 mb-2">
-              Cron expression (UTC). Minimum granularity: 1 hour.
+            <label className="block text-sm font-medium mb-1">
+              When should it run?
+            </label>
+            <p className="text-xs text-zinc-500 mb-3">
+              Pick a preset, or write your own schedule below. All times
+              are in UTC. Minimum: 1 run per hour.
             </p>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {CRON_PRESETS.map((p) => (
                 <button
                   key={p.value}
                   type="button"
                   onClick={() => setScheduleCron(p.value)}
                   className={
-                    "text-xs px-2 py-1 rounded border " +
+                    "text-xs px-2.5 py-1.5 rounded-full border transition-colors " +
                     (scheduleCron === p.value
-                      ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800"
-                      : "border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900")
+                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-black"
+                      : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900")
                   }
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <input
-              type="text"
-              required
-              value={scheduleCron}
-              onChange={(e) => setScheduleCron(e.target.value)}
-              placeholder="30 4 * * *"
-              className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
-            />
+
+            <details className="group">
+              <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 select-none list-none flex items-center gap-1">
+                <span className="group-open:rotate-90 transition-transform inline-block">
+                  ▸
+                </span>
+                Custom schedule (cron expression)
+              </summary>
+              <div className="mt-2 space-y-2">
+                <input
+                  type="text"
+                  required
+                  value={scheduleCron}
+                  onChange={(e) => setScheduleCron(e.target.value)}
+                  placeholder="30 4 * * *"
+                  className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                />
+                <p className="text-xs text-zinc-500">
+                  Format: <code>minute hour day-of-month month day-of-week</code>.
+                  Use <code>*</code> for &ldquo;any&rdquo;.{" "}
+                  <a
+                    href="https://crontab.guru"
+                    target="_blank"
+                    rel="noopener"
+                    className="underline"
+                  >
+                    crontab.guru
+                  </a>{" "}
+                  helps you build one.
+                </p>
+              </div>
+            </details>
+
+            <div className="mt-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-sm">
+              <span className="text-xs uppercase tracking-wide text-zinc-500 mr-2">
+                Runs:
+              </span>
+              <span className="text-zinc-900 dark:text-zinc-100">
+                {humanizeCron(scheduleCron)}
+              </span>
+            </div>
+
             {errFor("schedule_cron") && (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-2 text-xs text-red-600">
                 {errFor("schedule_cron")}
               </p>
             )}

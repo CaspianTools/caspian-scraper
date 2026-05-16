@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectDoc, sourcesCol } from "@/lib/firestore/collections";
+import { humanizeCron } from "@/lib/cron/humanize";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,11 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <StatCard label="Schedule" value={data.schedule_cron} mono />
+          <StatCard
+            label="Schedule"
+            value={humanizeCron(data.schedule_cron)}
+            hint={data.schedule_cron}
+          />
           <StatCard
             label="Sources"
             value={String(sourcesCount)}
@@ -127,11 +132,13 @@ function StatCard({
   label,
   value,
   link,
+  hint,
   mono,
 }: {
   label: string;
   value: string;
   link?: string;
+  hint?: string;
   mono?: boolean;
 }) {
   const body = (
@@ -145,7 +152,7 @@ function StatCard({
           (mono ? "font-mono" : "font-medium") +
           " text-zinc-900 dark:text-zinc-100 truncate"
         }
-        title={value}
+        title={hint || value}
       >
         {value}
       </div>

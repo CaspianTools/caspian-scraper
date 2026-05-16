@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
 import { SignOutButton } from "@/components/SignOutButton";
+import { humanizeCron } from "@/lib/cron/humanize";
 
 export const dynamic = "force-dynamic";
 
@@ -110,11 +111,11 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
         </p>
       )}
       <div className="text-xs text-zinc-500 space-y-1">
-        <div>
+        <div title={project.schedule_cron}>
           schedule:{" "}
-          <code className="text-zinc-700 dark:text-zinc-300">
-            {project.schedule_cron}
-          </code>
+          <span className="text-zinc-700 dark:text-zinc-300">
+            {humanizeCron(project.schedule_cron)}
+          </span>
         </div>
         <div>
           last run:{" "}
