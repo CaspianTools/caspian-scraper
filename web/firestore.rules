@@ -1,22 +1,100 @@
 rules_version = '2';
 
+// Caspian Scraper — multi-tenant Firestore rules.
+//
+// Model: every doc is owned by a Firebase user (UID). A user can only
+// read/write their own data. The Firebase Admin SDK (used by the web
+// app's API routes and the Python scraper) bypasses all rules — those
+// paths are governed by the backend code instead.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A user can read and update their own profile doc. Writes are limited
-    // to the prefs subobject — installation_id, fork, email are bot-managed
-    // and must be written by the backend via the admin SDK (which bypasses
-    // these rules).
+
+    // ---- /users/{uid} ----
+    // A user reads their own profile doc. Profile data (email, name,
+    // picture, last_signed_in_at, quota) is written by the backend at
+    // /api/auth/session-login. Clients can only mutate the `prefs`
+    // subobject directly.
     match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['prefs']);
       allow create, delete: if false;
+    }
 
-      // Caches are server-only. Admin SDK writes bypass these rules.
-      match /{cache=**} {
-        allow read, write: if false;
+    // ---- /projects/{projectId} ----
+    // A project's owner is identified by the `owner_uid` field. The
+    // project's owner has full read/write access to the project doc
+    // AND every subcollection (sources, destinations, runs, lessons,
+    // published). Secrets are NOT readable from the client — see below.
+    match /projects/{projectId} {
+      allow read:   if isProjectOwner();
+      allow update: if isProjectOwner()
+        && request.resource.data.owner_uid == resource.data.owner_uid;
+      allow create: if isSignedIn()
+        && request.resource.data.owner_uid == request.auth.uid;
+      allow delete: if isProjectOwner();
+
+      // Sources / destinations / runs / lessons / published —
+      // ownership inherits from the parent project.
+      match /sources/{sourceId} {
+        allow read, write: if isProjectOwner();
       }
+      match /destinations/{destId} {
+        allow read, write: if isProjectOwner();
+      }
+      match /runs/{runId} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // runs are written only by the scraper service account
+      }
+      match /lessons/{lessonId} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // lessons are appended only by the scraper
+      }
+      match /published/{slug} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // published is written only by the scraper
+      }
+
+      // Secrets: write-only from clients, never readable. The value
+      // is read only by the scraper service account (which bypasses
+      // these rules). On update, the owner can overwrite the value —
+      // they never need to read it back.
+      match /secrets/{name} {
+        allow read: if false;
+        allow create, update: if isProjectOwner()
+          && request.resource.data.keys().hasOnly(
+               ['value', 'created_at', 'updated_at'])
+          && request.resource.data.value is string
+          && request.resource.data.value.size() <= 4096;
+        allow delete: if isProjectOwner();
+      }
+
+      // Helper: a project's owner is whoever's UID matches owner_uid.
+      function isProjectOwner() {
+        return isSignedIn()
+          && request.auth.uid == get(
+               /databases/$(database)/documents/projects/$(projectId)
+             ).data.owner_uid;
+      }
+    }
+
+    // ---- /run_requests/{requestId} ----
+    // Top-level ad-hoc trigger queue. A user inserts a request; the
+    // scraper picks it up. Status updates after creation are written
+    // by the scraper (service account, bypasses rules).
+    match /run_requests/{requestId} {
+      allow read: if isSignedIn()
+        && request.auth.uid == resource.data.requested_by_uid;
+      allow create: if isSignedIn()
+        && request.resource.data.requested_by_uid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update, delete: if false;   // service account only
+    }
+
+    // ---- helpers ----
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
 }
