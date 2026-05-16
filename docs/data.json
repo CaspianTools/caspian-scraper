@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scraper_repo": "CaspianTools/caspian-scraper",
-  "last_updated": "2026-05-15T05:50:35Z",
+  "last_updated": "2026-05-16T05:37:39Z",
   "employers": [
     {
       "name": "Halliburton",
@@ -1151,10 +1151,10 @@
     }
   ],
   "totals": {
-    "runs": 14,
-    "found_alltime": 38,
+    "runs": 15,
+    "found_alltime": 41,
     "published_alltime": 3,
-    "errors_alltime": 14
+    "errors_alltime": 15
   },
   "runs": [
     {
@@ -1607,6 +1607,1935 @@
           "found": 5,
           "published": 0,
           "skipped_duplicate": 5,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "url": "https://careerportal.qatarenergy.qa/jobs/categories/Health+Safety+Environment+%26+Security",
+          "found": 2,
+          "published": 0,
+          "skipped_duplicate": 2,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": true,
+          "url": "https://careerportal.qatarenergy.qa/jobs/categories/Idd+El-Shargi+-+Health%2C+Safety++%26+Envr",
+          "found": 1,
+          "published": 0,
+          "skipped_duplicate": 1,
+          "errors": []
+        },
+        {
+          "name": "Saudi Aramco",
+          "ats": "successfactors",
+          "active": true,
+          "url": "https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch=",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": [
+            "ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+          ]
+        },
+        {
+          "name": "Abraj Energy Services",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.abrajenergy.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ADES Holding",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.adesgroup.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ADNOC (Abu Dhabi National Oil Co.)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.adnoc.ae/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ADNOC (Group)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://jobs.adnoc.ae/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ADNOC Global Trading",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://agtcareers.adnoc.ae/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ADNOC Logistics & Services",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://adnocls.ae/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Aker Solutions",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.akersolutions.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Al-Furat Petroleum Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Apache Egypt",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.apachecorp.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ARA Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.arapetroleum.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ARO Drilling",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.arodrilling.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bahrain LNG",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bahrainlng.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bahri",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bahri.sa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Baker Hughes",
+          "ats": "successfactors",
+          "active": false,
+          "url": "https://careers.bakerhughes.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Banagas",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.banagas.com.bh/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "BAPCO (Bahrain Petroleum Co.)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bapco.net/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bapco Energies",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bapcoenergies.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bapco Upstream / Tatweer Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.tatweer.bh/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bapetco",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bapetco.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Basra Oil Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.boc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bechtel",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://jobs.bechtel.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Borouge",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.borouge.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Borr Drilling",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.borrdrilling.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "BP",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "BP",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bp.com/en/global/corporate/careers.html",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "CC Energy Development",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.consolidatedcontractors.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Cheiron Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.cheiron-eg.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Chevron",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Chevron",
+          "ats": "successfactors",
+          "active": false,
+          "url": "https://careers.chevron.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Chiyoda Almana Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.chiyoda-almana.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Chiyoda Corporation",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.chiyodacorp.com/en/career/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "CNPC",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.cnpc.com.cn/en/career/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Crescent Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.crescent.ae/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Daewoo E&C",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.daewooenc.com/recruit",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Daleel Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.daleelpetroleum.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Dana Gas",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.danagas.com/en-us/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Dhi Qar Oil Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.dqoc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "DNO Iraq (Tawke)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.dno.no/en/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Dragon Oil",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.dragonoil.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Drydocks World",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.drydocks.gov.ae/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Dubai Petroleum Establishment",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.dubaipetroleum.ae/Pages/Careers.aspx",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "EGAS",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.egas.com.eg/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "EGPC",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.egpc.com.eg/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Egyptian Drilling Company (EDC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.egyptiandrilling.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Emerson Process",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.emerson.com/en-us/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ENOC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.enoc.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ENOC (Emirates National Oil Co.)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.enoc.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Enppi",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.enppi.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "EQUATE Petrochemical",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.equate.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Equinor",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.equinor.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ExxonMobil",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ExxonMobil",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://corporate.exxonmobil.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Fertiglobe",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.fertiglobe.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Fluor",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.fluor.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Galfar Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.galfar.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "GASCO",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.gasco.com.eg/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Gazprom Neft Badra",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.gazprom-neft.com/career/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Genel Energy",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.genelenergy.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "GPIC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.gpic.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Gulf Drilling International",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.gdi.com.qa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Honeywell UOP",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.honeywell.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Hydrocarbon Finder E&P",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.hydrocarbonfinder.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Hyundai E&C",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.hdec.kr/en/recruit/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Hyundai Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Hyundai Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://career.hec.co.kr/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "ICOFC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.icofc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "IEOC (Eni Egypt)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.eni.com/en-IT/careers.html",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Industries",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.iq.com.qa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Inpex",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.inpex.co.jp/english/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "IOEC (Iranian Offshore Engineering & Construction)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.ioec.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Iraq Drilling Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.idc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Iraq Petroleum Pipelines Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "JGC Holdings",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.jgc.com/en/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Jordan Petroleum Refinery Company (JPRC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.jopetrol.com.jo/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KBR",
+          "ats": "successfactors",
+          "active": false,
+          "url": "https://careers.kbr.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KGOC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kgoc.com.kw/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Khalda Petroleum",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.khalda-eg.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KIPIC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://kipic.com.kw/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KNPC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.knpc.com/en/Careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KNPC (Kuwait National Petroleum Co.)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.knpc.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "KUFPEC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kufpec.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Kuwait Drilling Company (Burgan)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.burganco.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Kuwait Oil Company (KOC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kockw.com/sites/EN/Pages/Join%20Us/Join-Us.aspx",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Kuwait Oil Tanker Company (KOTC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kotc.com.kw/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Kuwait Petroleum Corporation (KPC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kpc.com.kw/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Kuwait Petroleum Corporation (KPC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.kpc.com.kw/KPCCareers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "L&T Energy Hydrocarbon (Saudi)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.larsentoubro.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "L&T Hydrocarbon Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Lamprell",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.lamprell.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Luberef",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.luberef.com.sa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Maersk Drilling / Noble Corp",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.noblecorp.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Manaseer Oil & Gas",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.manaseergroup.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "McDermott",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "McDermott",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.mcdermott.com/careers/search-apply",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Midland Oil Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.midoc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Missan Oil Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.missanoc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Mubadala Energy",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.mubadalaenergy.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Nakilat",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nakilat.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "National Petroleum Company (NPC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.npc.com.jo/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NIDC (National Iranian Drilling)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nidc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NIGC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nigc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NIOC (National Iranian Oil Company)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nioc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NIORDC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.niordc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NMDC Energy",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nmdc.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "North Oil Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.noc.oil.gov.iq/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NPC (National Petrochemical Co)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nipc.net/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NPCC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.npcc.ae/npccweb/career/default.aspx",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NPCC (National Petroleum Construction Co.)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.npcc.ae/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NPS (National Petroleum Services)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nps-sa.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Oman LNG",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.omanlng.com/en/Careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Oman Oil Company (OQ)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.oq.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "OMV",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.omv.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "OQ",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.oq.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "OQ8 (Duqm Refinery)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.oq8.om/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Pars Oil and Gas Company (POGC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.pogc.ir/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "PDO (Petroleum Development Oman)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.pdo.co.om/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petro Rabigh",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrorabigh.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petrobel",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrobel.com.eg/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petrofac",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrofac.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petrofac",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://petrofac.referrals.selectminds.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petrogas E&P",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrogas.com.om/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petrojet",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrojet.com.eg/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Petroleum Development Oman (PDO)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petrojobs.om/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "PetroMasila",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.petromasila.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "PIC (Petrochemical Industries Company)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.pic.com.kw/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QAFAC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.qafac.com.qa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QAFCO",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.qafco.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QAPCO",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.qapco.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Qatar Fuel (WOQOD)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.woqod.com.qa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy",
+          "ats": "jibe",
+          "active": false,
+          "url": "https://careerportal.qatarenergy.qa/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy (formerly Qatar Petroleum)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.qatarenergy.qa/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "QatarEnergy LNG",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.qatarenergylng.qa/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Repsol",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.repsol.com/en/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SABIC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.sabic.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SABIC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://jobs.sabic.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Saipem",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Saipem",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://jobs.saipem.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SAMREF",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.samref.com.sa/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Samsung Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Samsung Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.samsungengineering.com/recruit/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SATORP",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.satorp.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Seadrill",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.seadrill.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Shelf Drilling",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.shelfdrilling.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Shell",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Shell",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.shell.com/careers.html",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Sinopec Engineering",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.segroup.cn/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SLB (Schlumberger)",
+          "ats": "successfactors",
+          "active": false,
+          "url": "https://careers.slb.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Stena Drilling",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.stena-drilling.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Subsea7",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.subsea7.com/en/careers.html",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Suez Oil Processing Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.sopc.com.eg/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "SUMED (Arab Petroleum Pipelines)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.sumed.com.eg/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Syrian Gas Company",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Syrian Petroleum Company (SPC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "http://www.spc.com.sy/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "TAQA",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.taqa.com/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "TechnipFMC",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.technipfmc.com/en/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Tecnicas Reunidas",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Tecnicas Reunidas",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.tecnicasreunidas.es/en/careers/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Tecnimont (Maire Tecnimont)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.mairetecnimont.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "TotalEnergies",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "TotalEnergies",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://careers.totalenergies.com/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Valaris",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.valaris.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Weatherford",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.weatherford.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "WEPCO",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.wepco.com.eg/",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "WesternZagros Resources",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.westernzagros.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Wintershall Dea",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://wintershalldea.com/en/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Wood (formerly Wood Group)",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.woodplc.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Worley",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.worley.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "YASREF",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.yasref.com/careers",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Yemen LNG",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Yemen Oil & Gas Corporation (YOGC)",
+          "ats": "unknown",
+          "active": false,
+          "url": "",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Adecco",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.adecco.com/en-ae",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Airswift",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.airswift.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Bayt.com",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.bayt.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Brunel",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.brunel.net/en/middle-east",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Capstone Solutions",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://capstone-solutions.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "GulfTalent",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.gulftalent.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Hays",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.hays.ae",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Indeed Middle East",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://ae.indeed.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "LinkedIn Jobs",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.linkedin.com/jobs",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Michael Page",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.michaelpage.ae",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "NES Fircroft",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.nesfircroft.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Progressive Recruitment",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.progressiverecruitment.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Robert Half",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.roberthalf.ae",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Sawaeed Employment",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://sawaeed.ae",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Sundus",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.sundusglobal.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "Talascend",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.talascend.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        },
+        {
+          "name": "TRS Staffing Solutions",
+          "ats": "unknown",
+          "active": false,
+          "url": "https://www.trsstaffing.com",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "started_at": "2026-05-16T05:36:31Z",
+      "finished_at": "2026-05-16T05:37:39Z",
+      "duration_seconds": 67,
+      "status": "error",
+      "checked": 4,
+      "skipped_inactive": 187,
+      "found": 3,
+      "published": 0,
+      "skipped_duplicate": 3,
+      "errors": [
+        "Saudi Aramco: ScrapeTimeoutError: search page timed out: https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch="
+      ],
+      "published_roles": [],
+      "by_employer": [
+        {
+          "name": "Halliburton",
+          "ats": "successfactors",
+          "active": true,
+          "url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
+          "found": 0,
+          "published": 0,
+          "skipped_duplicate": 0,
           "errors": []
         },
         {
