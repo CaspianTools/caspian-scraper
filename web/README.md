@@ -105,7 +105,7 @@ $pem.Replace("`n", "\n")
 ```bash
 cd web
 npm run dev
-# → http://localhost:3000
+# → http://localhost:4444
 ```
 
 1. Land on `/signin`.
