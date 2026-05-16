@@ -53,3 +53,10 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # Optional: name of a dedicated Firestore database (e.g. "scraper").
+  # Leave the secret unset to use the project's default DB.
+  - variable: FIRESTORE_DATABASE_ID
+    secret: FIRESTORE_DATABASE_ID
+    availability:
+      - RUNTIME

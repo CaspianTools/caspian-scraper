@@ -33,8 +33,18 @@ function adminApp(): App {
 export const adminAuth: Auth = new Proxy({} as Auth, {
   get: (_t, p) => Reflect.get(getAuth(adminApp()), p),
 });
+
+/**
+ * Firestore client, optionally bound to a dedicated database within the
+ * Firebase project. Set FIRESTORE_DATABASE_ID to e.g. "scraper" to use
+ * a named database; leave blank for the default DB.
+ */
+function _getDb(): Firestore {
+  const dbId = process.env.FIRESTORE_DATABASE_ID?.trim();
+  return dbId ? getFirestore(adminApp(), dbId) : getFirestore(adminApp());
+}
 export const adminDb: Firestore = new Proxy({} as Firestore, {
-  get: (_t, p) => Reflect.get(getFirestore(adminApp()), p),
+  get: (_t, p) => Reflect.get(_getDb(), p),
 });
 
 /**
