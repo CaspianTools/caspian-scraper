@@ -30,8 +30,16 @@ function adminApp(): App {
   return _app;
 }
 
+// Methods on the Firestore / Auth instances use `this` internally, so the
+// Proxy must bind functions to the underlying instance when returning them.
+// Without binding, calls like `adminDb.recursiveDelete(ref)` lose context.
+function _bindMember(target: object, key: string | symbol): unknown {
+  const value = Reflect.get(target, key);
+  return typeof value === "function" ? value.bind(target) : value;
+}
+
 export const adminAuth: Auth = new Proxy({} as Auth, {
-  get: (_t, p) => Reflect.get(getAuth(adminApp()), p),
+  get: (_t, p) => _bindMember(getAuth(adminApp()), p),
 });
 
 /**
@@ -44,7 +52,7 @@ function _getDb(): Firestore {
   return dbId ? getFirestore(adminApp(), dbId) : getFirestore(adminApp());
 }
 export const adminDb: Firestore = new Proxy({} as Firestore, {
-  get: (_t, p) => Reflect.get(_getDb(), p),
+  get: (_t, p) => _bindMember(_getDb(), p),
 });
 
 /**

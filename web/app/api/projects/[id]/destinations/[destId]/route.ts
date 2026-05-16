@@ -1,49 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { adminDb } from "@/lib/firebase/admin";
 import { getSessionFromBearer } from "@/lib/auth/session";
-import { ProjectPatchSchema } from "@/lib/firestore/schema";
-import { projectDoc } from "@/lib/firestore/collections";
+import { DestinationPatchSchema } from "@/lib/firestore/schema";
+import { projectDoc, destinationsCol } from "@/lib/firestore/collections";
 
-/**
- * GET /api/projects/[id]
- */
+async function checkProjectOwner(
+  projectId: string,
+  uid: string
+): Promise<boolean> {
+  const snap = await projectDoc(projectId).get();
+  return snap.exists && snap.data()?.owner_uid === uid;
+}
+
 export async function GET(
   req: NextRequest,
-  ctx: RouteContext<"/api/projects/[id]">
+  ctx: RouteContext<"/api/projects/[id]/destinations/[destId]">
 ) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-
-  const { id } = await ctx.params;
-  const snap = await projectDoc(id).get();
+  const { id, destId } = await ctx.params;
+  if (!(await checkProjectOwner(id, session.uid))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+  const snap = await destinationsCol(id).doc(destId).get();
   if (!snap.exists) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
-  const data = snap.data();
-  if (data?.owner_uid !== session.uid) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
-  return NextResponse.json({ id: snap.id, ...data });
+  return NextResponse.json({ id: snap.id, ...snap.data() });
 }
 
-/**
- * PATCH /api/projects/[id]
- */
 export async function PATCH(
   req: NextRequest,
-  ctx: RouteContext<"/api/projects/[id]">
+  ctx: RouteContext<"/api/projects/[id]/destinations/[destId]">
 ) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-
-  const { id } = await ctx.params;
-  const snap = await projectDoc(id).get();
-  if (!snap.exists || snap.data()?.owner_uid !== session.uid) {
+  const { id, destId } = await ctx.params;
+  if (!(await checkProjectOwner(id, session.uid))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
@@ -53,8 +50,7 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-
-  const parsed = ProjectPatchSchema.safeParse(body);
+  const parsed = DestinationPatchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid patch", details: parsed.error.issues },
@@ -62,41 +58,31 @@ export async function PATCH(
     );
   }
 
-  await projectDoc(id).update({
+  const ref = destinationsCol(id).doc(destId);
+  const existing = await ref.get();
+  if (!existing.exists) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+  await ref.update({
     ...parsed.data,
     updated_at: FieldValue.serverTimestamp(),
   });
-
-  const fresh = await projectDoc(id).get();
+  const fresh = await ref.get();
   return NextResponse.json({ id: fresh.id, ...fresh.data() });
 }
 
-/**
- * DELETE /api/projects/[id]
- *
- * Removes the project doc AND every subcollection
- * (sources, destinations, secrets, runs, lessons, published) via
- * Firestore's recursiveDelete. Irreversible.
- */
 export async function DELETE(
   req: NextRequest,
-  ctx: RouteContext<"/api/projects/[id]">
+  ctx: RouteContext<"/api/projects/[id]/destinations/[destId]">
 ) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-
-  const { id } = await ctx.params;
-  const ref = projectDoc(id);
-  const snap = await ref.get();
-  if (!snap.exists || snap.data()?.owner_uid !== session.uid) {
+  const { id, destId } = await ctx.params;
+  if (!(await checkProjectOwner(id, session.uid))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
-
-  // recursiveDelete walks all subcollections + their docs in batches.
-  // For the scale we expect (≤50 sources, modest runs/lessons), this
-  // is fine in a single request.
-  await adminDb.recursiveDelete(ref);
+  await destinationsCol(id).doc(destId).delete();
   return NextResponse.json({ ok: true });
 }
