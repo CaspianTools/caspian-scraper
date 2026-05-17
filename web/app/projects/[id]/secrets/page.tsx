@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
-import { secretsCol } from "@/lib/firestore/collections";
+import { secretsCol, destinationsCol } from "@/lib/firestore/collections";
 import {
   SecretsManager,
   type SecretListItem,
@@ -17,8 +17,12 @@ export default async function SecretsPage({ params }: PageProps) {
   if (!session) redirect("/signin");
   const { id } = await params;
 
-  const snap = await secretsCol(id).get();
-  const secrets: SecretListItem[] = snap.docs.map((d) => {
+  const [secretsSnap, destsSnap] = await Promise.all([
+    secretsCol(id).get(),
+    destinationsCol(id).select("name", "secret_ref").get(),
+  ]);
+
+  const secrets: SecretListItem[] = secretsSnap.docs.map((d) => {
     const data = d.data();
     const updated = data.updated_at?.toDate?.()
       ? data.updated_at.toDate().toISOString().slice(0, 19) + "Z"
@@ -27,6 +31,23 @@ export default async function SecretsPage({ params }: PageProps) {
       : "";
     return { name: d.id, updated_at: updated };
   });
+
+  // Collect the unique secret_refs that destinations point at — these
+  // are the names the user almost certainly wants to add next. Pair
+  // each with the destination name(s) referencing it so the dropdown
+  // can show context.
+  const referenceMap = new Map<string, string[]>();
+  for (const d of destsSnap.docs) {
+    const data = d.data();
+    const ref = (data.secret_ref as string | undefined)?.trim();
+    if (!ref) continue;
+    const list = referenceMap.get(ref) ?? [];
+    list.push((data.name as string) || "(unnamed destination)");
+    referenceMap.set(ref, list);
+  }
+  const referencedNames = Array.from(referenceMap.entries()).map(
+    ([name, destinations]) => ({ name, destinations })
+  );
 
   return (
     <>
@@ -39,7 +60,11 @@ export default async function SecretsPage({ params }: PageProps) {
           name.
         </p>
       </div>
-      <SecretsManager projectId={id} secrets={secrets} />
+      <SecretsManager
+        projectId={id}
+        secrets={secrets}
+        referencedNames={referencedNames}
+      />
     </>
   );
 }

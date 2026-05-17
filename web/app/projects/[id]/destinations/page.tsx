@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { destinationsCol } from "@/lib/firestore/collections";
-import { SeedLegacyDestinationButton } from "@/components/SeedLegacyDestinationButton";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +54,6 @@ export default async function DestinationsListPage({ params }: PageProps) {
           + Add destination
         </Link>
       </div>
-
-      <SeedLegacyDestinationButton projectId={id} />
 
       {dests.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
