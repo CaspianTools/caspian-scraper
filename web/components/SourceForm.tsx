@@ -4,20 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/firebase/clientFetch";
-
-export interface SourceFormInitial {
-  name: string;
-  kind: "employer" | "agency" | "feed";
-  ats: "successfactors" | "jibe" | "unknown";
-  careers_url: string;
-  active: boolean;
-  countries: string[];
-  segment: string;
-  headquarters: string;
-  website: string;
-  linkedin: string;
-  notes: string;
-}
+import type { SourceFormInitial } from "./sourceFormDefaults";
 
 interface Props {
   projectId: string;
@@ -28,24 +15,6 @@ interface Props {
 interface FieldErr {
   field?: string;
   message: string;
-}
-
-const EMPTY: SourceFormInitial = {
-  name: "",
-  kind: "employer",
-  ats: "unknown",
-  careers_url: "",
-  active: true,
-  countries: [],
-  segment: "",
-  headquarters: "",
-  website: "",
-  linkedin: "",
-  notes: "",
-};
-
-export function emptySourceFormInitial(): SourceFormInitial {
-  return { ...EMPTY };
 }
 
 export function SourceForm({ projectId, sourceId, initial }: Props) {

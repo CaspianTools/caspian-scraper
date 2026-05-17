@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SourceForm, emptySourceFormInitial } from "@/components/SourceForm";
+import { SourceForm } from "@/components/SourceForm";
+import { emptySourceFormInitial } from "@/components/sourceFormDefaults";
 
 export const dynamic = "force-dynamic";
 

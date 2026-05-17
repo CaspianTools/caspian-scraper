@@ -4,30 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
-
-export interface DestinationFormInitial {
-  name: string;
-  base_url: string;
-  list_path: string;
-  post_path: string;
-  auth_header_name: string;
-  auth_header_format: string;
-  secret_ref: string;
-}
-
-const EMPTY: DestinationFormInitial = {
-  name: "",
-  base_url: "",
-  list_path: "",
-  post_path: "",
-  auth_header_name: "X-API-Key",
-  auth_header_format: "{secret}",
-  secret_ref: "",
-};
-
-export function emptyDestinationFormInitial(): DestinationFormInitial {
-  return { ...EMPTY };
-}
+import type { DestinationFormInitial } from "./destinationFormDefaults";
 
 interface Props {
   projectId: string;

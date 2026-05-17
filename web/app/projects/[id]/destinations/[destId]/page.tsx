@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  DestinationForm,
-  type DestinationFormInitial,
-} from "@/components/DestinationForm";
+import { DestinationForm } from "@/components/DestinationForm";
+import type { DestinationFormInitial } from "@/components/destinationFormDefaults";
 import { destinationsCol, secretsCol } from "@/lib/firestore/collections";
 
 export const dynamic = "force-dynamic";

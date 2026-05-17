@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sourcesCol } from "@/lib/firestore/collections";
-import {
-  SourceForm,
-  type SourceFormInitial,
-} from "@/components/SourceForm";
+import { SourceForm } from "@/components/SourceForm";
+import type { SourceFormInitial } from "@/components/sourceFormDefaults";
 
 export const dynamic = "force-dynamic";
 
