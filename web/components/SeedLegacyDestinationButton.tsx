@@ -4,32 +4,29 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 
-interface SeedResult {
-  total: number;
-  added: number;
-  skipped_duplicate: number;
-  skipped_invalid: number;
-}
-
-export function SeedLegacyButton({ projectId }: { projectId: string }) {
+export function SeedLegacyDestinationButton({
+  projectId,
+}: {
+  projectId: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<SeedResult | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function handleSeed() {
     if (
       !confirm(
-        "Import the legacy employers.json (191 entries) into this project? Existing duplicates will be skipped."
+        "Add the legacy entirelysafe.com API destination (referencing secret ENTIRELYSAFE_API_KEY)?"
       )
     )
       return;
     setBusy(true);
     setErr(null);
-    setResult(null);
+    setMsg(null);
     try {
       const res = await authedFetch(
-        `/api/projects/${projectId}/seed-legacy`,
+        `/api/projects/${projectId}/seed-legacy-destination`,
         { method: "POST" }
       );
       const body = await res.json().catch(() => ({}));
@@ -37,12 +34,13 @@ export function SeedLegacyButton({ projectId }: { projectId: string }) {
         setErr(body.error || `Request failed (${res.status})`);
         return;
       }
-      setResult({
-        total: body.total ?? 0,
-        added: body.added ?? 0,
-        skipped_duplicate: body.skipped_duplicate ?? 0,
-        skipped_invalid: body.skipped_invalid ?? 0,
-      });
+      if (body.created) {
+        setMsg(
+          "Added entirelysafe.com destination. Now add a secret named ENTIRELYSAFE_API_KEY on the Secrets tab."
+        );
+      } else {
+        setMsg(body.message || "Already exists.");
+      }
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -54,19 +52,12 @@ export function SeedLegacyButton({ projectId }: { projectId: string }) {
   return (
     <div className="rounded-lg border border-amber-300 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
       <div className="text-xs text-amber-900 dark:text-amber-200">
-        <strong>Legacy import (temporary).</strong> Bulk-load all 191
-        employers from <code>employers.json</code> into this project as
-        sources. Duplicates by careers URL are skipped. Remove this
-        button once HSE is fully migrated.
+        <strong>Legacy import (temporary).</strong> Add the entirelysafe.com API as a destination — the one the old <code>scrape.py</code> used to POST to. Skipped if it already exists. References secret <code>ENTIRELYSAFE_API_KEY</code>.
       </div>
       <div className="flex items-center gap-3">
-        {result && (
-          <span className="text-xs text-amber-900 dark:text-amber-200">
-            Added {result.added}, skipped {result.skipped_duplicate} dup
-            {result.skipped_invalid > 0
-              ? `, ${result.skipped_invalid} invalid`
-              : ""}
-            .
+        {msg && (
+          <span className="text-xs text-amber-900 dark:text-amber-200 max-w-md">
+            {msg}
           </span>
         )}
         {err && (
@@ -80,7 +71,7 @@ export function SeedLegacyButton({ projectId }: { projectId: string }) {
           disabled={busy}
           className="text-xs h-8 px-3 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 font-medium whitespace-nowrap"
         >
-          {busy ? "Importing…" : "Seed from employers.json"}
+          {busy ? "Adding…" : "Add entirelysafe destination"}
         </button>
       </div>
     </div>
