@@ -64,7 +64,34 @@ export function humanizeCron(cron: string): string {
     const stepMatch = h.match(/^\*\/(\d+)$/);
     if (stepMatch) {
       const n = parseInt(stepMatch[1], 10);
-      return `Every ${n} hour${n === 1 ? "" : "s"}, on minute ${minute}.`;
+      if (n === 1) return `Every hour, on minute ${minute}.`;
+      return `Every ${n} hours, on minute ${minute}.`;
+    }
+  }
+
+  // Pattern: minute hour */N * *  →  Every N days at HH:MM UTC
+  if (mo === "*" && dow === "*") {
+    const stepMatch = dom.match(/^\*\/(\d+)$/);
+    if (stepMatch) {
+      const n = parseInt(stepMatch[1], 10);
+      const t = formatTime(h, minute);
+      if (t) {
+        if (n === 1) return `Every day at ${t}.`;
+        return `Every ${n} days at ${t}.`;
+      }
+    }
+  }
+
+  // Pattern: minute hour 1 */N *  →  First of every N months at HH:MM UTC
+  if (dow === "*" && dom === "1") {
+    const stepMatch = mo.match(/^\*\/(\d+)$/);
+    if (stepMatch) {
+      const n = parseInt(stepMatch[1], 10);
+      const t = formatTime(h, minute);
+      if (t) {
+        if (n === 1) return `On the 1st of every month at ${t}.`;
+        return `On the 1st of every ${n} months at ${t}.`;
+      }
     }
   }
 
