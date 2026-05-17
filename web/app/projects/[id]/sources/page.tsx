@@ -1,9 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { sourcesCol } from "@/lib/firestore/collections";
+import { SeedLegacyButton } from "@/components/SeedLegacyButton";
 
 export const dynamic = "force-dynamic";
+
+async function legacyFileExists(): Promise<boolean> {
+  try {
+    await fs.access(path.resolve(process.cwd(), "..", "employers.json"));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,7 +37,10 @@ export default async function SourcesListPage({ params }: PageProps) {
   const { id } = await params;
 
   // Ownership is enforced by the parent layout.
-  const snap = await sourcesCol(id).orderBy("created_at", "desc").get();
+  const [snap, hasLegacy] = await Promise.all([
+    sourcesCol(id).orderBy("created_at", "desc").get(),
+    legacyFileExists(),
+  ]);
   const sources: SourceRow[] = snap.docs.map((d) => {
     const data = d.data();
     return {
@@ -57,6 +72,8 @@ export default async function SourcesListPage({ params }: PageProps) {
           + Add source
         </Link>
       </div>
+
+      {hasLegacy && <SeedLegacyButton projectId={id} /> }
 
       {sources.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
