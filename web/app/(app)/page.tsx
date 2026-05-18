@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
-import { SignOutButton } from "@/components/SignOutButton";
 import { humanizeCron } from "@/lib/cron/humanize";
 
 export const dynamic = "force-dynamic";
@@ -41,47 +40,33 @@ export default async function Home() {
   });
 
   return (
-    <main className="min-h-screen bg-zinc-50 dark:bg-black">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">
-            Caspian Scraper
-          </h1>
-          <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-            <span>{session.email}</span>
-            <SignOutButton />
-          </div>
+    <main className="max-w-6xl mx-auto px-6 py-10">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Projects</h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+            {projects.length === 0
+              ? "Create your first project to get started."
+              : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
+          </p>
         </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Projects</h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-              {projects.length === 0
-                ? "Create your first project to get started."
-                : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
-          <Link
-            href="/projects/new"
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors"
-          >
-            + New project
-          </Link>
-        </div>
-
-        {projects.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((p) => (
-              <ProjectCard key={p.id} project={p} />
-            ))}
-          </div>
-        )}
+        <Link
+          href="/projects/new"
+          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors"
+        >
+          + New project
+        </Link>
       </div>
+
+      {projects.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projects.map((p) => (
+            <ProjectCard key={p.id} project={p} />
+          ))}
+        </div>
+      )}
     </main>
   );
 }
