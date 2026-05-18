@@ -32,7 +32,6 @@ Optional environment variables:
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import re
@@ -52,13 +51,9 @@ from playwright.sync_api import (
     sync_playwright,
 )
 
-import firebase_admin
-from firebase_admin import credentials, firestore as fa_firestore
-from google.cloud.firestore_v1 import (
-    FieldFilter,
-    Increment,
-    SERVER_TIMESTAMP,
-)
+from google.cloud import firestore as gcf
+from google.cloud.firestore_v1 import FieldFilter, SERVER_TIMESTAMP
+from google.oauth2 import service_account
 
 
 # ---------------------------------------------------------------------------
@@ -792,9 +787,14 @@ _FIRESTORE_CLIENT: Any = None
 
 def get_db() -> Any:
     """
-    Lazily initialise the Firebase Admin SDK from the SA JSON in the
-    GOOGLE_APPLICATION_CREDENTIALS_JSON env var, and return a Firestore
-    client bound to FIRESTORE_DATABASE_ID (or the project default).
+    Build a Firestore client from the service-account JSON in the
+    GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Bound to
+    FIRESTORE_DATABASE_ID (e.g. "scraper") when set, otherwise the
+    project's default database.
+
+    Uses google.cloud.firestore.Client directly rather than going via
+    firebase_admin so we can pass `database=` for named DBs — the
+    Python firebase-admin wrapper doesn't expose that kwarg.
     """
     global _FIRESTORE_CLIENT
     if _FIRESTORE_CLIENT is not None:
@@ -812,14 +812,14 @@ def get_db() -> Any:
             f"GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON: {e}"
         ) from e
 
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(credentials.Certificate(sa_dict))
+    creds = service_account.Credentials.from_service_account_info(sa_dict)
+    project_id = sa_dict.get("project_id", "")
 
+    kwargs: dict[str, Any] = {"project": project_id, "credentials": creds}
     db_id = os.environ.get("FIRESTORE_DATABASE_ID", "").strip()
     if db_id:
-        _FIRESTORE_CLIENT = fa_firestore.client(database_id=db_id)
-    else:
-        _FIRESTORE_CLIENT = fa_firestore.client()
+        kwargs["database"] = db_id
+    _FIRESTORE_CLIENT = gcf.Client(**kwargs)
     return _FIRESTORE_CLIENT
 
 
