@@ -26,8 +26,17 @@ export function RunNowButton({ projectId }: { projectId: string }) {
       }
       if (body.reused) {
         setMsg("A run request is already pending for this project.");
+      } else if (body.dispatched) {
+        setMsg("Dispatched. Workflow fires within ~1 minute.");
+      } else if (body.dispatch_error) {
+        setMsg(
+          `Queued (cron ≤15 min). Instant dispatch failed: ${body.dispatch_error}`
+        );
       } else {
-        setMsg("Queued. The scraper will pick it up on its next tick.");
+        setMsg(
+          "Queued. The next cron tick (≤15 min) will pick it up. " +
+            "Set GH_DISPATCH_TOKEN for instant dispatch."
+        );
       }
       router.refresh();
     } catch (e) {
