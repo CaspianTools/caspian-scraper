@@ -60,3 +60,13 @@ env:
     secret: FIRESTORE_DATABASE_ID
     availability:
       - RUNTIME
+
+  # Optional: GitHub fine-grained PAT with Actions:read+write on the
+  # caspian-scraper repo. When set, "Run scrape now" fires a
+  # workflow_dispatch immediately (~1 min latency) instead of waiting
+  # for the next 15-minute cron tick. Without this, queued requests
+  # still run, just slower.
+  - variable: GH_DISPATCH_TOKEN
+    secret: GH_DISPATCH_TOKEN
+    availability:
+      - RUNTIME

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { projectDoc, runRequestsCol } from "@/lib/firestore/collections";
+import { dispatchScrapeWorkflow } from "@/lib/github/dispatch";
 
 async function checkProjectOwner(
   projectId: string,
@@ -88,5 +89,20 @@ export async function POST(
     run_id: "",
   });
 
-  return NextResponse.json({ id: ref.id, status: "pending" }, { status: 201 });
+  // Fire workflow_dispatch immediately (if GH_DISPATCH_TOKEN is set).
+  // This is best-effort: the cron will still pick up the request within
+  // 15 min even if dispatch fails. Awaiting here is fine — the GitHub
+  // API typically responds in under a second.
+  const dispatch = await dispatchScrapeWorkflow({ projectId: id });
+
+  return NextResponse.json(
+    {
+      id: ref.id,
+      status: "pending",
+      dispatched: dispatch.attempted && dispatch.ok === true,
+      dispatch_error:
+        dispatch.attempted && !dispatch.ok ? dispatch.error : undefined,
+    },
+    { status: 201 }
+  );
 }

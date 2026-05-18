@@ -1,18 +1,38 @@
 #!/usr/bin/env python3
 """
-HSE scraper.
+Multi-project scraper.
 
-Reads `employers.json`, scrapes each active employer's careers site for HSE
-job postings, and publishes new ones to entirelysafe.com via its REST API.
-The API is the single source of truth — there is no local cache or database;
-dedup is performed by listing existing vacancies before posting.
+Reads project / source / destination / secret configuration from
+Firestore (the `caspian-tools` / `scraper` named database) and writes
+run results, per-source lessons, and published items back to the same
+database.
+
+Triggered by GitHub Actions every 15 minutes (schedule_cron match
+across enabled projects) and on demand via workflow_dispatch with an
+optional `project_id` input.
 
 Required environment variables:
-  ENTIRELYSAFE_API_KEY    API key, sent as `X-API-Key` on every request.
+  GOOGLE_APPLICATION_CREDENTIALS_JSON
+      The Firebase Admin SDK service-account JSON (whole file as a
+      string). Set as the FIREBASE_ADMIN_SA_JSON repo secret.
+  FIRESTORE_DATABASE_ID
+      Name of the Firestore database (e.g. "scraper"). Omit for the
+      project default.
+
+Optional environment variables:
+  ONLY_PROJECT_ID    Run only this project (for workflow_dispatch).
+  DRY_RUN            "true" / "1" / "yes" → skip every POST and skip
+                     writing /published; still writes /runs + /lessons
+                     so the dashboard reflects what *would* have run.
+  MAX_PROJECTS_PER_TICK   Default 10. Caps how many projects this
+                          invocation will process.
+  PER_PROJECT_TIMEOUT_SECONDS   Default 300. Per-project soft budget
+                                (checked between sources).
 """
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
@@ -20,32 +40,37 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urljoin
 
 import bleach
 import requests
+from croniter import croniter
 from playwright.sync_api import (
     Page,
     TimeoutError as PWTimeout,
     sync_playwright,
 )
 
+import firebase_admin
+from firebase_admin import credentials, firestore as fa_firestore
+from google.cloud.firestore_v1 import (
+    FieldFilter,
+    Increment,
+    SERVER_TIMESTAMP,
+)
 
-API_BASE = "https://entirelysafe.com/api/v1"
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
 RATE_LIMIT_FLOOR = 10
-REPO_ROOT = Path(__file__).parent
-EMPLOYERS_FILE = REPO_ROOT / "employers.json"
-DATA_FILE = REPO_ROOT / "docs" / "data.json"
-LESSONS_FILE = REPO_ROOT / "state" / "lessons.jsonl"
-RUN_HISTORY_LIMIT = 30
-RECENT_PUBLISHED_LIMIT = 50
-DATA_SCHEMA_VERSION = 1
+DEFAULT_MAX_PROJECTS_PER_TICK = 10
+DEFAULT_PER_PROJECT_TIMEOUT_S = 300
 
-# HTML sanitization allow-lists for description content sent to entirelysafe.
-# Anything outside these is stripped (including scripts, styles, inline
-# event handlers, javascript: URLs).
+# HTML sanitization allow-lists for description content. Anything outside
+# these is stripped (scripts, styles, inline handlers, javascript: URLs).
 ALLOWED_HTML_TAGS = {
     "p", "br", "hr",
     "ul", "ol", "li",
@@ -55,8 +80,8 @@ ALLOWED_HTML_TAGS = {
 }
 ALLOWED_HTML_ATTRS = {"a": ["href", "rel", "title"]}
 
-# Firebase Auth UID of the user that scraped vacancies are attributed to.
-# Override via ENTIRELYSAFE_POSTED_BY env var if a different account should own them.
+# Default "posted_by" UID for entirelysafe-style destinations that need
+# an attribution field. Override per destination via field_map.
 DEFAULT_POSTED_BY = "zFuwetFo6HhHVG9hXmPt28wQFRA2"
 
 HSE_KEYWORDS = [
@@ -69,8 +94,6 @@ HSE_KEYWORDS = [
     "field safety",
 ]
 
-# Order matters — first match wins.
-# Values must match the entirelysafe schema: 'full-time' | 'part-time' | 'contract' | 'temporary'.
 EMPLOYMENT_TYPE_MAP: list[tuple[str, str]] = [
     ("full time", "full-time"),
     ("full-time", "full-time"),
@@ -84,8 +107,8 @@ EMPLOYMENT_TYPE_MAP: list[tuple[str, str]] = [
     ("temp", "temporary"),
 ]
 
-# Country-name → ISO-2 code (lowercase, matches src/data/countries.ts in entirelysafe).
-# Longest names match first in infer_country() so "united states" beats "states".
+# Country-name → ISO-2 code (lowercase). Longest names match first in
+# infer_country() so "united states" beats "states".
 COUNTRY_NAME_TO_CODE: dict[str, str] = {
     "united states": "us", "usa": "us", "u.s.": "us", "u.s.a.": "us",
     "united kingdom": "gb", "uk": "gb", "england": "gb", "scotland": "gb",
@@ -118,55 +141,37 @@ COUNTRY_NAME_TO_CODE: dict[str, str] = {
 }
 _COUNTRY_NAMES_BY_LENGTH: list[str] = sorted(COUNTRY_NAME_TO_CODE, key=len, reverse=True)
 
-# Common oil-and-gas / industrial cities → ISO-2 country codes. Used as a
-# fallback when the location string omits the country name (e.g. "Dhahran"
-# alone rather than "Dhahran, Saudi Arabia"). Lowercase keys; longest-first
-# match in infer_country so "abu dhabi" beats "dhabi".
 CITY_TO_COUNTRY: dict[str, str] = {
-    # Saudi Arabia
     "dhahran": "sa", "riyadh": "sa", "al-khobar": "sa", "khobar": "sa",
     "jeddah": "sa", "yanbu": "sa", "jubail": "sa", "tabuk": "sa",
-    # UAE
     "abu dhabi": "ae", "dubai": "ae", "sharjah": "ae", "ruwais": "ae",
-    # Qatar
     "ras laffan": "qa", "mesaieed": "qa", "doha": "qa", "lusail": "qa",
     "al-shaheen": "qa", "al shaheen": "qa", "idd el-shargi": "qa",
-    # Oman / Bahrain / Kuwait
     "muscat": "om", "sohar": "om",
     "manama": "bh",
     "kuwait city": "kw", "ahmadi": "kw",
-    # Iraq
     "basra": "iq", "baghdad": "iq", "erbil": "iq", "kurdistan": "iq",
-    # Iran
     "tehran": "ir",
-    # Norway / UK / Netherlands
     "stavanger": "no", "bergen": "no", "trondheim": "no", "oslo": "no",
     "aberdeen": "gb", "london": "gb", "great yarmouth": "gb",
     "amsterdam": "nl", "rotterdam": "nl", "the hague": "nl",
-    # USA
     "houston": "us", "midland": "us", "odessa": "us", "denver": "us",
     "anchorage": "us", "new orleans": "us", "lafayette": "us",
-    # Canada
     "calgary": "ca", "edmonton": "ca", "fort mcmurray": "ca",
     "halifax": "ca", "st. john's": "ca", "st johns": "ca",
-    # Caspian
     "baku": "az",
     "atyrau": "kz", "almaty": "kz", "astana": "kz", "aktau": "kz",
-    # Asia-Pacific
     "perth": "au", "brisbane": "au", "darwin": "au", "melbourne": "au",
     "kuala lumpur": "my", "miri": "my", "bintulu": "my",
     "jakarta": "id", "balikpapan": "id",
     "mumbai": "in", "chennai": "in", "new delhi": "in",
-    # Africa
     "lagos": "ng", "abuja": "ng", "port harcourt": "ng",
     "cairo": "eg", "alexandria": "eg",
-    # Europe
     "paris": "fr", "pau": "fr",
     "milan": "it", "rome": "it",
     "madrid": "es", "barcelona": "es",
     "moscow": "ru", "saint petersburg": "ru", "sakhalin": "ru",
     "istanbul": "tr",
-    # Latin America
     "mexico city": "mx", "ciudad del carmen": "mx", "villahermosa": "mx",
     "rio de janeiro": "br", "macae": "br",
     "neuquen": "ar", "neuquén": "ar",
@@ -178,7 +183,8 @@ _CITY_NAMES_BY_LENGTH: list[str] = sorted(CITY_TO_COUNTRY, key=len, reverse=True
 
 
 # ---------------------------------------------------------------------------
-# Domain types
+# Domain types and pure helpers (preserved from the legacy single-tenant
+# implementation; no Firestore dependency)
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -223,13 +229,41 @@ def make_slug(title: str, company: str) -> str:
     return raw.strip("-")
 
 
+_SCRIPT_STYLE_RE = re.compile(
+    r"<(script|style|noscript|iframe)\b[^>]*>.*?</\1\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def sanitize_description(html_or_text: str) -> str:
+    """Strip <script>/<style>/inline-handlers and unknown tags before publishing."""
+    if not html_or_text:
+        return ""
+    cleaned = _SCRIPT_STYLE_RE.sub("", html_or_text)
+    return bleach.clean(
+        cleaned,
+        tags=ALLOWED_HTML_TAGS,
+        attributes=ALLOWED_HTML_ATTRS,
+        strip=True,
+        strip_comments=True,
+    )
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 # ---------------------------------------------------------------------------
-# Parser registry
+# Parser registry (preserved from the legacy implementation — parsers don't
+# care whether config comes from JSON or Firestore)
 # ---------------------------------------------------------------------------
 
 class ScrapeTimeoutError(RuntimeError):
-    """Raised when a parser can't load a search page — surfaced as a
-    per-employer error rather than swallowed into a silent `found: 0`."""
+    """Raised when a parser can't load a search page."""
 
 
 class Parser(Protocol):
@@ -238,19 +272,17 @@ class Parser(Protocol):
 
 
 class BaseHtmlParser:
-    """
-    Shared scaffolding for HTML-scraping parsers. Concrete subclasses
-    declare five class-level selector chains plus an optional
-    ``DETAIL_HREF_RE`` filter; they may override ``collect_links`` if
-    their site uses something other than click-Next pagination.
-    """
-
     LIST_LINK_SELECTORS: list[str] = []
     DETAIL_TITLE_SELECTORS: list[str] = []
     DETAIL_LOCATION_SELECTORS: list[str] = []
     DETAIL_DESCRIPTION_SELECTORS: list[str] = []
     NEXT_PAGE_SELECTORS: list[str] = []
     DETAIL_HREF_RE: "re.Pattern[str] | None" = None
+
+    SEARCH_GOTO_TIMEOUT_MS = 45_000
+    SEARCH_SELECTOR_TIMEOUT_MS = 8_000
+    DETAIL_GOTO_TIMEOUT_MS = 30_000
+    DETAIL_SELECTOR_TIMEOUT_MS = 6_000
 
     def __init__(self, page: Page) -> None:
         self.page = page
@@ -289,11 +321,6 @@ class BaseHtmlParser:
                 return html
         return ""
 
-    SEARCH_GOTO_TIMEOUT_MS = 45_000
-    SEARCH_SELECTOR_TIMEOUT_MS = 8_000
-    DETAIL_GOTO_TIMEOUT_MS = 30_000
-    DETAIL_SELECTOR_TIMEOUT_MS = 6_000
-
     def _goto_search(self, search_url: str) -> None:
         try:
             self.page.goto(
@@ -305,8 +332,6 @@ class BaseHtmlParser:
             raise ScrapeTimeoutError(
                 f"search page timed out: {search_url}"
             ) from e
-        # Give SPA-style careers sites a chance to render their list before we
-        # gather. Failures here are non-fatal — _gather_links logs its own miss.
         if self.LIST_LINK_SELECTORS:
             try:
                 self.page.wait_for_selector(
@@ -356,7 +381,6 @@ class BaseHtmlParser:
         return False
 
     def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
-        """Default: load search page, gather links, click Next, repeat."""
         self._goto_search(search_url)
         seen: list[str] = []
         for page_idx in range(max_pages):
@@ -405,9 +429,6 @@ class BaseHtmlParser:
             print(f"no title selector matched on {url}", file=sys.stderr)
             return None
 
-        # Gate on title BEFORE extracting the description — most jobs on a
-        # search page that lacks an HSE filter will fail this check, so
-        # skipping description extraction is a 50%+ saving on per-page work.
         if not is_hse(title):
             return None
 
@@ -444,12 +465,6 @@ class BaseHtmlParser:
 
 
 class SuccessFactorsParser(BaseHtmlParser):
-    """
-    SAP SuccessFactors career-site parser. Aramco, Halliburton, and many
-    other large employers use SF; skin-level differences between tenants
-    are absorbed by the per-field selector fallback chains below.
-    """
-
     LIST_LINK_SELECTORS = [
         "a.jobTitle-link",
         "a[data-careersite-propertyid='title']",
@@ -479,12 +494,6 @@ class SuccessFactorsParser(BaseHtmlParser):
 
 
 class JibeParser(BaseHtmlParser):
-    """
-    Jibe (iCIMS recruitment marketing) career-site parser.
-    Used by QatarEnergy and other employers whose sites are served via
-    cms.jibecdn.com. Job detail URLs follow /jobs/<numeric-id>?lang=en-us.
-    """
-
     LIST_LINK_SELECTORS = [
         "a[href*='/jobs/'][href*='lang=']",
         "a.job-tile-link",
@@ -511,11 +520,9 @@ class JibeParser(BaseHtmlParser):
         "a[aria-label='Next']",
         "button[aria-label='Next']",
     ]
-    # Drop nav links that share /jobs/ prefix (e.g. /jobs/categories/...).
     DETAIL_HREF_RE = re.compile(r"/jobs/\d+")
 
     def collect_links(self, search_url: str, max_pages: int = 5) -> list[str]:
-        """Jibe lazy-loads via scroll, with click-Next fallback."""
         self._goto_search(search_url)
         seen: list[str] = []
 
@@ -557,11 +564,11 @@ PARSERS: dict[str, type] = {
 
 
 # ---------------------------------------------------------------------------
-# entirelysafe.com client
+# Destination client (generic, parameterised by Firestore destination doc)
 # ---------------------------------------------------------------------------
 
 class AuthHaltError(Exception):
-    """Raised on 401/403 responses — a halting condition for the run."""
+    """Raised on 401/403 — halts the run."""
 
 
 def _extract_error(r: requests.Response) -> tuple[str, str]:
@@ -592,43 +599,77 @@ def _maybe_sleep_for_rate_limit(r: requests.Response) -> None:
         time.sleep(wait)
 
 
-class EntirelySafeClient:
-    def __init__(self, api_key: str, base_url: str = API_BASE) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.session = requests.Session()
-        self.session.headers.update({
-            "X-API-Key": api_key,
-            "Accept": "application/json",
-        })
+class DestinationClient:
+    """
+    Generic HTTP client built from a Firestore destination doc + the
+    resolved secret value. Supports two operations:
 
-    def list_vacancies(self) -> list[dict]:
+      list_existing()  → GET {base_url}{list_path}, returns rows for dedup.
+      post_role(role)  → POST {base_url}{post_path} with the built payload.
+
+    Auth: the header_name + header_format build a single header from the
+    secret. Format examples: "{secret}", "Bearer {secret}".
+    """
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        list_path: str,
+        post_path: str,
+        auth_header_name: str,
+        auth_header_format: str,
+        secret_value: str,
+        field_map: dict[str, str] | None = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.list_path = list_path
+        self.post_path = post_path
+        self.field_map = field_map or {}
+        self.session = requests.Session()
+        if auth_header_name:
+            header_value = (auth_header_format or "{secret}").replace(
+                "{secret}", secret_value
+            )
+            self.session.headers[auth_header_name] = header_value
+        self.session.headers["Accept"] = "application/json"
+
+    def list_existing(self) -> list[dict]:
+        """
+        Walk the destination's list endpoint, returning all rows. Assumes
+        entirelysafe-style { data: [...], meta: { total_pages } } pagination
+        when present; otherwise treats the response as a single page.
+        """
         results: list[dict] = []
         page = 1
+        url = f"{self.base_url}{self.list_path}"
         while True:
-            r = self.session.get(
-                f"{self.base_url}/vacancies",
-                params={"per_page": 100, "page": page},
-                timeout=30,
-            )
+            r = self.session.get(url, params={"per_page": 100, "page": page}, timeout=30)
             if r.status_code in (401, 403):
                 code, message = _extract_error(r)
                 raise AuthHaltError(f"{r.status_code} {code}: {message}")
             if r.status_code != 200:
                 code, message = _extract_error(r)
                 raise RuntimeError(
-                    f"GET /vacancies?page={page} → {r.status_code} {code}: {message}"
+                    f"GET {self.list_path}?page={page} → {r.status_code} {code}: {message}"
                 )
             try:
                 body = r.json() or {}
             except ValueError:
                 raise RuntimeError(
-                    f"GET /vacancies?page={page} returned non-JSON body"
+                    f"GET {self.list_path}?page={page} returned non-JSON body"
                 )
-            results.extend(body.get("data") or [])
-            meta = body.get("meta") or {}
-            try:
-                total_pages = int(meta.get("total_pages") or 1)
-            except (TypeError, ValueError):
+            if isinstance(body, dict) and isinstance(body.get("data"), list):
+                results.extend(body["data"])
+                meta = body.get("meta") or {}
+                try:
+                    total_pages = int(meta.get("total_pages") or 1)
+                except (TypeError, ValueError):
+                    total_pages = 1
+            elif isinstance(body, list):
+                results.extend(body)
+                total_pages = 1
+            else:
                 total_pages = 1
             _maybe_sleep_for_rate_limit(r)
             if page >= total_pages:
@@ -636,17 +677,19 @@ class EntirelySafeClient:
             page += 1
         return results
 
-    def post_vacancy(
+    def post_role(
         self, payload: dict
     ) -> tuple[str, dict | None, str]:
         """
-        Post a vacancy. Returns (status, data, message) where status is one of:
+        Returns (status, data, message) where status is one of:
           - "ok"          — successful create
           - "auth"        — 401/403, caller should halt
           - "validation"  — 400 / VALIDATION_ERROR, skip role and continue
           - "other"       — any other non-success, skip role and continue
         """
-        r = self._post_once(payload)
+        mapped = _apply_field_map(payload, self.field_map)
+        url = f"{self.base_url}{self.post_path}"
+        r = self.session.post(url, json=mapped, timeout=30)
 
         if r.status_code == 429:
             reset = r.headers.get("X-RateLimit-Reset")
@@ -663,13 +706,15 @@ class EntirelySafeClient:
                 file=sys.stderr,
             )
             time.sleep(wait)
-            r = self._post_once(payload)
+            r = self.session.post(url, json=mapped, timeout=30)
 
         if r.status_code in (200, 201):
             _maybe_sleep_for_rate_limit(r)
             data: dict | None = None
             try:
-                data = (r.json() or {}).get("data")
+                data = (r.json() or {}).get("data") if r.headers.get(
+                    "Content-Type", ""
+                ).startswith("application/json") else None
             except ValueError:
                 data = None
             return ("ok", data, "")
@@ -697,63 +742,28 @@ class EntirelySafeClient:
 
         return ("other", None, f"HTTP {r.status_code} {code}: {message}")
 
-    def _post_once(self, payload: dict) -> requests.Response:
-        return self.session.post(
-            f"{self.base_url}/vacancies",
-            json=payload,
-            timeout=30,
-        )
 
-
-# ---------------------------------------------------------------------------
-# Config + payload helpers
-# ---------------------------------------------------------------------------
-
-def load_employers() -> list[dict]:
-    if not EMPLOYERS_FILE.exists():
-        raise FileNotFoundError(
-            f"employers.json not found at {EMPLOYERS_FILE}"
-        )
-    try:
-        data = json.loads(EMPLOYERS_FILE.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"employers.json is not valid JSON: {e}") from e
-    if not isinstance(data, list):
-        raise ValueError("employers.json must be a JSON array")
-    for i, entry in enumerate(data):
-        if not isinstance(entry, dict):
-            raise ValueError(f"employers.json[{i}] must be an object")
-        for key in ("name", "careers_url", "ats", "active"):
-            if key not in entry:
-                raise ValueError(
-                    f"employers.json[{i}] missing required key '{key}'"
-                )
-    return data
-
-
-_SCRIPT_STYLE_RE = re.compile(
-    r"<(script|style|noscript|iframe)\b[^>]*>.*?</\1\s*>",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def sanitize_description(html_or_text: str) -> str:
-    """Strip <script>/<style>/inline-handlers and unknown tags before publishing."""
-    if not html_or_text:
-        return ""
-    # Bleach with strip=True removes the *tags* but keeps *inner text*; for
-    # <script>/<style>/<iframe>/<noscript> we want both gone, so pre-strip them.
-    cleaned = _SCRIPT_STYLE_RE.sub("", html_or_text)
-    return bleach.clean(
-        cleaned,
-        tags=ALLOWED_HTML_TAGS,
-        attributes=ALLOWED_HTML_ATTRS,
-        strip=True,
-        strip_comments=True,
-    )
+def _apply_field_map(
+    payload: dict, field_map: dict[str, str]
+) -> dict:
+    """
+    Rename keys in `payload` per `field_map`. Keys not in the map are
+    passed through unchanged. Lets users configure destinations whose
+    API expects different field names without code changes.
+    """
+    if not field_map:
+        return payload
+    out: dict = {}
+    for k, v in payload.items():
+        out[field_map.get(k, k)] = v
+    return out
 
 
 def build_payload(role: Role, slug: str) -> dict:
+    """
+    Build the canonical role payload. Destinations may rename keys via
+    their field_map. Schema matches entirelysafe.com's /vacancies API.
+    """
     payload: dict = {
         "title": role.title,
         "slug": slug,
@@ -762,7 +772,9 @@ def build_payload(role: Role, slug: str) -> dict:
         "employmentType": role.employment_type,
         "applicationUrl": role.application_url,
         "status": "published",
-        "postedBy": os.environ.get("ENTIRELYSAFE_POSTED_BY", "").strip() or DEFAULT_POSTED_BY,
+        "postedBy": os.environ.get(
+            "ENTIRELYSAFE_POSTED_BY", ""
+        ).strip() or DEFAULT_POSTED_BY,
     }
     if role.country:
         payload["location"] = {"country": role.country, "remote": False}
@@ -772,177 +784,239 @@ def build_payload(role: Role, slug: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Dashboard data file (docs/data.json)
+# Firestore plumbing
 # ---------------------------------------------------------------------------
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+_FIRESTORE_CLIENT: Any = None
 
 
-def repo_full_name() -> str:
-    return os.environ.get("GITHUB_REPOSITORY", "CaspianTools/caspian-scraper")
+def get_db() -> Any:
+    """
+    Lazily initialise the Firebase Admin SDK from the SA JSON in the
+    GOOGLE_APPLICATION_CREDENTIALS_JSON env var, and return a Firestore
+    client bound to FIRESTORE_DATABASE_ID (or the project default).
+    """
+    global _FIRESTORE_CLIENT
+    if _FIRESTORE_CLIENT is not None:
+        return _FIRESTORE_CLIENT
 
-
-def load_data_file() -> dict:
-    if not DATA_FILE.exists():
-        return {}
-    try:
-        loaded = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-        return loaded if isinstance(loaded, dict) else {}
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def employer_meta(employers: list[dict]) -> list[dict]:
-    return [
-        {
-            "name": str(e.get("name") or "").strip(),
-            "ats": str(e.get("ats") or "").strip(),
-            "active": bool(e.get("active")),
-            "url": str(e.get("url") or "").strip(),
-        }
-        for e in employers
-    ]
-
-
-def update_data_json(run_record: dict, employers_meta: list[dict]) -> None:
-    """Append the run to docs/data.json, trimming history and updating totals."""
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    existing = load_data_file()
-
-    runs = list(existing.get("runs") or [])
-    runs.append(run_record)
-    runs = runs[-RUN_HISTORY_LIMIT:]
-
-    recent = list(existing.get("recent_published") or [])
-    role_ts = run_record.get("finished_at") or run_record.get("started_at")
-    for role in run_record.get("published_roles") or []:
-        recent.append({"ts": role_ts, **role})
-    recent = recent[-RECENT_PUBLISHED_LIMIT:]
-
-    prev_totals = existing.get("totals") or {}
-    totals = {
-        "runs": int(prev_totals.get("runs") or 0) + 1,
-        "found_alltime": int(prev_totals.get("found_alltime") or 0)
-                         + int(run_record.get("found") or 0),
-        "published_alltime": int(prev_totals.get("published_alltime") or 0)
-                             + int(run_record.get("published") or 0),
-        "errors_alltime": int(prev_totals.get("errors_alltime") or 0)
-                          + len(run_record.get("errors") or []),
-    }
-
-    payload = {
-        "schema_version": DATA_SCHEMA_VERSION,
-        "scraper_repo": repo_full_name(),
-        "last_updated": run_record.get("finished_at") or utc_now_iso(),
-        "employers": employers_meta,
-        "totals": totals,
-        "runs": runs,
-        "recent_published": recent,
-    }
-
-    DATA_FILE.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-
-
-def finalize_run(
-    summary: dict,
-    by_employer: list[dict],
-    employers: list[dict],
-    started_at: str,
-    started_mono: float,
-    auth_halt: bool,
-) -> None:
-    finished_at = utc_now_iso()
-    duration = max(0, int(time.monotonic() - started_mono))
-    run_status = "auth_halt" if auth_halt else (
-        "error" if summary["errors"] else "ok"
-    )
-    run_record = {
-        "started_at": started_at,
-        "finished_at": finished_at,
-        "duration_seconds": duration,
-        "status": run_status,
-        **summary,
-        "by_employer": by_employer,
-    }
-    try:
-        update_data_json(run_record, employer_meta(employers))
-    except Exception as e:
-        print(
-            f"failed to update {DATA_FILE}: {type(e).__name__}: {e}",
-            file=sys.stderr,
+    sa_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip()
+    if not sa_json:
+        raise RuntimeError(
+            "GOOGLE_APPLICATION_CREDENTIALS_JSON env var is not set"
         )
     try:
-        append_lessons(by_employer, started_at, finished_at, run_status)
-    except Exception as e:
-        print(
-            f"failed to update {LESSONS_FILE}: {type(e).__name__}: {e}",
-            file=sys.stderr,
-        )
+        sa_dict = json.loads(sa_json)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON: {e}"
+        ) from e
+
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(credentials.Certificate(sa_dict))
+
+    db_id = os.environ.get("FIRESTORE_DATABASE_ID", "").strip()
+    if db_id:
+        _FIRESTORE_CLIENT = fa_firestore.client(database_id=db_id)
+    else:
+        _FIRESTORE_CLIENT = fa_firestore.client()
+    return _FIRESTORE_CLIENT
 
 
-def _verdict(emp: dict) -> str:
-    """Classify a per-employer run outcome for LLM filtering."""
-    if emp.get("errors"):
+def _doc_with_id(snap) -> dict:
+    data = snap.to_dict() or {}
+    data["__id"] = snap.id
+    return data
+
+
+def load_project(db, project_id: str) -> dict | None:
+    snap = db.collection("projects").document(project_id).get()
+    if not snap.exists:
+        return None
+    return _doc_with_id(snap)
+
+
+def load_sources(db, project_id: str, *, active_only: bool = True) -> list[dict]:
+    col = db.collection("projects").document(project_id).collection("sources")
+    q = col
+    if active_only:
+        q = q.where(filter=FieldFilter("active", "==", True))
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def load_destinations(db, project_id: str) -> list[dict]:
+    col = (
+        db.collection("projects")
+        .document(project_id)
+        .collection("destinations")
+    )
+    return [_doc_with_id(d) for d in col.stream()]
+
+
+def load_secrets(db, project_id: str) -> dict[str, str]:
+    col = (
+        db.collection("projects").document(project_id).collection("secrets")
+    )
+    out: dict[str, str] = {}
+    for d in col.stream():
+        v = (d.to_dict() or {}).get("value")
+        if isinstance(v, str):
+            out[d.id] = v
+    return out
+
+
+def list_pending_run_requests(db) -> list[dict]:
+    q = (
+        db.collection("run_requests")
+        .where(filter=FieldFilter("status", "==", "pending"))
+        .order_by("created_at")
+        .limit(50)
+    )
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def update_run_request(db, request_id: str, updates: dict) -> None:
+    db.collection("run_requests").document(request_id).update(updates)
+
+
+def list_enabled_projects(db) -> list[dict]:
+    q = db.collection("projects").where(filter=FieldFilter("enabled", "==", True))
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def find_due_work(
+    db, now: datetime
+) -> list[tuple[str, str]]:
+    """
+    Returns a list of (project_id, trigger) pairs to run this tick.
+      trigger == "request:<request_id>" for queued ad-hoc runs
+      trigger == "schedule"             for cron-due projects
+
+    Deduplicates: if a project has both a pending request AND its cron
+    is due, the request wins (one run satisfies both).
+    """
+    work: list[tuple[str, str]] = []
+    seen_projects: set[str] = set()
+
+    # Ad-hoc requests first — most user-visible.
+    for req in list_pending_run_requests(db):
+        pid = str(req.get("project_id") or "")
+        if not pid or pid in seen_projects:
+            continue
+        seen_projects.add(pid)
+        work.append((pid, f"request:{req['__id']}"))
+
+    # Then schedule-due projects.
+    for proj in list_enabled_projects(db):
+        pid = proj["__id"]
+        if pid in seen_projects:
+            continue
+        cron = str(proj.get("schedule_cron") or "").strip()
+        if not cron:
+            continue
+        last_run_at = proj.get("last_run_at")
+        last_dt: datetime | None = None
+        if hasattr(last_run_at, "to_datetime"):
+            try:
+                last_dt = last_run_at.to_datetime()
+            except Exception:
+                last_dt = None
+        elif isinstance(last_run_at, datetime):
+            last_dt = last_run_at
+        if not _is_cron_due(cron, last_dt, now):
+            continue
+        seen_projects.add(pid)
+        work.append((pid, "schedule"))
+
+    return work
+
+
+def _is_cron_due(cron_expr: str, last_run_at: datetime | None, now: datetime) -> bool:
+    """
+    True if the cron expression's next firing after `last_run_at` falls
+    at or before `now`. Never-run projects (last_run_at is None) are
+    always due.
+    """
+    if last_run_at is None:
+        return True
+    try:
+        # Step from the last run forward; if the next scheduled point is
+        # already past, we owe at least one run.
+        itr = croniter(cron_expr, last_run_at)
+        next_run = itr.get_next(datetime)
+        if next_run.tzinfo is None:
+            next_run = next_run.replace(tzinfo=timezone.utc)
+        return next_run <= now
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Per-project runner
+# ---------------------------------------------------------------------------
+
+def _verdict(
+    *, errors_count: int, published: int, found: int
+) -> str:
+    if errors_count > 0:
         return "errors"
-    if emp.get("published", 0) > 0:
+    if published > 0:
         return "ok"
-    if emp.get("found", 0) == 0:
-        # Silent failure: page loaded fine, no HSE roles matched. Most
-        # actionable — usually means selectors drifted or HSE_KEYWORDS too narrow.
+    if found == 0:
         return "zero_found"
-    # found > 0 but published == 0 — every role was a duplicate of an existing
-    # entirelysafe.com vacancy. Informational, not an error.
     return "no_new"
 
 
-def append_lessons(
-    by_employer: list[dict],
-    run_started: str,
-    run_finished: str,
-    run_status: str,
-) -> None:
-    """Append one JSONL line per *active* employer for downstream LLM analysis.
-
-    The state file is bot-owned and append-only. Each line is self-contained
-    context so the LLM can reason about a single (employer, run) pair without
-    cross-referencing other lines.
+def run_project(
+    db,
+    project_id: str,
+    trigger: str,
+    *,
+    dry_run: bool,
+    per_project_deadline: float,
+) -> dict:
     """
-    if not by_employer:
-        return
-    LESSONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with LESSONS_FILE.open("a", encoding="utf-8") as f:
-        for emp in by_employer:
-            if not emp.get("active"):
-                continue
-            entry = {
-                "run_started": run_started,
-                "run_finished": run_finished,
-                "run_status": run_status,
-                "employer": emp.get("name", ""),
-                "ats": emp.get("ats", ""),
-                "careers_url": emp.get("url", ""),
-                "verdict": _verdict(emp),
-                "found": emp.get("found", 0),
-                "published": emp.get("published", 0),
-                "skipped_duplicate": emp.get("skipped_duplicate", 0),
-                "errors": list(emp.get("errors", [])),
-            }
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-def main() -> int:
+    Run one project end-to-end. Writes a /runs/{run_id} doc, per-source
+    /lessons docs, and /published docs (unless dry_run). Returns a
+    summary dict for the workflow logs.
+    """
     started_at = utc_now_iso()
     started_mono = time.monotonic()
 
-    summary: dict = {
+    project = load_project(db, project_id)
+    if project is None:
+        return {
+            "project_id": project_id,
+            "status": "error",
+            "error": "project not found",
+        }
+
+    project_name = str(project.get("name") or project_id)
+    print(f"\n=== Project: {project_name} ({project_id}) trigger={trigger} dry={dry_run} ===")
+
+    # Pre-create the /runs/{run_id} doc so the UI sees the run as running.
+    run_ref = (
+        db.collection("projects").document(project_id).collection("runs").document()
+    )
+    run_id = run_ref.id
+    run_ref.set({
+        "started_at": SERVER_TIMESTAMP,
+        "finished_at": None,
+        "duration_seconds": 0,
+        "status": "running",
+        "trigger": trigger,
+        "dry_run": dry_run,
+        "totals": {
+            "checked": 0,
+            "found": 0,
+            "published": 0,
+            "skipped_duplicate": 0,
+            "errors_count": 0,
+        },
+        "errors": [],
+    })
+
+    summary = {
         "checked": 0,
         "skipped_inactive": 0,
         "found": 0,
@@ -951,113 +1025,142 @@ def main() -> int:
         "errors": [],
         "published_roles": [],
     }
-    by_employer: list[dict] = []
-    employers: list[dict] = []
     auth_halt = False
-    exit_code = 0
+    overrun = False
 
     try:
-        api_key = os.environ.get("ENTIRELYSAFE_API_KEY", "").strip()
-        if not api_key:
-            msg = "ENTIRELYSAFE_API_KEY is not set"
-            print(msg, file=sys.stderr)
-            summary["errors"].append(msg)
-            exit_code = 1
-            return exit_code
+        sources = load_sources(db, project_id, active_only=True)
+        destinations = load_destinations(db, project_id)
+        secrets = load_secrets(db, project_id)
 
-        try:
-            employers = load_employers()
-        except (FileNotFoundError, ValueError) as e:
-            msg = f"config error: {e}"
-            print(msg, file=sys.stderr)
-            summary["errors"].append(msg)
-            exit_code = 1
-            return exit_code
+        if not destinations:
+            summary["errors"].append("no destinations configured")
+            return _finalize_project_run(
+                db, project_id, run_ref, run_id, project, summary,
+                started_at, started_mono, trigger, dry_run,
+                auth_halt=False, overrun=False,
+            )
 
-        client = EntirelySafeClient(api_key)
+        # Build clients keyed by destination doc id (used for posting).
+        clients: dict[str, DestinationClient] = {}
+        for dest in destinations:
+            secret_ref = str(dest.get("secret_ref") or "").strip()
+            secret_value = secrets.get(secret_ref, "")
+            if not secret_value:
+                summary["errors"].append(
+                    f"destination {dest.get('name') or dest['__id']}: "
+                    f"secret '{secret_ref}' not set"
+                )
+                continue
+            clients[dest["__id"]] = DestinationClient(
+                base_url=str(dest.get("base_url") or ""),
+                list_path=str(dest.get("list_path") or ""),
+                post_path=str(dest.get("post_path") or ""),
+                auth_header_name=str(dest.get("auth_header_name") or ""),
+                auth_header_format=str(dest.get("auth_header_format") or "{secret}"),
+                secret_value=secret_value,
+                field_map=dest.get("field_map") or {},
+            )
 
-        try:
-            existing = client.list_vacancies()
-        except AuthHaltError as e:
-            msg = f"auth failure listing vacancies (halting): {e}"
-            print(msg, file=sys.stderr)
-            summary["errors"].append(msg)
-            exit_code = 1
-            return exit_code
-        except Exception as e:
-            msg = f"failed to list existing vacancies: {type(e).__name__}: {e}"
-            print(msg, file=sys.stderr)
-            summary["errors"].append(msg)
-            exit_code = 1
-            return exit_code
+        if not clients:
+            summary["errors"].append("no usable destinations (all secrets missing)")
+            return _finalize_project_run(
+                db, project_id, run_ref, run_id, project, summary,
+                started_at, started_mono, trigger, dry_run,
+                auth_halt=False, overrun=False,
+            )
 
+        # Pre-fetch existing items from each destination for dedup.
         existing_slugs: set[str] = set()
         existing_title_company: set[tuple[str, str]] = set()
-        for v in existing:
-            slug = (v.get("slug") or "").strip()
-            if slug:
-                existing_slugs.add(slug)
-            title = (v.get("title") or "").strip().lower()
-            company = (v.get("company") or "").strip().lower()
-            if title and company:
-                existing_title_company.add((title, company))
+        for dest_id, client in clients.items():
+            try:
+                for v in client.list_existing():
+                    slug = (v.get("slug") or "").strip()
+                    if slug:
+                        existing_slugs.add(slug)
+                    title = (v.get("title") or "").strip().lower()
+                    company = (v.get("company") or "").strip().lower()
+                    if title and company:
+                        existing_title_company.add((title, company))
+            except AuthHaltError as e:
+                summary["errors"].append(
+                    f"auth halt listing existing on destination {dest_id}: {e}"
+                )
+                auth_halt = True
+                return _finalize_project_run(
+                    db, project_id, run_ref, run_id, project, summary,
+                    started_at, started_mono, trigger, dry_run,
+                    auth_halt=True, overrun=False,
+                )
+            except Exception as e:
+                summary["errors"].append(
+                    f"failed to list existing on destination {dest_id}: "
+                    f"{type(e).__name__}: {e}"
+                )
 
+        # Launch one Playwright session for the project (browser reuse across
+        # sources). Per-project deadline checked between sources.
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (compatible; HSE-Scraper/1.0)"
+                user_agent="Mozilla/5.0 (compatible; CaspianScraper/1.0)"
             )
             page = context.new_page()
 
             try:
-                for emp in employers:
-                    name = str(emp.get("name") or "").strip()
-                    url = str(emp.get("careers_url") or "").strip()
-                    ats = str(emp.get("ats") or "").strip().lower()
-                    active = bool(emp.get("active"))
+                for source in sources:
+                    if time.monotonic() >= per_project_deadline:
+                        overrun = True
+                        summary["errors"].append(
+                            f"per-project timeout reached; stopping "
+                            f"({len(sources)} sources configured)"
+                        )
+                        break
 
-                    emp_record = {
-                        "name": name or "(unnamed)",
-                        "ats": ats,
-                        "active": active,
-                        "url": url,
+                    src_name = str(source.get("name") or source["__id"])
+                    src_ats = str(source.get("ats") or "").strip().lower()
+                    src_url = str(source.get("careers_url") or "").strip()
+                    src_record = {
+                        "name": src_name,
+                        "ats": src_ats,
+                        "careers_url": src_url,
                         "found": 0,
                         "published": 0,
                         "skipped_duplicate": 0,
                         "errors": [],
                     }
-                    by_employer.append(emp_record)
 
-                    if not active:
-                        summary["skipped_inactive"] += 1
-                        continue
-                    if not name or not url or not ats:
-                        emp_record["errors"].append(
-                            "active employer entry missing name/careers_url/ats"
+                    if not src_url or not src_ats:
+                        src_record["errors"].append(
+                            "source missing careers_url or ats"
                         )
                         summary["errors"].append(
-                            f"active employer entry missing name/careers_url/ats: {emp!r}"
+                            f"{src_name}: missing careers_url or ats"
                         )
+                        _write_lesson(db, project_id, run_id, source, src_record, started_at)
                         continue
 
                     summary["checked"] += 1
-                    parser_cls = PARSERS.get(ats)
+                    parser_cls = PARSERS.get(src_ats)
                     if parser_cls is None:
-                        msg = f"no parser registered for ATS '{ats}'"
-                        emp_record["errors"].append(msg)
-                        summary["errors"].append(f"{name}: {msg}")
+                        msg = f"no parser registered for ats '{src_ats}'"
+                        src_record["errors"].append(msg)
+                        summary["errors"].append(f"{src_name}: {msg}")
+                        _write_lesson(db, project_id, run_id, source, src_record, started_at)
                         continue
 
                     try:
                         parser = parser_cls(page)
-                        roles = parser.parse(name, url)
+                        roles = parser.parse(src_name, src_url)
                     except Exception as e:
                         msg = f"{type(e).__name__}: {e}"
-                        emp_record["errors"].append(msg)
-                        summary["errors"].append(f"{name}: {msg}")
+                        src_record["errors"].append(msg)
+                        summary["errors"].append(f"{src_name}: {msg}")
+                        _write_lesson(db, project_id, run_id, source, src_record, started_at)
                         continue
 
-                    emp_record["found"] = len(roles)
+                    src_record["found"] = len(roles)
                     summary["found"] += len(roles)
 
                     for role in roles:
@@ -1072,43 +1175,74 @@ def main() -> int:
                             or title_company in existing_title_company
                         ):
                             summary["skipped_duplicate"] += 1
-                            emp_record["skipped_duplicate"] += 1
+                            src_record["skipped_duplicate"] += 1
                             continue
 
                         payload = build_payload(role, slug)
-                        status, data, message = client.post_vacancy(payload)
 
-                        if status == "ok":
-                            existing_slugs.add(slug)
-                            existing_title_company.add(title_company)
+                        if dry_run:
+                            # In dry-run, count what we would publish but
+                            # don't actually POST or write /published.
                             summary["published"] += 1
-                            emp_record["published"] += 1
+                            src_record["published"] += 1
                             summary["published_roles"].append({
                                 "employer": role.employer,
                                 "title": role.title,
                                 "location": role.location,
                                 "country": role.country,
-                                "employment_type": role.employment_type,
                                 "slug": slug,
-                                "id": (data or {}).get("id", ""),
-                                "url": role.application_url,
+                                "destination": "(dry-run)",
                             })
-                        elif status == "auth":
+                            continue
+
+                        # Try each destination in order until one succeeds.
+                        # If all fail with non-auth errors, log and move on.
+                        posted = False
+                        for dest in destinations:
+                            client = clients.get(dest["__id"])
+                            if client is None:
+                                continue
+                            status, data, message = client.post_role(payload)
+                            if status == "ok":
+                                existing_slugs.add(slug)
+                                existing_title_company.add(title_company)
+                                summary["published"] += 1
+                                src_record["published"] += 1
+                                summary["published_roles"].append({
+                                    "employer": role.employer,
+                                    "title": role.title,
+                                    "location": role.location,
+                                    "country": role.country,
+                                    "slug": slug,
+                                    "destination_id": dest["__id"],
+                                    "destination_response_id": (data or {}).get("id", ""),
+                                })
+                                _write_published(
+                                    db, project_id, slug, role, dest, source, data
+                                )
+                                posted = True
+                                break
+                            if status == "auth":
+                                summary["errors"].append(
+                                    f"auth halt during POST: {message}"
+                                )
+                                src_record["errors"].append(
+                                    f"auth halt: {message}"
+                                )
+                                auth_halt = True
+                                break
+                            # validation / other → try next destination
                             summary["errors"].append(
-                                f"auth halt during POST: {message}"
+                                f"{src_name} / {role.title}: {message}"
                             )
-                            emp_record["errors"].append(
-                                f"auth halt during POST: {message}"
-                            )
-                            auth_halt = True
-                            break
-                        else:
-                            summary["errors"].append(
-                                f"{name} / {role.title}: {message}"
-                            )
-                            emp_record["errors"].append(
+                            src_record["errors"].append(
                                 f"{role.title}: {message}"
                             )
+
+                        if auth_halt:
+                            break
+
+                    _write_lesson(db, project_id, run_id, source, src_record, started_at)
 
                     if auth_halt:
                         break
@@ -1118,18 +1252,299 @@ def main() -> int:
                 except Exception:
                     pass
 
-        if auth_halt:
-            exit_code = 1
-        elif summary["errors"]:
-            # Surface non-empty error list to the workflow so cron failures
-            # turn the run red and the issue-on-failure step fires.
-            exit_code = 2
-        return exit_code
-    finally:
-        finalize_run(
-            summary, by_employer, employers, started_at, started_mono, auth_halt
+        return _finalize_project_run(
+            db, project_id, run_ref, run_id, project, summary,
+            started_at, started_mono, trigger, dry_run,
+            auth_halt=auth_halt, overrun=overrun,
         )
-        print(json.dumps(summary, indent=2))
+
+    except Exception as e:
+        summary["errors"].append(
+            f"unexpected error: {type(e).__name__}: {e}"
+        )
+        return _finalize_project_run(
+            db, project_id, run_ref, run_id, project, summary,
+            started_at, started_mono, trigger, dry_run,
+            auth_halt=False, overrun=False,
+        )
+
+
+def _finalize_project_run(
+    db,
+    project_id: str,
+    run_ref,
+    run_id: str,
+    project: dict,
+    summary: dict,
+    started_at: str,
+    started_mono: float,
+    trigger: str,
+    dry_run: bool,
+    *,
+    auth_halt: bool,
+    overrun: bool,
+) -> dict:
+    duration = max(0, int(time.monotonic() - started_mono))
+    if auth_halt:
+        status = "auth_halt"
+    elif summary["errors"]:
+        status = "error"
+    else:
+        status = "ok"
+
+    totals = {
+        "checked": summary["checked"],
+        "found": summary["found"],
+        "published": summary["published"],
+        "skipped_duplicate": summary["skipped_duplicate"],
+        "errors_count": len(summary["errors"]),
+    }
+
+    try:
+        run_ref.update({
+            "finished_at": SERVER_TIMESTAMP,
+            "duration_seconds": duration,
+            "status": status,
+            "totals": totals,
+            "errors": summary["errors"],
+            "overrun": overrun,
+            "published_roles_sample": summary["published_roles"][:25],
+        })
+    except Exception as e:
+        print(
+            f"failed to finalize /runs/{run_id}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+    if not dry_run:
+        try:
+            db.collection("projects").document(project_id).update({
+                "last_run_at": SERVER_TIMESTAMP,
+            })
+        except Exception as e:
+            print(
+                f"failed to update last_run_at: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    # Mark the run_request done/failed if this was an ad-hoc trigger.
+    if trigger.startswith("request:"):
+        try:
+            update_run_request(
+                db,
+                trigger.split(":", 1)[1],
+                {
+                    "status": "failed" if status in ("error", "auth_halt") else "done",
+                    "finished_at": SERVER_TIMESTAMP,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as e:
+            print(
+                f"failed to update run_request: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    print(json.dumps({
+        "project_id": project_id,
+        "run_id": run_id,
+        "status": status,
+        "duration_seconds": duration,
+        **totals,
+    }))
+
+    return {
+        "project_id": project_id,
+        "run_id": run_id,
+        "status": status,
+        "duration_seconds": duration,
+        **totals,
+    }
+
+
+def _write_lesson(
+    db,
+    project_id: str,
+    run_id: str,
+    source: dict,
+    src_record: dict,
+    started_at: str,
+) -> None:
+    verdict = _verdict(
+        errors_count=len(src_record.get("errors", [])),
+        published=src_record.get("published", 0),
+        found=src_record.get("found", 0),
+    )
+    try:
+        (
+            db.collection("projects").document(project_id)
+            .collection("lessons").document()
+            .set({
+                "run_id": run_id,
+                "ts": SERVER_TIMESTAMP,
+                "source_id": source["__id"],
+                "source_name": source.get("name") or source["__id"],
+                "ats": source.get("ats") or "",
+                "careers_url": source.get("careers_url") or "",
+                "verdict": verdict,
+                "found": src_record.get("found", 0),
+                "published": src_record.get("published", 0),
+                "skipped_duplicate": src_record.get("skipped_duplicate", 0),
+                "errors": list(src_record.get("errors", [])),
+            })
+        )
+    except Exception as e:
+        print(
+            f"failed to write lesson for {source.get('name')}: "
+            f"{type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+    # Best-effort update of the source's last_run_summary mirror — gives
+    # the Sources table a quick "last X / Y" badge without a runs join.
+    try:
+        (
+            db.collection("projects").document(project_id)
+            .collection("sources").document(source["__id"])
+            .update({
+                "last_run_summary": {
+                    "ts": SERVER_TIMESTAMP,
+                    "found": src_record.get("found", 0),
+                    "published": src_record.get("published", 0),
+                    "errors_count": len(src_record.get("errors", [])),
+                    "verdict": verdict,
+                },
+            })
+        )
+    except Exception:
+        pass
+
+
+def _write_published(
+    db,
+    project_id: str,
+    slug: str,
+    role: Role,
+    dest: dict,
+    source: dict,
+    api_data: dict | None,
+) -> None:
+    try:
+        (
+            db.collection("projects").document(project_id)
+            .collection("published").document(slug)
+            .set({
+                "title": role.title,
+                "employer": role.employer,
+                "location": role.location,
+                "country": role.country,
+                "ats": source.get("ats") or "",
+                "published_at": SERVER_TIMESTAMP,
+                "destination_id": dest["__id"],
+                "destination_response_id": (api_data or {}).get("id", ""),
+                "source_id": source["__id"],
+                "source_url": role.application_url,
+            })
+        )
+    except Exception as e:
+        print(
+            f"failed to write /published/{slug}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    v = os.environ.get(name, "").strip().lower()
+    if not v:
+        return default
+    return v in {"1", "true", "yes", "y", "on"}
+
+
+def main() -> int:
+    started_mono = time.monotonic()
+    try:
+        db = get_db()
+    except Exception as e:
+        print(f"firestore init failed: {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+
+    dry_run = _env_bool("DRY_RUN")
+    only_project_id = os.environ.get("ONLY_PROJECT_ID", "").strip() or None
+    try:
+        max_projects = int(
+            os.environ.get("MAX_PROJECTS_PER_TICK") or DEFAULT_MAX_PROJECTS_PER_TICK
+        )
+    except ValueError:
+        max_projects = DEFAULT_MAX_PROJECTS_PER_TICK
+    try:
+        per_project_timeout = int(
+            os.environ.get("PER_PROJECT_TIMEOUT_SECONDS")
+            or DEFAULT_PER_PROJECT_TIMEOUT_S
+        )
+    except ValueError:
+        per_project_timeout = DEFAULT_PER_PROJECT_TIMEOUT_S
+
+    now = utc_now()
+
+    # Build the work list.
+    if only_project_id:
+        work: list[tuple[str, str]] = [(only_project_id, "manual")]
+        print(f"ONLY_PROJECT_ID={only_project_id} dry_run={dry_run}", file=sys.stderr)
+    else:
+        work = find_due_work(db, now)[:max_projects]
+        print(
+            f"found {len(work)} project(s) due "
+            f"(dry_run={dry_run}, max_per_tick={max_projects})",
+            file=sys.stderr,
+        )
+
+    if not work:
+        print(json.dumps({"projects": 0, "status": "idle"}))
+        return 0
+
+    # Mark requests as "running" up-front so the UI's Pending list clears.
+    for project_id, trigger in work:
+        if trigger.startswith("request:"):
+            try:
+                update_run_request(
+                    db,
+                    trigger.split(":", 1)[1],
+                    {"status": "running", "picked_up_at": SERVER_TIMESTAMP},
+                )
+            except Exception as e:
+                print(
+                    f"failed to mark run_request running: "
+                    f"{type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+
+    results: list[dict] = []
+    has_errors = False
+    for project_id, trigger in work:
+        per_project_deadline = time.monotonic() + per_project_timeout
+        result = run_project(
+            db,
+            project_id,
+            trigger,
+            dry_run=dry_run,
+            per_project_deadline=per_project_deadline,
+        )
+        results.append(result)
+        if result.get("status") not in ("ok",):
+            has_errors = True
+
+    total_duration = max(0, int(time.monotonic() - started_mono))
+    print(json.dumps({
+        "tick_finished_at": utc_now_iso(),
+        "duration_seconds": total_duration,
+        "projects": len(results),
+        "results": results,
+    }, indent=2))
+    return 2 if has_errors else 0
 
 
 if __name__ == "__main__":

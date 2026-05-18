@@ -1,0 +1,74 @@
+name: Run due scrapes
+
+# Multi-tenant scraper. Runs every 15 minutes (schedule_cron match
+# across enabled projects) and on demand via workflow_dispatch.
+#
+# Required repo secret:
+#   FIREBASE_ADMIN_SA_JSON  Service-account JSON for the Firebase
+#                           project, with Cloud Datastore / Firestore
+#                           User permissions on the `scraper` database.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "Run only this project (Firestore doc ID). Leave blank to process all due projects."
+        required: false
+        type: string
+      dry_run:
+        description: "Skip POST steps; still record /runs + /lessons."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run scraper
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_SA_JSON }}
+          FIRESTORE_DATABASE_ID: scraper
+          ONLY_PROJECT_ID: ${{ inputs.project_id }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python scrape.py
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh issue create \
+            --title "scrape-due failed: run #${RUN_NUMBER}" \
+            --body "The scrape-due workflow failed.
+
+          - Run: ${RUN_URL}
+          - Triggered by: \`${EVENT}\`
+          - Commit: \`${SHA}\`
+
+          Inspect the logs and the Firestore /runs collection for the failing project." \
+            || echo "::warning::failed to open issue; check workflow permissions"

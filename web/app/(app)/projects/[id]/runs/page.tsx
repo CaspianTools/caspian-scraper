@@ -82,15 +82,6 @@ export default async function RunsPage({ params }: PageProps) {
         <RunNowButton projectId={id} />
       </div>
 
-      <div className="rounded-lg border border-amber-300 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
-        <strong>Heads up:</strong> the scraper-runner side of the platform is
-        still in progress. Clicking <em>Run scrape now</em> queues a request
-        in Firestore correctly, but nothing is consuming the queue yet —
-        requests will sit as <code>pending</code> until the next phase lands
-        (scrape.py rewrite + every-15-min workflow). Use <em>Dry run</em>
-        below for immediate feedback on your wiring.
-      </div>
-
       <DryRunPanel projectId={id} />
 
       {pendingRequests.length > 0 && (
