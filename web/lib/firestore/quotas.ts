@@ -1,10 +1,16 @@
 import { projectsCol, sourcesCol, userDoc } from "./collections";
 import type { Quota } from "./schema";
 
+// Effectively unlimited. The platform is single-tenant in practice and
+// the original 50/3 caps were getting in the way (the HSE project alone
+// has 176 sources from the legacy import). Per-user quota stored in
+// /users/{uid}.quota still wins if set, so an admin can re-tighten on
+// a specific account.
+const NO_LIMIT = 1_000_000;
 const DEFAULT_QUOTA: Quota = {
-  projects_max: 3,
-  sources_max_per_project: 50,
-  runs_per_day_max: 50,
+  projects_max: NO_LIMIT,
+  sources_max_per_project: NO_LIMIT,
+  runs_per_day_max: NO_LIMIT,
 };
 
 /**
