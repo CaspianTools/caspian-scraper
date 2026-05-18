@@ -1285,19 +1285,25 @@ def _finalize_project_run(
     overrun: bool,
 ) -> dict:
     duration = max(0, int(time.monotonic() - started_mono))
+    errors_count = len(summary["errors"])
+    checked = summary["checked"]
     if auth_halt:
         status = "auth_halt"
-    elif summary["errors"]:
-        status = "error"
-    else:
+    elif errors_count == 0:
         status = "ok"
+    elif checked > 0 and errors_count < checked:
+        # Some sources succeeded, some failed — surface as "partial"
+        # so the UI doesn't shout "error" at a run that mostly worked.
+        status = "partial"
+    else:
+        status = "error"
 
     totals = {
-        "checked": summary["checked"],
+        "checked": checked,
         "found": summary["found"],
         "published": summary["published"],
         "skipped_duplicate": summary["skipped_duplicate"],
-        "errors_count": len(summary["errors"]),
+        "errors_count": errors_count,
     }
 
     try:
@@ -1532,7 +1538,7 @@ def main() -> int:
                 )
 
     results: list[dict] = []
-    has_errors = False
+    has_hard_failure = False
     for project_id, trigger in work:
         per_project_deadline = time.monotonic() + per_project_timeout
         result = run_project(
@@ -1543,8 +1549,10 @@ def main() -> int:
             per_project_deadline=per_project_deadline,
         )
         results.append(result)
-        if result.get("status") not in ("ok",):
-            has_errors = True
+        # "partial" and "ok" are healthy enough not to fail the workflow
+        # run; "error" and "auth_halt" are hard failures.
+        if result.get("status") in ("error", "auth_halt"):
+            has_hard_failure = True
 
     total_duration = max(0, int(time.monotonic() - started_mono))
     print(json.dumps({
@@ -1553,7 +1561,7 @@ def main() -> int:
         "projects": len(results),
         "results": results,
     }, indent=2))
-    return 2 if has_errors else 0
+    return 2 if has_hard_failure else 0
 
 
 if __name__ == "__main__":

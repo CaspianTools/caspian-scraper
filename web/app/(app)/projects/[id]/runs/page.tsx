@@ -41,6 +41,22 @@ function fmtRelative(iso: string): string {
   return `${Math.round(delta / 86400)}d ago`;
 }
 
+function statusClasses(status: string): string {
+  switch (status) {
+    case "ok":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "partial":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    case "running":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "auth_halt":
+    case "error":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    default:
+      return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+  }
+}
+
 export default async function RunsPage({ params }: PageProps) {
   const session = await getSessionFromCookie();
   if (!session) redirect("/signin");
@@ -118,16 +134,39 @@ export default async function RunsPage({ params }: PageProps) {
             {runs.map((r) => {
               const row = r as Record<string, unknown> & { id: string };
               const started = tsToIso(row.started_at);
+              const status = String(row.status ?? "");
+              const totals = (row.totals ?? {}) as Record<string, number>;
               return (
-                <li key={row.id} className="px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{String(row.status ?? "")}</div>
-                    <div className="text-xs text-zinc-500">
+                <li
+                  key={row.id}
+                  className="px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={
+                          "text-xs px-2 py-0.5 rounded-full " +
+                          statusClasses(status)
+                        }
+                      >
+                        {status.replace("_", " ") || "unknown"}
+                      </span>
+                      {Object.keys(totals).length > 0 && (
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
+                          {Number(totals.found ?? 0)} found ·{" "}
+                          {Number(totals.published ?? 0)} published ·{" "}
+                          {Number(totals.errors_count ?? 0)} err
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-1">
                       started {fmtRelative(started)} · trigger{" "}
                       {String(row.trigger ?? "")}
                     </div>
                   </div>
-                  <code className="text-xs text-zinc-500">{row.id}</code>
+                  <code className="text-xs text-zinc-500 shrink-0">
+                    {row.id}
+                  </code>
                 </li>
               );
             })}
