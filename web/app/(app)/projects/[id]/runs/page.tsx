@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { runRequestsCol, runsCol } from "@/lib/firestore/collections";
 import { RunNowButton } from "@/components/RunNowButton";
+import { DryRunPanel } from "@/components/DryRunPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -86,8 +87,11 @@ export default async function RunsPage({ params }: PageProps) {
         still in progress. Clicking <em>Run scrape now</em> queues a request
         in Firestore correctly, but nothing is consuming the queue yet —
         requests will sit as <code>pending</code> until the next phase lands
-        (scrape.py rewrite + every-15-min workflow).
+        (scrape.py rewrite + every-15-min workflow). Use <em>Dry run</em>
+        below for immediate feedback on your wiring.
       </div>
+
+      <DryRunPanel projectId={id} />
 
       {pendingRequests.length > 0 && (
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
