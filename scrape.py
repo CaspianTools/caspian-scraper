@@ -1474,6 +1474,7 @@ def main() -> int:
 
     dry_run = _env_bool("DRY_RUN")
     only_project_id = os.environ.get("ONLY_PROJECT_ID", "").strip() or None
+    request_id = os.environ.get("REQUEST_ID", "").strip() or None
     try:
         max_projects = int(
             os.environ.get("MAX_PROJECTS_PER_TICK") or DEFAULT_MAX_PROJECTS_PER_TICK
@@ -1492,8 +1493,16 @@ def main() -> int:
 
     # Build the work list.
     if only_project_id:
-        work: list[tuple[str, str]] = [(only_project_id, "manual")]
-        print(f"ONLY_PROJECT_ID={only_project_id} dry_run={dry_run}", file=sys.stderr)
+        # If this dispatch satisfies a specific run-request, encode it
+        # into the trigger so the existing request-update logic flips
+        # the /run_requests doc to done at finalise time.
+        trigger = f"request:{request_id}" if request_id else "manual"
+        work: list[tuple[str, str]] = [(only_project_id, trigger)]
+        print(
+            f"ONLY_PROJECT_ID={only_project_id} trigger={trigger} "
+            f"dry_run={dry_run}",
+            file=sys.stderr,
+        )
     else:
         work = find_due_work(db, now)[:max_projects]
         print(

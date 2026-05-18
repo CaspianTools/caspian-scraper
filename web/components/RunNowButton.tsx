@@ -24,8 +24,14 @@ export function RunNowButton({ projectId }: { projectId: string }) {
         setErr(body.error || `Request failed (${res.status})`);
         return;
       }
-      if (body.reused) {
-        setMsg("A run request is already pending for this project.");
+      if (body.reused && body.dispatched) {
+        setMsg(
+          "A run request was already pending — re-fired dispatch. Workflow runs within ~1 minute."
+        );
+      } else if (body.reused) {
+        setMsg(
+          "A run request is already pending for this project. It will run on the next cron tick."
+        );
       } else if (body.dispatched) {
         setMsg("Dispatched. Workflow fires within ~1 minute.");
       } else if (body.dispatch_error) {

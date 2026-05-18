@@ -64,6 +64,9 @@ export async function POST(
 
   // Soft anti-abuse: if there's already a pending request for this
   // project from this user, return it instead of creating a duplicate.
+  // We still try to dispatch — gives the user a "kick" path when an
+  // earlier dispatch didn't claim that request (e.g. a stale queue
+  // entry the cron hasn't picked up yet).
   const existing = await runRequestsCol()
     .where("project_id", "==", id)
     .where("requested_by_uid", "==", session.uid)
@@ -72,10 +75,17 @@ export async function POST(
     .get();
   if (!existing.empty) {
     const doc = existing.docs[0];
+    const dispatch = await dispatchScrapeWorkflow({
+      projectId: id,
+      requestId: doc.id,
+    });
     return NextResponse.json({
       id: doc.id,
       ...doc.data(),
       reused: true,
+      dispatched: dispatch.attempted && dispatch.ok === true,
+      dispatch_error:
+        dispatch.attempted && !dispatch.ok ? dispatch.error : undefined,
     });
   }
 
@@ -92,8 +102,13 @@ export async function POST(
   // Fire workflow_dispatch immediately (if GH_DISPATCH_TOKEN is set).
   // This is best-effort: the cron will still pick up the request within
   // 15 min even if dispatch fails. Awaiting here is fine — the GitHub
-  // API typically responds in under a second.
-  const dispatch = await dispatchScrapeWorkflow({ projectId: id });
+  // API typically responds in under a second. requestId is passed so
+  // the runner can mark THIS specific /run_requests doc done at finish
+  // instead of leaving it as "pending" for the cron to redo.
+  const dispatch = await dispatchScrapeWorkflow({
+    projectId: id,
+    requestId: ref.id,
+  });
 
   return NextResponse.json(
     {

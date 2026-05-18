@@ -29,6 +29,8 @@ export interface DispatchResult {
 export async function dispatchScrapeWorkflow(opts: {
   projectId: string;
   dryRun?: boolean;
+  /** When set, the runner marks /run_requests/<id> done at finalise. */
+  requestId?: string;
 }): Promise<DispatchResult> {
   const token = process.env.GH_DISPATCH_TOKEN?.trim();
   if (!token) return { attempted: false };
@@ -51,6 +53,7 @@ export async function dispatchScrapeWorkflow(opts: {
         inputs: {
           project_id: opts.projectId,
           dry_run: opts.dryRun ? "true" : "false",
+          ...(opts.requestId ? { request_id: opts.requestId } : {}),
         },
       }),
     });

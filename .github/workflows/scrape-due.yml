@@ -22,6 +22,10 @@ on:
         required: false
         type: boolean
         default: false
+      request_id:
+        description: "Run-request ID this dispatch satisfies (optional). When set, the runner marks /run_requests/<id> done at finish."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -51,6 +55,7 @@ jobs:
           FIRESTORE_DATABASE_ID: scraper
           ONLY_PROJECT_ID: ${{ inputs.project_id }}
           DRY_RUN: ${{ inputs.dry_run }}
+          REQUEST_ID: ${{ inputs.request_id }}
         run: python scrape.py
 
       - name: Open issue on failure
