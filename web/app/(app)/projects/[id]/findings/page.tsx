@@ -55,6 +55,7 @@ export default async function FindingsPage({ params }: PageProps) {
       attempts: Number(data.attempts ?? 0),
       destination_id: String(data.destination_id ?? ""),
       destination_response_id: String(data.destination_response_id ?? ""),
+      destination_slug: String(data.destination_slug ?? ""),
       published_at: tsToIso(data.published_at),
       error: String(data.error ?? ""),
     };

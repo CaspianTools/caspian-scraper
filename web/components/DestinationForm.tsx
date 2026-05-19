@@ -155,13 +155,13 @@ export function DestinationForm({
       <Row
         label="Public item URL pattern"
         error={errFor("item_url_template")}
-        hint='Optional. Public URL of one item on this destination. Use the literal "{slug}" as the placeholder for the role slug. Lets the Findings tab show an "open on destination" link.'
+        hint='Optional. Used by the Findings tab to link out to an item on the destination. Placeholders: {destination_slug} (preferred — slug the destination actually stores), {slug} (our generated slug), {destination_response_id} (id returned by the destination on POST). Example: https://entirelysafe.com/vacancies/{destination_slug}'
       >
         <input
           type="text"
           value={form.item_url_template}
           onChange={(e) => set("item_url_template", e.target.value)}
-          placeholder="https://entirelysafe.com/vacancies/{slug}"
+          placeholder="https://entirelysafe.com/vacancies/{destination_slug}"
           className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
         />
       </Row>

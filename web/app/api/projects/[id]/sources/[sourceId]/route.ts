@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSessionFromBearer } from "@/lib/auth/session";
-import { SourcePatchSchema } from "@/lib/firestore/schema";
+import {
+  SourcePatchSchema,
+  isValidKindAts,
+  type AtsType,
+  type ItemKind,
+} from "@/lib/firestore/schema";
 import { projectDoc, sourcesCol } from "@/lib/firestore/collections";
 
 async function checkProjectOwner(
@@ -69,6 +74,30 @@ export async function PATCH(
   const existing = await ref.get();
   if (!existing.exists) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  // Validate the (item_kind, ats) combo against the merged result. Either
+  // field may be in the patch; missing fields fall back to the existing doc.
+  const existingData = existing.data() ?? {};
+  const mergedKind: ItemKind =
+    (parsed.data.item_kind as ItemKind | undefined) ??
+    ((existingData.item_kind as ItemKind | undefined) ?? "job");
+  const mergedAts: AtsType =
+    (parsed.data.ats as AtsType | undefined) ??
+    (existingData.ats as AtsType);
+  if (mergedAts && !isValidKindAts(mergedKind, mergedAts)) {
+    return NextResponse.json(
+      {
+        error: "invalid patch",
+        details: [
+          {
+            path: ["ats"],
+            message: `ats '${mergedAts}' is not valid for item_kind '${mergedKind}'`,
+          },
+        ],
+      },
+      { status: 400 }
+    );
   }
 
   await ref.update({

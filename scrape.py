@@ -32,12 +32,13 @@ Optional environment variables:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
 from urllib.parse import urljoin
@@ -196,6 +197,69 @@ class Role:
     application_url: str = ""
     employment_type: str = "full-time"
     closing_date: str = ""           # ISO YYYY-MM-DD if known
+
+
+@dataclass
+class ProductListing:
+    retailer_id: str
+    retailer_name: str
+    product_url: str
+    name: str
+    brand: str = ""
+    gtin: str | None = None
+    size_value: float | None = None
+    size_unit: str = ""              # "L", "ml", "kg", "g", "ea"
+    price_value: float = 0.0
+    price_currency: str = "AED"     # ISO 4217
+    unit_price_value: float | None = None
+    unit_price_basis: str = ""       # e.g. "per kg"
+    in_stock: bool | None = None
+    image_url: str = ""
+    raw_jsonld: dict = field(default_factory=dict)
+
+
+def listing_id_for(retailer_id: str, product_url: str) -> str:
+    """Deterministic listing ID — sha1 of retailer + URL. Stable across runs."""
+    h = hashlib.sha1(f"{retailer_id}|{product_url}".encode("utf-8")).hexdigest()
+    return h[:32]
+
+
+# Unit conversion table for unit-price normalisation. Values are the
+# factor to multiply size_value by to get the canonical unit. Pairs of
+# (input_unit, canonical_unit, factor). Canonical bases:
+#   mass    → kg  (so price-per-kg is the basis)
+#   volume  → L   (so price-per-L is the basis)
+#   count   → ea  (per-unit)
+_UNIT_NORMALISE: dict[str, tuple[str, float]] = {
+    # mass
+    "kg": ("kg", 1.0), "kilogram": ("kg", 1.0), "kilograms": ("kg", 1.0),
+    "g":  ("kg", 0.001), "gram": ("kg", 0.001), "grams": ("kg", 0.001),
+    "mg": ("kg", 1e-6), "milligram": ("kg", 1e-6),
+    # volume
+    "l": ("L", 1.0), "litre": ("L", 1.0), "liter": ("L", 1.0),
+    "litres": ("L", 1.0), "liters": ("L", 1.0),
+    "ml": ("L", 0.001), "millilitre": ("L", 0.001), "milliliter": ("L", 0.001),
+    "cl": ("L", 0.01), "centilitre": ("L", 0.01),
+    # count
+    "ea": ("ea", 1.0), "each": ("ea", 1.0), "unit": ("ea", 1.0),
+    "pcs": ("ea", 1.0), "piece": ("ea", 1.0), "pieces": ("ea", 1.0),
+}
+
+
+def compute_unit_price(
+    price: float, size_value: float | None, size_unit: str
+) -> tuple[float | None, str]:
+    """Return (unit_price, basis_string) or (None, '') if not normalisable."""
+    if not size_value or size_value <= 0 or price <= 0:
+        return (None, "")
+    norm = _UNIT_NORMALISE.get(size_unit.strip().lower())
+    if not norm:
+        return (None, "")
+    canonical_unit, factor = norm
+    canonical_size = size_value * factor
+    if canonical_size <= 0:
+        return (None, "")
+    return (price / canonical_size, f"per {canonical_unit}")
 
 
 def is_hse(*texts: str) -> bool:
@@ -556,9 +620,277 @@ class JibeParser(BaseHtmlParser):
         return seen
 
 
+class JsonLdProductParser(BaseHtmlParser):
+    """Extracts schema.org/Product JSON-LD from a retailer listing/category
+    page. v1 contract: source.careers_url is a listing/category page; the
+    parser collects detail-page links the same way `BaseHtmlParser` does
+    for jobs, then on each detail page reads the first JSON-LD `Product`
+    block (with nested `Offer`) and yields one `ProductListing`.
+
+    No CSS fallback in v1 — if the retailer doesn't expose JSON-LD, the
+    listing is skipped and logged. This is intentional: see the plan in
+    plans/can-we-use-the-pure-narwhal.md §1.
+    """
+
+    # Pure JSON-LD: no field-specific selectors needed. We still want to
+    # discover detail links from the listing page, so subclasses or
+    # source.notes can hint via env in future; for v1 we accept the
+    # universal "a[href]" filtered by a common product-URL substring.
+    LIST_LINK_SELECTORS = [
+        "a[href*='/p/']",
+        "a[href*='/product/']",
+        "a[href*='/products/']",
+        "a[itemprop='url']",
+    ]
+    DETAIL_TITLE_SELECTORS: list[str] = []  # unused; we read JSON-LD
+    NEXT_PAGE_SELECTORS = [
+        "a[rel='next']",
+        "a[aria-label='Next']",
+        "button[aria-label='Next']",
+    ]
+
+    DETAIL_JSONLD_SELECTOR = "script[type='application/ld+json']"
+
+    # Regex to split "5kg" / "2.5 L" / "500 g" / "1L" into value + unit.
+    _SIZE_RE = re.compile(
+        r"(\d+(?:[\.,]\d+)?)\s*(kilogram[s]?|kg|gram[s]?|g|"
+        r"milligram[s]?|mg|millilit(?:er|re)s?|ml|"
+        r"centilit(?:er|re)s?|cl|lit(?:er|re)s?|l|"
+        r"each|ea|piece[s]?|pcs|unit)\b",
+        re.IGNORECASE,
+    )
+
+    def _read_jsonld_blocks(self) -> list[Any]:
+        """Return parsed contents of every <script type=application/ld+json>."""
+        out: list[Any] = []
+        try:
+            els = self.page.query_selector_all(self.DETAIL_JSONLD_SELECTOR)
+        except Exception:
+            return out
+        for el in els:
+            try:
+                txt = el.inner_text() or el.text_content() or ""
+            except Exception:
+                continue
+            txt = txt.strip()
+            if not txt:
+                continue
+            try:
+                data = json.loads(txt)
+            except ValueError:
+                continue
+            if isinstance(data, list):
+                out.extend(data)
+            else:
+                out.append(data)
+        return out
+
+    @staticmethod
+    def _find_product(blocks: list[Any]) -> dict | None:
+        """Find the first node whose @type is Product (handles @graph wrappers)."""
+        def is_product(node: Any) -> bool:
+            if not isinstance(node, dict):
+                return False
+            t = node.get("@type")
+            if isinstance(t, str):
+                return t.lower() == "product"
+            if isinstance(t, list):
+                return any(isinstance(x, str) and x.lower() == "product" for x in t)
+            return False
+
+        for blk in blocks:
+            if is_product(blk):
+                return blk
+            if isinstance(blk, dict) and isinstance(blk.get("@graph"), list):
+                for node in blk["@graph"]:
+                    if is_product(node):
+                        return node
+        return None
+
+    @staticmethod
+    def _pick_offer(node: dict) -> dict | None:
+        offers = node.get("offers")
+        if isinstance(offers, dict):
+            # AggregateOffer → drill into nested offers if present
+            if str(offers.get("@type", "")).lower() == "aggregateoffer":
+                nested = offers.get("offers")
+                if isinstance(nested, list) and nested:
+                    return nested[0] if isinstance(nested[0], dict) else None
+                # Fall back to using lowPrice/highPrice off the aggregate itself
+                return offers
+            return offers
+        if isinstance(offers, list) and offers and isinstance(offers[0], dict):
+            return offers[0]
+        return None
+
+    @staticmethod
+    def _brand_text(node: dict) -> str:
+        b = node.get("brand")
+        if isinstance(b, str):
+            return b.strip()
+        if isinstance(b, dict):
+            return str(b.get("name") or "").strip()
+        if isinstance(b, list) and b:
+            first = b[0]
+            if isinstance(first, str):
+                return first.strip()
+            if isinstance(first, dict):
+                return str(first.get("name") or "").strip()
+        return ""
+
+    @staticmethod
+    def _gtin(node: dict) -> str | None:
+        for key in ("gtin13", "gtin14", "gtin12", "gtin8", "gtin"):
+            v = node.get(key)
+            if isinstance(v, (str, int)) and str(v).strip():
+                return str(v).strip()
+        return None
+
+    def _parse_size(self, node: dict, name: str) -> tuple[float | None, str]:
+        # Prefer schema.org structured size if available.
+        for key in ("size", "weight"):
+            v = node.get(key)
+            if isinstance(v, dict):
+                val = v.get("value")
+                unit = v.get("unitText") or v.get("unitCode") or ""
+                try:
+                    f = float(val) if val is not None else None
+                except (TypeError, ValueError):
+                    f = None
+                if f is not None and unit:
+                    return (f, str(unit))
+        # Fall back to regex over the product name (very common in groceries).
+        m = self._SIZE_RE.search(name or "")
+        if not m:
+            return (None, "")
+        try:
+            val = float(m.group(1).replace(",", "."))
+        except ValueError:
+            return (None, "")
+        return (val, m.group(2))
+
+    @staticmethod
+    def _price_offer(offer: dict) -> tuple[float, str]:
+        # price can be a string ("12.50") or number; currency in priceCurrency
+        price_raw = offer.get("price")
+        if price_raw is None:
+            # AggregateOffer fallback
+            price_raw = offer.get("lowPrice") or offer.get("highPrice")
+        try:
+            price = float(str(price_raw).replace(",", "."))
+        except (TypeError, ValueError):
+            price = 0.0
+        currency = str(offer.get("priceCurrency") or "").strip().upper() or "AED"
+        return (price, currency)
+
+    @staticmethod
+    def _availability(offer: dict) -> bool | None:
+        v = offer.get("availability")
+        if not isinstance(v, str):
+            return None
+        s = v.lower()
+        if "instock" in s or "in_stock" in s or "preorder" in s:
+            return True
+        if "outofstock" in s or "out_of_stock" in s or "soldout" in s:
+            return False
+        return None
+
+    def parse_product(
+        self, retailer_id: str, retailer_name: str, url: str
+    ) -> ProductListing | None:
+        try:
+            self.page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=self.DETAIL_GOTO_TIMEOUT_MS,
+            )
+        except PWTimeout:
+            print(f"timeout loading product {url}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(
+                f"error loading product {url}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return None
+
+        blocks = self._read_jsonld_blocks()
+        if not blocks:
+            print(f"no JSON-LD on {url}", file=sys.stderr)
+            return None
+
+        node = self._find_product(blocks)
+        if not node:
+            print(f"no schema.org/Product node in JSON-LD on {url}", file=sys.stderr)
+            return None
+
+        name = str(node.get("name") or "").strip()
+        if not name:
+            print(f"JSON-LD Product has no name on {url}", file=sys.stderr)
+            return None
+
+        offer = self._pick_offer(node)
+        if not offer:
+            print(f"JSON-LD Product has no Offer on {url}", file=sys.stderr)
+            return None
+
+        price, currency = self._price_offer(offer)
+        if price <= 0:
+            print(f"JSON-LD Offer has no usable price on {url}", file=sys.stderr)
+            return None
+
+        brand = self._brand_text(node)
+        gtin = self._gtin(node)
+        size_value, size_unit = self._parse_size(node, name)
+        unit_price, unit_basis = compute_unit_price(price, size_value, size_unit)
+        image = node.get("image")
+        if isinstance(image, list):
+            image = image[0] if image else ""
+        image_url = str(image or "").strip()
+        in_stock = self._availability(offer)
+
+        return ProductListing(
+            retailer_id=retailer_id,
+            retailer_name=retailer_name,
+            product_url=url,
+            name=name,
+            brand=brand,
+            gtin=gtin,
+            size_value=size_value,
+            size_unit=size_unit,
+            price_value=price,
+            price_currency=currency,
+            unit_price_value=unit_price,
+            unit_price_basis=unit_basis,
+            in_stock=in_stock,
+            image_url=image_url,
+            raw_jsonld=node if isinstance(node, dict) else {},
+        )
+
+    def parse_products(
+        self, retailer_id: str, retailer_name: str, search_url: str
+    ) -> list[ProductListing]:
+        out: list[ProductListing] = []
+        for link in self.collect_links(search_url):
+            try:
+                listing = self.parse_product(retailer_id, retailer_name, link)
+            except Exception as e:
+                print(
+                    f"error parsing product {link}: {type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                continue
+            if listing:
+                out.append(listing)
+        return out
+
+
 PARSERS: dict[str, type] = {
+    # job parsers
     "successfactors": SuccessFactorsParser,
     "jibe": JibeParser,
+    # product parsers
+    "jsonld_product": JsonLdProductParser,
 }
 
 
@@ -1037,7 +1369,10 @@ def run_project(
         destinations = load_destinations(db, project_id)
         secrets = load_secrets(db, project_id)
 
-        if not destinations:
+        has_job_source = any(
+            (s.get("item_kind") or "job") == "job" for s in sources
+        )
+        if has_job_source and not destinations:
             summary["errors"].append("no destinations configured")
             return _finalize_project_run(
                 db, project_id, run_ref, run_id, project, summary,
@@ -1066,7 +1401,7 @@ def run_project(
                 field_map=dest.get("field_map") or {},
             )
 
-        if not clients:
+        if has_job_source and not clients:
             summary["errors"].append("no usable destinations (all secrets missing)")
             return _finalize_project_run(
                 db, project_id, run_ref, run_id, project, summary,
@@ -1075,8 +1410,13 @@ def run_project(
             )
 
         # Pre-fetch existing items from each destination for dedup.
+        # Also record (title_company → destination_slug) so we can give
+        # /findings the destination's ACTUAL slug for duplicates — our
+        # generated slug may not match the one stored on the
+        # destination's side (e.g. when it dedups by title+company).
         existing_slugs: set[str] = set()
         existing_title_company: set[tuple[str, str]] = set()
+        dest_slug_by_title_company: dict[tuple[str, str], str] = {}
         for dest_id, client in clients.items():
             try:
                 for v in client.list_existing():
@@ -1087,6 +1427,8 @@ def run_project(
                     company = (v.get("company") or "").strip().lower()
                     if title and company:
                         existing_title_company.add((title, company))
+                        if slug and (title, company) not in dest_slug_by_title_company:
+                            dest_slug_by_title_company[(title, company)] = slug
             except AuthHaltError as e:
                 summary["errors"].append(
                     f"auth halt listing existing on destination {dest_id}: {e}"
@@ -1154,14 +1496,67 @@ def run_project(
                         _write_lesson(db, project_id, run_id, source, src_record, started_at)
                         continue
 
+                    src_item_kind = str(source.get("item_kind") or "job")
+                    roles: list[Role] = []
+                    listings: list[ProductListing] = []
                     try:
                         parser = parser_cls(page)
-                        roles = parser.parse(src_name, src_url)
+                        if src_item_kind == "product":
+                            if not isinstance(parser, JsonLdProductParser):
+                                raise RuntimeError(
+                                    f"parser {type(parser).__name__} does "
+                                    f"not support product extraction"
+                                )
+                            listings = parser.parse_products(
+                                source["__id"], src_name, src_url
+                            )
+                        else:
+                            roles = parser.parse(src_name, src_url)
                     except Exception as e:
                         msg = f"{type(e).__name__}: {e}"
                         src_record["errors"].append(msg)
                         summary["errors"].append(f"{src_name}: {msg}")
                         _write_lesson(db, project_id, run_id, source, src_record, started_at)
+                        continue
+
+                    # Product path: write listings + upsert canonicals, then
+                    # move on. No destination POSTs, no dedup-by-slug — the
+                    # listing ID is deterministic (sha1 of retailer+url) and
+                    # write-once for canonical_id.
+                    if src_item_kind == "product":
+                        src_record["found"] = len(listings)
+                        summary["found"] += len(listings)
+                        for listing in listings:
+                            if dry_run:
+                                src_record["published"] += 1
+                                summary["published"] += 1
+                                summary["published_roles"].append({
+                                    "retailer": src_name,
+                                    "name": listing.name,
+                                    "brand": listing.brand,
+                                    "price": (
+                                        f"{listing.price_value:.2f} "
+                                        f"{listing.price_currency}"
+                                    ),
+                                    "gtin": listing.gtin or "",
+                                    "destination": "(dry-run)",
+                                })
+                                continue
+                            listing_id, is_new = _upsert_listing(
+                                db, project_id, listing, source
+                            )
+                            _upsert_canonical_gtin(
+                                db, project_id, listing, listing_id
+                            )
+                            if is_new:
+                                src_record["published"] += 1
+                                summary["published"] += 1
+                            else:
+                                src_record["skipped_duplicate"] += 1
+                                summary["skipped_duplicate"] += 1
+                        _write_lesson(
+                            db, project_id, run_id, source, src_record, started_at
+                        )
                         continue
 
                     src_record["found"] = len(roles)
@@ -1181,9 +1576,21 @@ def run_project(
                             summary["skipped_duplicate"] += 1
                             src_record["skipped_duplicate"] += 1
                             if slug and not dry_run:
+                                # Resolve the destination's actual slug
+                                # for this role so the Findings UI can
+                                # link to it. Prefer slug-match (ours
+                                # matches theirs) over title+company
+                                # lookup.
+                                dest_slug = (
+                                    slug if slug in existing_slugs
+                                    else dest_slug_by_title_company.get(
+                                        title_company, ""
+                                    )
+                                )
                                 _upsert_finding(
                                     db, project_id, run_id, slug,
                                     role, source, "duplicate",
+                                    destination_slug=dest_slug,
                                 )
                             continue
 
@@ -1229,10 +1636,17 @@ def run_project(
                                 _write_published(
                                     db, project_id, slug, role, dest, source, data
                                 )
+                                # The destination MAY return its own
+                                # slug in the response — prefer it over
+                                # ours for the public-URL template.
+                                returned_slug = str(
+                                    (data or {}).get("slug") or ""
+                                ).strip()
                                 _upsert_finding(
                                     db, project_id, run_id, slug,
                                     role, source, "published",
                                     dest=dest, api_data=data,
+                                    destination_slug=returned_slug or slug,
                                 )
                                 posted = True
                                 break
@@ -1490,6 +1904,7 @@ def _upsert_finding(
     dest: dict | None = None,
     api_data: dict | None = None,
     error: str | None = None,
+    destination_slug: str | None = None,
 ) -> None:
     """
     Write a /findings/{slug} doc — one per unique role this project has
@@ -1523,6 +1938,12 @@ def _upsert_finding(
             "last_seen_run_id": run_id,
             "attempts": Increment(1),
         }
+        # destination_slug always written when known — gives the
+        # Findings UI the correct slug for building public URLs (our
+        # generated slug may differ from the one the destination
+        # actually stores).
+        if destination_slug:
+            common["destination_slug"] = destination_slug
 
         if existing is None:
             payload = {
@@ -1574,6 +1995,127 @@ def _upsert_finding(
     except Exception as e:
         print(
             f"failed to upsert /findings/{slug}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+
+def _upsert_listing(
+    db,
+    project_id: str,
+    listing: ProductListing,
+    source: dict,
+) -> tuple[str, bool]:
+    """
+    Upsert /listings/{listingId}. Returns (listing_id, is_new).
+
+    Preserves:
+      - first_seen_at on re-scrapes
+      - canonical_id once set (matching is write-once; see plan §4)
+    """
+    listing_id = listing_id_for(listing.retailer_id, listing.product_url)
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("listings").document(listing_id)
+    )
+    try:
+        snap = ref.get()
+        existing = snap.to_dict() if snap.exists else None
+        common = {
+            "retailer_id": listing.retailer_id,
+            "retailer_name": listing.retailer_name,
+            "product_url": listing.product_url,
+            "name": listing.name,
+            "brand": listing.brand,
+            "gtin": listing.gtin,
+            "size_value": listing.size_value,
+            "size_unit": listing.size_unit,
+            "price_value": listing.price_value,
+            "price_currency": listing.price_currency,
+            "unit_price_value": listing.unit_price_value,
+            "unit_price_basis": listing.unit_price_basis,
+            "in_stock": listing.in_stock,
+            "image_url": listing.image_url,
+            "raw_jsonld": listing.raw_jsonld,
+            "last_seen_at": SERVER_TIMESTAMP,
+        }
+        if existing is None:
+            # First sighting: stamp first_seen_at; pre-link to GTIN canonical
+            # if available (the canonical doc itself is upserted by caller).
+            ref.set({
+                **common,
+                "first_seen_at": SERVER_TIMESTAMP,
+                "canonical_id": listing.gtin if listing.gtin else None,
+                "source_id": source["__id"],
+            })
+            return (listing_id, True)
+        # Re-scrape: refresh fields but do NOT overwrite canonical_id once
+        # set. The matching pipeline is write-once (see plan §4).
+        updates = dict(common)
+        if not existing.get("canonical_id") and listing.gtin:
+            updates["canonical_id"] = listing.gtin
+        ref.update(updates)
+        return (listing_id, False)
+    except Exception as e:
+        print(
+            f"failed to upsert /listings/{listing_id}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+        return (listing_id, False)
+
+
+def _upsert_canonical_gtin(
+    db,
+    project_id: str,
+    listing: ProductListing,
+    listing_id: str,
+) -> None:
+    """
+    Upsert /canonicals/{gtin} when the listing has a GTIN. Adds this
+    listing_id + retailer_id to the canonical's denormalised arrays.
+    No-op if listing.gtin is None.
+    """
+    if not listing.gtin:
+        return
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("canonicals").document(listing.gtin)
+    )
+    try:
+        snap = ref.get()
+        if not snap.exists:
+            ref.set({
+                "display_name": listing.name,
+                "brand": listing.brand,
+                "size_value": listing.size_value,
+                "size_unit": listing.size_unit,
+                "gtin": listing.gtin,
+                "listing_ids": [listing_id],
+                "retailer_ids": [listing.retailer_id],
+                "created_at": SERVER_TIMESTAMP,
+                "confirmed_by": "",  # GTIN-auto
+            })
+            return
+        # Use ArrayUnion-style merging without firestore.ArrayUnion to keep
+        # the dependency surface small. Re-read + dedup + write.
+        data = snap.to_dict() or {}
+        listing_ids = list(data.get("listing_ids") or [])
+        retailer_ids = list(data.get("retailer_ids") or [])
+        changed = False
+        if listing_id not in listing_ids:
+            listing_ids.append(listing_id)
+            changed = True
+        if listing.retailer_id not in retailer_ids:
+            retailer_ids.append(listing.retailer_id)
+            changed = True
+        if changed:
+            ref.update({
+                "listing_ids": listing_ids,
+                "retailer_ids": retailer_ids,
+            })
+    except Exception as e:
+        print(
+            f"failed to upsert /canonicals/{listing.gtin}: "
+            f"{type(e).__name__}: {e}",
             file=sys.stderr,
         )
 

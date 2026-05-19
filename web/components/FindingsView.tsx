@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 export interface FindingRow {
-  id: string; // slug
+  id: string; // slug (our generated one)
   title: string;
   employer: string;
   location: string;
@@ -19,6 +19,8 @@ export interface FindingRow {
   attempts: number;
   destination_id: string;
   destination_response_id: string;
+  /** Slug as stored on the destination (may differ from our generated id). */
+  destination_slug: string;
   published_at: string;
   error: string;
 }
@@ -37,13 +39,21 @@ interface Props {
 /**
  * Build the public URL of a finding on the destination.
  *
- * Resolution order:
+ * Resolution order for the template:
  *   1. finding.destination_id → matching destination's template
  *   2. First destination with a template set
  *   3. null (no icon rendered)
  *
- * Returns null when no template is available OR the matched
- * destination has an empty template.
+ * Supported placeholders in the template (literal curly braces):
+ *   {destination_slug}        — slug the destination actually stores
+ *                               (preferred; populated by the scraper
+ *                               from its list/POST responses)
+ *   {slug}                    — our generated slug (the doc ID)
+ *   {destination_response_id} — id returned by the destination's POST
+ *
+ * If the chosen template uses {destination_slug} but the finding has
+ * none recorded yet, falls back to {slug} for backward compatibility
+ * with findings that pre-date the destination_slug capture.
  */
 function urlForFinding(
   finding: FindingRow,
@@ -63,7 +73,16 @@ function urlForFinding(
     if (fallback) template = fallback.item_url_template;
   }
   if (!template) return null;
-  return template.replace("{slug}", encodeURIComponent(finding.id));
+  const enc = encodeURIComponent;
+  const slug = finding.id;
+  const destSlug = finding.destination_slug || slug;
+  return template
+    .replace(/\{destination_slug\}/g, enc(destSlug))
+    .replace(/\{slug\}/g, enc(slug))
+    .replace(
+      /\{destination_response_id\}/g,
+      enc(finding.destination_response_id || "")
+    );
 }
 
 function ExternalLinkIcon() {

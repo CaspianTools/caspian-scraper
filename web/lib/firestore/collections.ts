@@ -62,6 +62,14 @@ export function findingsCol(projectId: string): CollectionReference {
   return projectDoc(projectId).collection("findings");
 }
 
+export function listingsCol(projectId: string): CollectionReference {
+  return projectDoc(projectId).collection("listings");
+}
+
+export function canonicalsCol(projectId: string): CollectionReference {
+  return projectDoc(projectId).collection("canonicals");
+}
+
 export function runRequestsCol(): CollectionReference {
   return db().collection("run_requests");
 }

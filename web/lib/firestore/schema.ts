@@ -11,12 +11,38 @@ import { z } from "zod";
 /**
  * The ATS / parser types the scraper supports. Adding a new value here
  * requires a corresponding entry in `PARSERS` in scrape.py.
+ *
+ * Job parsers: successfactors, jibe, unknown.
+ * Product parsers: jsonld_product.
  */
-export const AtsType = z.enum(["successfactors", "jibe", "unknown"]);
+export const AtsType = z.enum([
+  "successfactors",
+  "jibe",
+  "unknown",
+  "jsonld_product",
+]);
 export type AtsType = z.infer<typeof AtsType>;
 
 export const SourceKind = z.enum(["employer", "agency", "feed"]);
 export type SourceKind = z.infer<typeof SourceKind>;
+
+/**
+ * Whether a source produces jobs (published to external destinations)
+ * or products (stored as listings + canonicals for cross-retailer
+ * comparison inside this app). Default is "job" so existing sources
+ * need no migration.
+ */
+export const ItemKind = z.enum(["job", "product"]);
+export type ItemKind = z.infer<typeof ItemKind>;
+
+const JOB_ATS = new Set<AtsType>(["successfactors", "jibe", "unknown"]);
+const PRODUCT_ATS = new Set<AtsType>(["jsonld_product"]);
+
+export function isValidKindAts(item_kind: ItemKind, ats: AtsType): boolean {
+  if (item_kind === "job") return JOB_ATS.has(ats);
+  if (item_kind === "product") return PRODUCT_ATS.has(ats);
+  return false;
+}
 
 export const RunStatus = z.enum(["ok", "error", "auth_halt", "running"]);
 export type RunStatus = z.infer<typeof RunStatus>;
@@ -93,6 +119,7 @@ export type ProjectPatch = z.infer<typeof ProjectPatchSchema>;
 
 export const SourceCreateSchema = z.object({
   name: z.string().min(1).max(120),
+  item_kind: ItemKind.default("job"),
   kind: SourceKind.default("employer"),
   ats: AtsType,
   careers_url: z.string().url(),
@@ -219,6 +246,63 @@ export const PublishedDocSchema = z.object({
   source_url: z.string(),
 });
 export type PublishedDoc = z.infer<typeof PublishedDocSchema>;
+
+// /projects/{projectId}/listings/{listingId} --------------------------------
+// Per-retailer scraped product record. listingId is a deterministic hash
+// of (retailer_id + "|" + product_url) so re-scrapes upsert in place.
+
+export const ListingDocSchema = z.object({
+  retailer_id: z.string(),
+  retailer_name: z.string().default(""),
+  product_url: z.string().url(),
+  name: z.string(),
+  brand: z.string().default(""),
+  gtin: z.string().nullable().default(null),
+  size_value: z.number().nullable().default(null),
+  size_unit: z.string().default(""),
+  price_value: z.number(),
+  price_currency: z.string().length(3),
+  unit_price_value: z.number().nullable().default(null),
+  unit_price_basis: z.string().default(""),
+  in_stock: z.boolean().nullable().default(null),
+  image_url: z.string().default(""),
+  canonical_id: z.string().nullable().default(null),
+  first_seen_at: z.string().datetime(),
+  last_seen_at: z.string().datetime(),
+  raw_jsonld: z.unknown().optional(),
+});
+export type ListingDoc = z.infer<typeof ListingDocSchema>;
+
+// /projects/{projectId}/canonicals/{canonicalId} ----------------------------
+// One row in the comparison table. canonicalId is the GTIN if known,
+// otherwise a generated nanoid created at manual-link time.
+
+export const CanonicalDocSchema = z.object({
+  display_name: z.string(),
+  brand: z.string().default(""),
+  size_value: z.number().nullable().default(null),
+  size_unit: z.string().default(""),
+  gtin: z.string().nullable().default(null),
+  listing_ids: z.array(z.string()).default([]),
+  retailer_ids: z.array(z.string()).default([]),
+  created_at: z.string().datetime(),
+  confirmed_by: z.string().default(""),
+});
+export type CanonicalDoc = z.infer<typeof CanonicalDocSchema>;
+
+// POST /api/projects/[id]/listings/[lid]/match payload
+export const ListingMatchSchema = z.union([
+  z.object({ canonical_id: z.string().min(1) }),
+  z.object({
+    create_canonical: z.object({
+      display_name: z.string().min(1).max(200),
+      brand: z.string().max(120).default(""),
+      size_value: z.number().nullable().default(null),
+      size_unit: z.string().max(20).default(""),
+    }),
+  }),
+]);
+export type ListingMatch = z.infer<typeof ListingMatchSchema>;
 
 // /run_requests/{requestId} -------------------------------------------------
 
