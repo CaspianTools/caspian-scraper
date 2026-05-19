@@ -52,7 +52,11 @@ from playwright.sync_api import (
 )
 
 from google.cloud import firestore as gcf
-from google.cloud.firestore_v1 import FieldFilter, SERVER_TIMESTAMP
+from google.cloud.firestore_v1 import (
+    FieldFilter,
+    Increment,
+    SERVER_TIMESTAMP,
+)
 from google.oauth2 import service_account
 
 
@@ -1176,6 +1180,11 @@ def run_project(
                         ):
                             summary["skipped_duplicate"] += 1
                             src_record["skipped_duplicate"] += 1
+                            if slug and not dry_run:
+                                _upsert_finding(
+                                    db, project_id, run_id, slug,
+                                    role, source, "duplicate",
+                                )
                             continue
 
                         payload = build_payload(role, slug)
@@ -1220,6 +1229,11 @@ def run_project(
                                 _write_published(
                                     db, project_id, slug, role, dest, source, data
                                 )
+                                _upsert_finding(
+                                    db, project_id, run_id, slug,
+                                    role, source, "published",
+                                    dest=dest, api_data=data,
+                                )
                                 posted = True
                                 break
                             if status == "auth":
@@ -1237,6 +1251,11 @@ def run_project(
                             )
                             src_record["errors"].append(
                                 f"{role.title}: {message}"
+                            )
+                            _upsert_finding(
+                                db, project_id, run_id, slug,
+                                role, source, "failed",
+                                dest=dest, error=message,
                             )
 
                         if auth_halt:
@@ -1455,6 +1474,106 @@ def _write_published(
     except Exception as e:
         print(
             f"failed to write /published/{slug}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+
+def _upsert_finding(
+    db,
+    project_id: str,
+    run_id: str,
+    slug: str,
+    role: Role,
+    source: dict,
+    status: str,
+    *,
+    dest: dict | None = None,
+    api_data: dict | None = None,
+    error: str | None = None,
+) -> None:
+    """
+    Write a /findings/{slug} doc — one per unique role this project has
+    ever seen. Status reflects the upload outcome on the latest run, with
+    one exception: a previously "published" finding never downgrades to
+    "duplicate" (we DID publish it; the destination just remembers).
+
+    status: "duplicate" | "published" | "failed"
+    """
+    ref = (
+        db.collection("projects").document(project_id)
+        .collection("findings").document(slug)
+    )
+    try:
+        snap = ref.get()
+        existing = snap.to_dict() if snap.exists else None
+
+        # Fields refreshed every encounter — role / source metadata can
+        # drift as the source's careers page updates.
+        common: dict = {
+            "title": role.title,
+            "employer": role.employer,
+            "location": role.location,
+            "country": role.country,
+            "employment_type": role.employment_type,
+            "ats": source.get("ats") or "",
+            "source_id": source["__id"],
+            "source_name": source.get("name") or "",
+            "source_url": role.application_url,
+            "last_seen_at": SERVER_TIMESTAMP,
+            "last_seen_run_id": run_id,
+            "attempts": Increment(1),
+        }
+
+        if existing is None:
+            payload = {
+                **common,
+                "first_seen_at": SERVER_TIMESTAMP,
+                "first_seen_run_id": run_id,
+                "status": status,
+            }
+            if status == "published" and dest is not None:
+                payload["destination_id"] = dest["__id"]
+                payload["destination_response_id"] = (
+                    (api_data or {}).get("id", "")
+                )
+                payload["published_at"] = SERVER_TIMESTAMP
+            elif status == "failed" and dest is not None:
+                payload["destination_id"] = dest["__id"]
+                if error:
+                    payload["error"] = error
+            ref.set(payload)
+            return
+
+        # Existing finding — preserve "published" against later
+        # encounters that legitimately see it as a duplicate.
+        prev_status = str(existing.get("status") or "")
+        updates: dict = dict(common)
+        if prev_status == "published":
+            # No status change. Duplicate sightings of an already-
+            # published role aren't interesting beyond the timestamp.
+            pass
+        elif status == "published":
+            updates["status"] = "published"
+            if dest is not None:
+                updates["destination_id"] = dest["__id"]
+                updates["destination_response_id"] = (
+                    (api_data or {}).get("id", "")
+                )
+                updates["published_at"] = SERVER_TIMESTAMP
+        elif status == "failed":
+            updates["status"] = "failed"
+            if dest is not None:
+                updates["destination_id"] = dest["__id"]
+            if error:
+                updates["error"] = error
+        elif status == "duplicate":
+            # Only meaningful as an upgrade path from "failed".
+            if prev_status == "failed":
+                updates["status"] = "duplicate"
+        ref.update(updates)
+    except Exception as e:
+        print(
+            f"failed to upsert /findings/{slug}: {type(e).__name__}: {e}",
             file=sys.stderr,
         )
 

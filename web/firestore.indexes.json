@@ -48,6 +48,22 @@
         { "fieldPath": "source_id", "order": "ASCENDING" },
         { "fieldPath": "ts", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "findings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "last_seen_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "findings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source_id", "order": "ASCENDING" },
+        { "fieldPath": "last_seen_at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

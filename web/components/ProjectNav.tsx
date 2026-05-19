@@ -18,6 +18,7 @@ export function ProjectNav({ projectId }: { projectId: string }) {
     { href: `${base}/destinations`, label: "Destinations" },
     { href: `${base}/secrets`, label: "Secrets" },
     { href: `${base}/runs`, label: "Runs" },
+    { href: `${base}/findings`, label: "Findings" },
     { href: `${base}/lessons`, label: "Lessons" },
     { href: `${base}/settings`, label: "Settings" },
   ];

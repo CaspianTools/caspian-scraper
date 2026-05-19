@@ -55,6 +55,10 @@ service cloud.firestore {
         allow read: if isProjectOwner();
         allow write: if false;   // published is written only by the scraper
       }
+      match /findings/{slug} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // findings are written only by the scraper
+      }
 
       // Secrets: write-only from clients, never readable. The value
       // is read only by the scraper service account (which bypasses

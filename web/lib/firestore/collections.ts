@@ -58,6 +58,10 @@ export function publishedCol(projectId: string): CollectionReference {
   return projectDoc(projectId).collection("published");
 }
 
+export function findingsCol(projectId: string): CollectionReference {
+  return projectDoc(projectId).collection("findings");
+}
+
 export function runRequestsCol(): CollectionReference {
   return db().collection("run_requests");
 }
