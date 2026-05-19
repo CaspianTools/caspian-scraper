@@ -143,6 +143,11 @@ export const DestinationCreateSchema = z.object({
   secret_ref: z.string().min(1).max(80),
   /** Field mapping for the role payload (free-form for now). */
   field_map: z.record(z.string(), z.string()).default({}),
+  // Optional public URL pattern for an item, e.g.
+  // "https://entirelysafe.com/vacancies/{slug}". The literal "{slug}"
+  // token is substituted with the finding's doc ID at display time.
+  // Used by the Findings tab to show an "open on destination" link.
+  item_url_template: z.string().max(500).default(""),
 });
 export type DestinationCreate = z.infer<typeof DestinationCreateSchema>;
 

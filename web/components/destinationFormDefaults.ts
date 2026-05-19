@@ -10,6 +10,7 @@ export interface DestinationFormInitial {
   auth_header_name: string;
   auth_header_format: string;
   secret_ref: string;
+  item_url_template: string;
 }
 
 export function emptyDestinationFormInitial(): DestinationFormInitial {
@@ -21,5 +22,6 @@ export function emptyDestinationFormInitial(): DestinationFormInitial {
     auth_header_name: "X-API-Key",
     auth_header_format: "{secret}",
     secret_ref: "",
+    item_url_template: "",
   };
 }

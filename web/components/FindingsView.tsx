@@ -23,9 +23,61 @@ export interface FindingRow {
   error: string;
 }
 
+export interface DestinationForFinding {
+  id: string;
+  item_url_template: string;
+}
+
 interface Props {
   projectId: string;
   findings: FindingRow[];
+  destinations: DestinationForFinding[];
+}
+
+/**
+ * Build the public URL of a finding on the destination.
+ *
+ * Resolution order:
+ *   1. finding.destination_id → matching destination's template
+ *   2. First destination with a template set
+ *   3. null (no icon rendered)
+ *
+ * Returns null when no template is available OR the matched
+ * destination has an empty template.
+ */
+function urlForFinding(
+  finding: FindingRow,
+  destinations: DestinationForFinding[]
+): string | null {
+  if (finding.status !== "published" && finding.status !== "duplicate") {
+    return null;
+  }
+  if (destinations.length === 0) return null;
+  let template = "";
+  if (finding.destination_id) {
+    const exact = destinations.find((d) => d.id === finding.destination_id);
+    if (exact?.item_url_template) template = exact.item_url_template;
+  }
+  if (!template) {
+    const fallback = destinations.find((d) => d.item_url_template);
+    if (fallback) template = fallback.item_url_template;
+  }
+  if (!template) return null;
+  return template.replace("{slug}", encodeURIComponent(finding.id));
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="w-4 h-4 shrink-0"
+      aria-hidden="true"
+    >
+      <path d="M11 3a1 1 0 100 2h2.586L7.293 11.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+      <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+    </svg>
+  );
 }
 
 type View = "list" | "cards";
@@ -57,7 +109,7 @@ function fmtRelative(iso: string): string {
   return `${Math.round(delta / 86400)}d ago`;
 }
 
-export function FindingsView({ projectId, findings }: Props) {
+export function FindingsView({ projectId, findings, destinations }: Props) {
   const [view, setView] = useState<View>("list");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [q, setQ] = useState("");
@@ -148,9 +200,17 @@ export function FindingsView({ projectId, findings }: Props) {
             : "No findings match these filters."}
         </div>
       ) : view === "list" ? (
-        <ListView projectId={projectId} findings={filtered} />
+        <ListView
+          projectId={projectId}
+          findings={filtered}
+          destinations={destinations}
+        />
       ) : (
-        <CardsView projectId={projectId} findings={filtered} />
+        <CardsView
+          projectId={projectId}
+          findings={filtered}
+          destinations={destinations}
+        />
       )}
     </div>
   );
@@ -159,15 +219,18 @@ export function FindingsView({ projectId, findings }: Props) {
 function ListView({
   projectId,
   findings,
+  destinations,
 }: {
   projectId: string;
   findings: FindingRow[];
+  destinations: DestinationForFinding[];
 }) {
   return (
     <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
           <tr>
+            <th className="text-right px-3 py-2 font-medium w-px">#</th>
             <th className="text-left px-4 py-2 font-medium">Title</th>
             <th className="text-left px-4 py-2 font-medium">Employer</th>
             <th className="text-left px-4 py-2 font-medium">Location</th>
@@ -178,69 +241,95 @@ function ListView({
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 align-top">
-          {findings.map((f) => (
-            <tr
-              key={f.id}
-              className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-            >
-              <td className="px-4 py-3 font-medium max-w-xs">
-                <div className="truncate">{f.title}</div>
-                {f.error && (
-                  <div
-                    className="text-xs text-red-600 dark:text-red-400 mt-1 truncate"
-                    title={f.error}
-                  >
-                    {f.error}
-                  </div>
-                )}
-              </td>
-              <td className="px-4 py-3">{f.employer}</td>
-              <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                {f.location || "—"}
-                {f.country && (
-                  <span className="text-xs text-zinc-500 ml-1">
-                    {f.country.toUpperCase()}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={
-                    "text-xs px-2 py-0.5 rounded-full whitespace-nowrap " +
-                    statusClasses(f.status)
-                  }
-                >
-                  {f.status}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-xs">
-                <Link
-                  href={`/projects/${projectId}/sources/${f.source_id}`}
-                  className="hover:underline"
-                >
-                  {f.source_name || f.source_id}
-                </Link>
-              </td>
-              <td
-                className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap"
-                title={f.last_seen_at}
+          {findings.map((f, i) => {
+            const destUrl = urlForFinding(f, destinations);
+            return (
+              <tr
+                key={f.id}
+                className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               >
-                {fmtRelative(f.last_seen_at)}
-              </td>
-              <td className="px-4 py-3 text-xs whitespace-nowrap">
-                {f.source_url && (
-                  <a
-                    href={f.source_url}
-                    target="_blank"
-                    rel="noopener"
-                    className="hover:underline text-zinc-700 dark:text-zinc-300"
+                <td className="px-3 py-3 text-right text-xs text-zinc-400 tabular-nums whitespace-nowrap">
+                  {i + 1}
+                </td>
+                <td className="px-4 py-3 max-w-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium truncate">{f.title}</span>
+                    {destUrl && (
+                      <a
+                        href={destUrl}
+                        target="_blank"
+                        rel="noopener"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open on destination"
+                        className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 shrink-0"
+                      >
+                        <ExternalLinkIcon />
+                      </a>
+                    )}
+                  </div>
+                  <div
+                    className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono truncate mt-0.5"
+                    title={f.id}
                   >
-                    Source ↗
-                  </a>
-                )}
-              </td>
-            </tr>
-          ))}
+                    {f.id}
+                  </div>
+                  {f.error && (
+                    <div
+                      className="text-xs text-red-600 dark:text-red-400 mt-1 truncate"
+                      title={f.error}
+                    >
+                      {f.error}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3">{f.employer}</td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                  {f.location || "—"}
+                  {f.country && (
+                    <span className="text-xs text-zinc-500 ml-1">
+                      {f.country.toUpperCase()}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={
+                      "text-xs px-2 py-0.5 rounded-full whitespace-nowrap " +
+                      statusClasses(f.status)
+                    }
+                  >
+                    {f.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-xs">
+                  <Link
+                    href={`/projects/${projectId}/sources/${f.source_id}`}
+                    className="hover:underline"
+                  >
+                    {f.source_name || f.source_id}
+                  </Link>
+                </td>
+                <td
+                  className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap"
+                  title={f.last_seen_at}
+                >
+                  {fmtRelative(f.last_seen_at)}
+                </td>
+                <td className="px-4 py-3 text-xs whitespace-nowrap">
+                  {f.source_url && (
+                    <a
+                      href={f.source_url}
+                      target="_blank"
+                      rel="noopener"
+                      className="hover:underline text-zinc-700 dark:text-zinc-300"
+                    >
+                      Source ↗
+                    </a>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -250,68 +339,102 @@ function ListView({
 function CardsView({
   projectId,
   findings,
+  destinations,
 }: {
   projectId: string;
   findings: FindingRow[];
+  destinations: DestinationForFinding[];
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      {findings.map((f) => (
-        <div
-          key={f.id}
-          className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex flex-col gap-3"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="font-medium leading-tight">{f.title}</h3>
-            <span
-              className={
-                "text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 " +
-                statusClasses(f.status)
-              }
-            >
-              {f.status}
+      {findings.map((f, i) => {
+        const destUrl = urlForFinding(f, destinations);
+        return (
+          <div
+            key={f.id}
+            className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex flex-col gap-3"
+          >
+            <span className="absolute top-3 left-3 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              #{i + 1}
             </span>
-          </div>
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            <div className="font-medium text-zinc-800 dark:text-zinc-200">
-              {f.employer}
+            <div className="flex items-start justify-between gap-3 pl-10">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3 className="font-medium leading-tight truncate">
+                    {f.title}
+                  </h3>
+                  {destUrl && (
+                    <a
+                      href={destUrl}
+                      target="_blank"
+                      rel="noopener"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Open on destination"
+                      className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 shrink-0"
+                    >
+                      <ExternalLinkIcon />
+                    </a>
+                  )}
+                </div>
+                <div
+                  className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono truncate mt-0.5"
+                  title={f.id}
+                >
+                  {f.id}
+                </div>
+              </div>
+              <span
+                className={
+                  "text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 " +
+                  statusClasses(f.status)
+                }
+              >
+                {f.status}
+              </span>
             </div>
-            <div className="text-xs mt-0.5">
-              {f.location || "—"}
-              {f.country && (
-                <span className="ml-1 text-zinc-500">
-                  {f.country.toUpperCase()}
-                </span>
-              )}
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                {f.employer}
+              </div>
+              <div className="text-xs mt-0.5">
+                {f.location || "—"}
+                {f.country && (
+                  <span className="ml-1 text-zinc-500">
+                    {f.country.toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-          {f.error && (
-            <div className="text-xs text-red-700 dark:text-red-400 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-2 py-1.5 break-words whitespace-pre-wrap font-mono">
-              {f.error}
+            {f.error && (
+              <div className="text-xs text-red-700 dark:text-red-400 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 px-2 py-1.5 break-words whitespace-pre-wrap font-mono">
+                {f.error}
+              </div>
+            )}
+            <div className="mt-auto pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+              <Link
+                href={`/projects/${projectId}/sources/${f.source_id}`}
+                className="hover:underline truncate max-w-[60%]"
+                title={f.source_name}
+              >
+                {f.source_name || "source"}
+              </Link>
+              <span title={f.last_seen_at}>
+                {fmtRelative(f.last_seen_at)}
+              </span>
             </div>
-          )}
-          <div className="mt-auto pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
-            <Link
-              href={`/projects/${projectId}/sources/${f.source_id}`}
-              className="hover:underline truncate max-w-[60%]"
-              title={f.source_name}
-            >
-              {f.source_name || "source"}
-            </Link>
-            <span title={f.last_seen_at}>{fmtRelative(f.last_seen_at)}</span>
+            {f.source_url && (
+              <a
+                href={f.source_url}
+                target="_blank"
+                rel="noopener"
+                className="text-xs text-zinc-700 dark:text-zinc-300 hover:underline"
+              >
+                Source ↗
+              </a>
+            )}
           </div>
-          {f.source_url && (
-            <a
-              href={f.source_url}
-              target="_blank"
-              rel="noopener"
-              className="text-xs text-zinc-700 dark:text-zinc-300 hover:underline"
-            >
-              Source ↗
-            </a>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

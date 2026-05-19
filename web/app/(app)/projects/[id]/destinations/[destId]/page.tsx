@@ -26,6 +26,7 @@ export default async function EditDestinationPage({ params }: PageProps) {
     auth_header_name: data.auth_header_name ?? "",
     auth_header_format: data.auth_header_format ?? "{secret}",
     secret_ref: data.secret_ref ?? "",
+    item_url_template: data.item_url_template ?? "",
   };
   const availableSecrets = secretsSnap.docs.map((d) => d.id);
 

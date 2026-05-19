@@ -152,6 +152,20 @@ export function DestinationForm({
         </Row>
       </div>
 
+      <Row
+        label="Public item URL pattern"
+        error={errFor("item_url_template")}
+        hint='Optional. Public URL of one item on this destination. Use the literal "{slug}" as the placeholder for the role slug. Lets the Findings tab show an "open on destination" link.'
+      >
+        <input
+          type="text"
+          value={form.item_url_template}
+          onChange={(e) => set("item_url_template", e.target.value)}
+          placeholder="https://entirelysafe.com/vacancies/{slug}"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+        />
+      </Row>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Row label="Auth header name" error={errFor("auth_header_name")} required>
           <input

@@ -1,7 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
-import { findingsCol } from "@/lib/firestore/collections";
-import { FindingsView, type FindingRow } from "@/components/FindingsView";
+import {
+  destinationsCol,
+  findingsCol,
+} from "@/lib/firestore/collections";
+import {
+  FindingsView,
+  type DestinationForFinding,
+  type FindingRow,
+} from "@/components/FindingsView";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +32,10 @@ export default async function FindingsPage({ params }: PageProps) {
   // Ownership enforced by parent layout. Load the most-recent 500
   // findings — covers a few thousand HSE postings comfortably; we can
   // paginate later if it grows.
-  const snap = await findingsCol(id)
-    .orderBy("last_seen_at", "desc")
-    .limit(500)
-    .get();
+  const [snap, destSnap] = await Promise.all([
+    findingsCol(id).orderBy("last_seen_at", "desc").limit(500).get(),
+    destinationsCol(id).get(),
+  ]);
 
   const findings: FindingRow[] = snap.docs.map((d) => {
     const data = d.data();
@@ -53,6 +60,14 @@ export default async function FindingsPage({ params }: PageProps) {
     };
   });
 
+  const destinations: DestinationForFinding[] = destSnap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      item_url_template: String(data.item_url_template ?? ""),
+    };
+  });
+
   return (
     <>
       <div>
@@ -67,7 +82,11 @@ export default async function FindingsPage({ params }: PageProps) {
         </p>
       </div>
 
-      <FindingsView projectId={id} findings={findings} />
+      <FindingsView
+        projectId={id}
+        findings={findings}
+        destinations={destinations}
+      />
     </>
   );
 }
