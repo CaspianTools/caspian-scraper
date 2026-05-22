@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { sourcesCol } from "@/lib/firestore/collections";
 import { SourcesTable, type SourceRow } from "@/components/SourcesTable";
+import { OpenQuickAddButton } from "@/components/quick-add/OpenQuickAddButton";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +41,9 @@ export default async function SourcesListPage({ params }: PageProps) {
               : `${sources.length} source${sources.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Link
-          href={`/projects/${id}/sources/new`}
-          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-        >
+        <OpenQuickAddButton kind="source" projectId={id}>
           + Add source
-        </Link>
+        </OpenQuickAddButton>
       </div>
 
       {sources.length === 0 ? (
@@ -57,12 +54,9 @@ export default async function SourcesListPage({ params }: PageProps) {
             <code className="text-xs">successfactors</code>,{" "}
             <code className="text-xs">jibe</code>.
           </p>
-          <Link
-            href={`/projects/${id}/sources/new`}
-            className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-          >
+          <OpenQuickAddButton kind="source" projectId={id} size="sm">
             Add your first source
-          </Link>
+          </OpenQuickAddButton>
         </div>
       ) : (
         <SourcesTable projectId={id} sources={sources} />

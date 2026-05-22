@@ -620,45 +620,101 @@ class JibeParser(BaseHtmlParser):
         return seen
 
 
-class JsonLdProductParser(BaseHtmlParser):
-    """Extracts schema.org/Product JSON-LD from a retailer listing/category
-    page. v1 contract: source.careers_url is a listing/category page; the
-    parser collects detail-page links the same way `BaseHtmlParser` does
-    for jobs, then on each detail page reads the first JSON-LD `Product`
-    block (with nested `Offer`) and yields one `ProductListing`.
+_DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-    No CSS fallback in v1 — if the retailer doesn't expose JSON-LD, the
-    listing is skipped and logged. This is intentional: see the plan in
-    plans/can-we-use-the-pure-narwhal.md §1.
+# Regex to split "5kg" / "2.5 L" / "500 g" / "1L" / "12 adet" → (value, unit).
+_SIZE_RE = re.compile(
+    r"(\d+(?:[\.,]\d+)?)\s*(kilogram[s]?|kg|gram[s]?|g|"
+    r"milligram[s]?|mg|millilit(?:er|re)s?|ml|"
+    r"centilit(?:er|re)s?|cl|lit(?:er|re)s?|l|"
+    r"each|ea|piece[s]?|pcs|adet|unit)\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_size_text(text: str) -> tuple[float | None, str]:
+    """Pull a (value, unit) pair out of free text like '12 adet' or '500ml'."""
+    if not text:
+        return (None, "")
+    m = _SIZE_RE.search(text)
+    if not m:
+        return (None, "")
+    try:
+        val = float(m.group(1).replace(",", "."))
+    except ValueError:
+        return (None, "")
+    return (val, m.group(2))
+
+
+def _parse_price_text(text: str) -> float | None:
+    """Best-effort price parser for free text like '₺ 14,90' or '14.99 AED'.
+    Returns None if no number can be recovered."""
+    if not text:
+        return None
+    cleaned = re.sub(r"[^\d,.\-]", "", text)
+    if not cleaned:
+        return None
+    # Both separators present → assume European-style (',' is decimal)
+    if "," in cleaned and "." in cleaned:
+        last_dot = cleaned.rfind(".")
+        last_comma = cleaned.rfind(",")
+        if last_comma > last_dot:
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    else:
+        cleaned = cleaned.replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+class ConfigurableProductParser(BaseHtmlParser):
+    """Multi-strategy product scraper driven by per-source configuration.
+
+    The source carries an `extraction` config (see web/lib/firestore/schema.ts
+    → ExtractionConfigSchema): how to discover detail-page URLs (sitemap /
+    css / category seeds) and an ordered chain of extractors to try
+    (jsonld_product → microdata → og_meta → css). First extractor that
+    yields a non-None `ProductListing` wins.
+
+    Used by the top-level Comparison surface. Per-project HSE-jobs flow is
+    untouched. See plan v2 (plans/can-we-use-the-pure-narwhal.md) §3.
+
+    Diagnostics: every parse_products() call accumulates link/page/
+    extractor counts that the caller surfaces on the run doc, so a
+    zero-found result explains itself (e.g. "links_discovered: 0" vs
+    "links_discovered: 30 but extractor_hits all zero").
     """
-
-    # Pure JSON-LD: no field-specific selectors needed. We still want to
-    # discover detail links from the listing page, so subclasses or
-    # source.notes can hint via env in future; for v1 we accept the
-    # universal "a[href]" filtered by a common product-URL substring.
-    LIST_LINK_SELECTORS = [
-        "a[href*='/p/']",
-        "a[href*='/product/']",
-        "a[href*='/products/']",
-        "a[itemprop='url']",
-    ]
-    DETAIL_TITLE_SELECTORS: list[str] = []  # unused; we read JSON-LD
-    NEXT_PAGE_SELECTORS = [
-        "a[rel='next']",
-        "a[aria-label='Next']",
-        "button[aria-label='Next']",
-    ]
 
     DETAIL_JSONLD_SELECTOR = "script[type='application/ld+json']"
 
-    # Regex to split "5kg" / "2.5 L" / "500 g" / "1L" into value + unit.
-    _SIZE_RE = re.compile(
-        r"(\d+(?:[\.,]\d+)?)\s*(kilogram[s]?|kg|gram[s]?|g|"
-        r"milligram[s]?|mg|millilit(?:er|re)s?|ml|"
-        r"centilit(?:er|re)s?|cl|lit(?:er|re)s?|l|"
-        r"each|ea|piece[s]?|pcs|unit)\b",
-        re.IGNORECASE,
-    )
+    def __init__(
+        self,
+        page: Page,
+        extraction: dict,
+        retailer_id: str,
+        retailer_name: str,
+    ) -> None:
+        super().__init__(page)
+        self.extraction = extraction or {}
+        self.retailer_id = retailer_id
+        self.retailer_name = retailer_name
+        self.diagnostics: dict[str, Any] = {
+            "links_discovered": 0,
+            "pages_visited": 0,
+            "extractor_hits": {
+                "jsonld_product": 0,
+                "microdata": 0,
+                "og_meta": 0,
+                "css": 0,
+            },
+            "http_errors": {},
+        }
+
+    def _user_agent(self) -> str:
+        return str(self.extraction.get("user_agent") or _DEFAULT_UA)
 
     def _read_jsonld_blocks(self) -> list[Any]:
         """Return parsed contents of every <script type=application/ld+json>."""
@@ -760,14 +816,7 @@ class JsonLdProductParser(BaseHtmlParser):
                 if f is not None and unit:
                     return (f, str(unit))
         # Fall back to regex over the product name (very common in groceries).
-        m = self._SIZE_RE.search(name or "")
-        if not m:
-            return (None, "")
-        try:
-            val = float(m.group(1).replace(",", "."))
-        except ValueError:
-            return (None, "")
-        return (val, m.group(2))
+        return _parse_size_text(name or "")
 
     @staticmethod
     def _price_offer(offer: dict) -> tuple[float, str]:
@@ -795,50 +844,147 @@ class JsonLdProductParser(BaseHtmlParser):
             return False
         return None
 
-    def parse_product(
-        self, retailer_id: str, retailer_name: str, url: str
-    ) -> ProductListing | None:
+    # ----- Link discovery --------------------------------------------------
+
+    def _discover_links_sitemap(
+        self, sitemap_url: str, href_includes: str | None
+    ) -> list[str]:
         try:
-            self.page.goto(
-                url,
-                wait_until="domcontentloaded",
-                timeout=self.DETAIL_GOTO_TIMEOUT_MS,
+            resp = requests.get(
+                sitemap_url,
+                timeout=20,
+                headers={"User-Agent": self._user_agent()},
             )
-        except PWTimeout:
-            print(f"timeout loading product {url}", file=sys.stderr)
-            return None
         except Exception as e:
+            print(f"sitemap fetch failed {sitemap_url}: {e}", file=sys.stderr)
+            return []
+        if resp.status_code >= 400:
+            self._record_http_error(resp.status_code)
             print(
-                f"error loading product {url}: {type(e).__name__}: {e}",
+                f"sitemap {sitemap_url} returned HTTP {resp.status_code}",
                 file=sys.stderr,
             )
-            return None
+            return []
+        try:
+            # sitemap.xml uses xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+            import xml.etree.ElementTree as _ET
+            root = _ET.fromstring(resp.content)
+        except Exception as e:
+            print(f"sitemap parse failed {sitemap_url}: {e}", file=sys.stderr)
+            return []
+        ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+        out: list[str] = []
+        for loc in root.iter(ns + "loc"):
+            u = (loc.text or "").strip()
+            if not u:
+                continue
+            if href_includes and href_includes not in u:
+                continue
+            out.append(u)
+        return out
 
+    def _discover_links_css(
+        self,
+        search_url: str,
+        link_selector: str,
+        href_includes: str | None,
+        next_page_selector: str | None,
+        max_pages: int,
+    ) -> list[str]:
+        # Drive BaseHtmlParser's existing pagination machinery via instance
+        # attrs. (BaseHtmlParser reads from .LIST_LINK_SELECTORS /
+        # .NEXT_PAGE_SELECTORS / .DETAIL_HREF_RE — those become instance
+        # attrs once we assign to self.)
+        self.LIST_LINK_SELECTORS = [link_selector] if link_selector else []
+        self.NEXT_PAGE_SELECTORS = (
+            [next_page_selector] if next_page_selector else []
+        )
+        self.DETAIL_HREF_RE = (
+            re.compile(re.escape(href_includes)) if href_includes else None
+        )
+        try:
+            return self.collect_links(search_url, max_pages=max_pages)
+        except ScrapeTimeoutError as e:
+            print(f"css discovery timeout: {e}", file=sys.stderr)
+            return []
+        except Exception as e:
+            print(f"css discovery error: {e}", file=sys.stderr)
+            return []
+
+    def discover_links(self, start_url: str) -> list[str]:
+        ld = self.extraction.get("link_discovery") or {}
+        mode = ld.get("mode")
+        if mode == "sitemap":
+            return self._discover_links_sitemap(
+                str(ld.get("sitemap_url") or ""),
+                ld.get("href_includes"),
+            )
+        if mode == "css":
+            return self._discover_links_css(
+                start_url,
+                str(ld.get("link_selector") or "a[href]"),
+                ld.get("href_includes"),
+                ld.get("next_page_selector"),
+                int(ld.get("max_pages") or 5),
+            )
+        if mode == "category_seeds":
+            seeds = ld.get("seed_urls") or []
+            link_sel = str(ld.get("link_selector") or "a[href]")
+            includes = ld.get("href_includes")
+            max_p = int(ld.get("max_pages") or 3)
+            out: list[str] = []
+            seen: set[str] = set()
+            for seed in seeds:
+                for link in self._discover_links_css(
+                    str(seed), link_sel, includes, None, max_p
+                ):
+                    if link not in seen:
+                        seen.add(link)
+                        out.append(link)
+            return out
+        print(f"unknown link_discovery.mode '{mode}'", file=sys.stderr)
+        return []
+
+    def _record_http_error(self, status: int) -> None:
+        key = str(status)
+        self.diagnostics["http_errors"][key] = (
+            self.diagnostics["http_errors"].get(key, 0) + 1
+        )
+
+    # ----- Per-page extractor chain ---------------------------------------
+
+    def _meta_content(self, name: str) -> str:
+        for sel in (f'meta[property="{name}"]', f'meta[name="{name}"]'):
+            try:
+                el = self.page.query_selector(sel)
+            except Exception:
+                continue
+            if not el:
+                continue
+            try:
+                c = (el.get_attribute("content") or "").strip()
+            except Exception:
+                continue
+            if c:
+                return c
+        return ""
+
+    def _extract_jsonld(self, url: str) -> ProductListing | None:
         blocks = self._read_jsonld_blocks()
         if not blocks:
-            print(f"no JSON-LD on {url}", file=sys.stderr)
             return None
-
         node = self._find_product(blocks)
         if not node:
-            print(f"no schema.org/Product node in JSON-LD on {url}", file=sys.stderr)
             return None
-
         name = str(node.get("name") or "").strip()
         if not name:
-            print(f"JSON-LD Product has no name on {url}", file=sys.stderr)
             return None
-
         offer = self._pick_offer(node)
         if not offer:
-            print(f"JSON-LD Product has no Offer on {url}", file=sys.stderr)
             return None
-
         price, currency = self._price_offer(offer)
         if price <= 0:
-            print(f"JSON-LD Offer has no usable price on {url}", file=sys.stderr)
             return None
-
         brand = self._brand_text(node)
         gtin = self._gtin(node)
         size_value, size_unit = self._parse_size(node, name)
@@ -848,10 +994,9 @@ class JsonLdProductParser(BaseHtmlParser):
             image = image[0] if image else ""
         image_url = str(image or "").strip()
         in_stock = self._availability(offer)
-
         return ProductListing(
-            retailer_id=retailer_id,
-            retailer_name=retailer_name,
+            retailer_id=self.retailer_id,
+            retailer_name=self.retailer_name,
             product_url=url,
             name=name,
             brand=brand,
@@ -867,21 +1012,214 @@ class JsonLdProductParser(BaseHtmlParser):
             raw_jsonld=node if isinstance(node, dict) else {},
         )
 
-    def parse_products(
-        self, retailer_id: str, retailer_name: str, search_url: str
-    ) -> list[ProductListing]:
-        out: list[ProductListing] = []
-        for link in self.collect_links(search_url):
+    def _extract_og_meta(self, url: str) -> ProductListing | None:
+        name = (
+            self._meta_content("og:title")
+            or self._meta_content("twitter:title")
+        )
+        if not name:
+            return None
+        price_str = self._meta_content(
+            "product:price:amount"
+        ) or self._meta_content("og:price:amount")
+        price = _parse_price_text(price_str)
+        if price is None or price <= 0:
+            return None
+        currency = (
+            self._meta_content("product:price:currency")
+            or self._meta_content("og:price:currency")
+            or ""
+        ).upper() or "USD"
+        brand = (
+            self._meta_content("product:brand")
+            or self._meta_content("og:brand")
+            or ""
+        )
+        image_url = self._meta_content("og:image")
+        size_value, size_unit = _parse_size_text(name)
+        unit_price, unit_basis = compute_unit_price(price, size_value, size_unit)
+        return ProductListing(
+            retailer_id=self.retailer_id,
+            retailer_name=self.retailer_name,
+            product_url=url,
+            name=name.strip(),
+            brand=brand.strip(),
+            gtin=None,
+            size_value=size_value,
+            size_unit=size_unit,
+            price_value=price,
+            price_currency=currency,
+            unit_price_value=unit_price,
+            unit_price_basis=unit_basis,
+            in_stock=None,
+            image_url=image_url,
+            raw_jsonld={},
+        )
+
+    def _extract_css(self, url: str, cfg: dict) -> ProductListing | None:
+        name_sel = str(cfg.get("name_selector") or "")
+        price_sel = str(cfg.get("price_selector") or "")
+        if not name_sel or not price_sel:
+            return None
+        name = self._first_text(self.page, [name_sel])
+        if not name:
+            return None
+        price_text = self._first_text(self.page, [price_sel])
+        price = _parse_price_text(price_text)
+        if price is None or price <= 0:
+            return None
+        currency = str(cfg.get("currency") or "USD").upper()
+        brand = ""
+        if cfg.get("brand_selector"):
+            brand = self._first_text(self.page, [str(cfg["brand_selector"])])
+        image_url = ""
+        if cfg.get("image_selector"):
             try:
-                listing = self.parse_product(retailer_id, retailer_name, link)
+                el = self.page.query_selector(str(cfg["image_selector"]))
+                if el:
+                    image_url = (
+                        el.get_attribute("src")
+                        or el.get_attribute("data-src")
+                        or el.get_attribute("data-original")
+                        or ""
+                    ).strip()
+                    if image_url.startswith("//"):
+                        image_url = "https:" + image_url
+            except Exception:
+                pass
+        size_text = ""
+        if cfg.get("size_selector"):
+            size_text = self._first_text(self.page, [str(cfg["size_selector"])])
+        size_value, size_unit = _parse_size_text(size_text or name)
+
+        in_stock: bool | None = None
+        if cfg.get("in_stock_selector"):
+            stock_text = self._first_text(
+                self.page, [str(cfg["in_stock_selector"])]
+            )
+            match = str(cfg.get("in_stock_text_match") or "").strip()
+            if match:
+                in_stock = bool(stock_text) and match.lower() in stock_text.lower()
+            else:
+                in_stock = bool(stock_text)
+
+        gtin: str | None = None
+        if cfg.get("gtin_selector"):
+            g = self._first_text(self.page, [str(cfg["gtin_selector"])]).strip()
+            if g.isdigit() and len(g) in (8, 12, 13, 14):
+                gtin = g
+
+        unit_price, unit_basis = compute_unit_price(price, size_value, size_unit)
+        return ProductListing(
+            retailer_id=self.retailer_id,
+            retailer_name=self.retailer_name,
+            product_url=url,
+            name=name.strip(),
+            brand=brand.strip(),
+            gtin=gtin,
+            size_value=size_value,
+            size_unit=size_unit,
+            price_value=price,
+            price_currency=currency,
+            unit_price_value=unit_price,
+            unit_price_basis=unit_basis,
+            in_stock=in_stock,
+            image_url=image_url,
+            raw_jsonld={},
+        )
+
+    def _extract_microdata(self, _url: str) -> ProductListing | None:
+        # Phase B — schema.org microdata via itemtype/itemprop walking.
+        # Stubbed so the dispatch doesn't crash if a config lists it.
+        return None
+
+    def _try_extractors(self, url: str) -> ProductListing | None:
+        for ex in self.extraction.get("extractors") or []:
+            t = str(ex.get("type") or "")
+            listing: ProductListing | None = None
+            if t == "jsonld_product":
+                listing = self._extract_jsonld(url)
+            elif t == "og_meta":
+                listing = self._extract_og_meta(url)
+            elif t == "css":
+                listing = self._extract_css(url, ex)
+            elif t == "microdata":
+                listing = self._extract_microdata(url)
+            if listing is not None:
+                self.diagnostics["extractor_hits"][t] = (
+                    self.diagnostics["extractor_hits"].get(t, 0) + 1
+                )
+                return listing
+        return None
+
+    # ----- Top-level entry ------------------------------------------------
+
+    def parse_one(self, url: str) -> ProductListing | None:
+        """Load `url`, run the extractor chain, return the first hit (or None).
+        Surfaces upstream HTTP errors into self.diagnostics so the run-detail
+        page can explain zero-found outcomes."""
+        wait_sel = self.extraction.get("wait_for_selector")
+        try:
+            resp = self.page.goto(
+                url,
+                wait_until="domcontentloaded",
+                timeout=self.DETAIL_GOTO_TIMEOUT_MS,
+            )
+            status_code = resp.status if resp is not None else 0
+            if status_code and status_code >= 400:
+                self._record_http_error(status_code)
+                return None
+        except PWTimeout:
+            print(f"timeout loading {url}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(f"error loading {url}: {type(e).__name__}: {e}", file=sys.stderr)
+            return None
+        self.diagnostics["pages_visited"] += 1
+        if wait_sel:
+            try:
+                self.page.wait_for_selector(
+                    wait_sel, timeout=self.DETAIL_SELECTOR_TIMEOUT_MS
+                )
+            except PWTimeout:
+                pass
+        return self._try_extractors(url)
+
+    def parse_products(self, start_url: str) -> list[ProductListing]:
+        ua = self._user_agent()
+        try:
+            self.page.context.set_extra_http_headers({"User-Agent": ua})
+        except Exception:
+            pass
+
+        links = self.discover_links(start_url)
+        self.diagnostics["links_discovered"] += len(links)
+        if not links:
+            print(
+                f"no detail-page links discovered from {start_url} "
+                f"(mode={(self.extraction.get('link_discovery') or {}).get('mode')})",
+                file=sys.stderr,
+            )
+            return []
+
+        delay_ms = int(self.extraction.get("request_delay_ms") or 1500)
+        out: list[ProductListing] = []
+        for link in links:
+            try:
+                listing = self.parse_one(link)
             except Exception as e:
                 print(
-                    f"error parsing product {link}: {type(e).__name__}: {e}",
+                    f"unhandled parse error {link}: {type(e).__name__}: {e}",
                     file=sys.stderr,
                 )
                 continue
             if listing:
                 out.append(listing)
+            if delay_ms > 0:
+                try:
+                    self.page.wait_for_timeout(delay_ms)
+                except Exception:
+                    pass
         return out
 
 
@@ -889,9 +1227,14 @@ PARSERS: dict[str, type] = {
     # job parsers
     "successfactors": SuccessFactorsParser,
     "jibe": JibeParser,
-    # product parsers
-    "jsonld_product": JsonLdProductParser,
 }
+
+# Note: product extraction lives outside this registry. The comparison
+# pipeline uses ConfigurableProductParser directly with a per-source
+# extraction config (see run_comparison_source). The `jsonld_product`
+# value still exists in web/lib/firestore/schema.ts → AtsType for
+# backwards-compat on the SourceCreateSchema; it just doesn't dispatch
+# anywhere on the project pipeline.
 
 
 # ---------------------------------------------------------------------------
@@ -1220,27 +1563,67 @@ def list_enabled_projects(db) -> list[dict]:
     return [_doc_with_id(d) for d in q.stream()]
 
 
+def list_active_comparison_sources(db) -> list[dict]:
+    """Top-level /comparison_sources, active==True. Used by find_due_work
+    + the run-now request handler."""
+    q = db.collection("comparison_sources").where(
+        filter=FieldFilter("active", "==", True)
+    )
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def load_comparison_source(db, source_id: str) -> dict | None:
+    snap = db.collection("comparison_sources").document(source_id).get()
+    if not snap.exists:
+        return None
+    return _doc_with_id(snap)
+
+
+def _to_datetime(v: Any) -> datetime | None:
+    """Coerce a Firestore timestamp / native datetime / None into UTC datetime."""
+    if v is None:
+        return None
+    if hasattr(v, "to_datetime"):
+        try:
+            return v.to_datetime()
+        except Exception:
+            return None
+    if isinstance(v, datetime):
+        return v
+    return None
+
+
 def find_due_work(
     db, now: datetime
-) -> list[tuple[str, str]]:
+) -> list[tuple[str, str, str]]:
     """
-    Returns a list of (project_id, trigger) pairs to run this tick.
-      trigger == "request:<request_id>" for queued ad-hoc runs
-      trigger == "schedule"             for cron-due projects
+    Returns (kind, id, trigger) tuples to run this tick.
+      kind == "project"            → id is a project_id, dispatched to run_project
+      kind == "comparison_source"  → id is a comparison_source_id, dispatched to
+                                      run_comparison_source
+      trigger == "request:<request_id>"  queued ad-hoc run
+      trigger == "schedule"              cron-due
 
-    Deduplicates: if a project has both a pending request AND its cron
-    is due, the request wins (one run satisfies both).
+    Deduplicates: if a target has both a pending request AND its cron is
+    due, the request wins. Comparison sources and projects have separate
+    seen-sets so a comparison-source request doesn't suppress a project
+    or vice versa.
     """
-    work: list[tuple[str, str]] = []
+    work: list[tuple[str, str, str]] = []
     seen_projects: set[str] = set()
+    seen_comparison: set[str] = set()
 
     # Ad-hoc requests first — most user-visible.
     for req in list_pending_run_requests(db):
         pid = str(req.get("project_id") or "")
-        if not pid or pid in seen_projects:
-            continue
-        seen_projects.add(pid)
-        work.append((pid, f"request:{req['__id']}"))
+        csid = str(req.get("comparison_source_id") or "")
+        trig = f"request:{req['__id']}"
+        if pid and pid not in seen_projects:
+            seen_projects.add(pid)
+            work.append(("project", pid, trig))
+        elif csid and csid not in seen_comparison:
+            seen_comparison.add(csid)
+            work.append(("comparison_source", csid, trig))
 
     # Then schedule-due projects.
     for proj in list_enabled_projects(db):
@@ -1250,19 +1633,25 @@ def find_due_work(
         cron = str(proj.get("schedule_cron") or "").strip()
         if not cron:
             continue
-        last_run_at = proj.get("last_run_at")
-        last_dt: datetime | None = None
-        if hasattr(last_run_at, "to_datetime"):
-            try:
-                last_dt = last_run_at.to_datetime()
-            except Exception:
-                last_dt = None
-        elif isinstance(last_run_at, datetime):
-            last_dt = last_run_at
+        last_dt = _to_datetime(proj.get("last_run_at"))
         if not _is_cron_due(cron, last_dt, now):
             continue
         seen_projects.add(pid)
-        work.append((pid, "schedule"))
+        work.append(("project", pid, "schedule"))
+
+    # Then schedule-due comparison sources (top-level, per-user).
+    for src in list_active_comparison_sources(db):
+        sid = src["__id"]
+        if sid in seen_comparison:
+            continue
+        cron = str(src.get("schedule_cron") or "").strip()
+        if not cron:
+            continue
+        last_dt = _to_datetime(src.get("last_run_at"))
+        if not _is_cron_due(cron, last_dt, now):
+            continue
+        seen_comparison.add(sid)
+        work.append(("comparison_source", sid, "schedule"))
 
     return work
 
@@ -1369,10 +1758,7 @@ def run_project(
         destinations = load_destinations(db, project_id)
         secrets = load_secrets(db, project_id)
 
-        has_job_source = any(
-            (s.get("item_kind") or "job") == "job" for s in sources
-        )
-        if has_job_source and not destinations:
+        if not destinations:
             summary["errors"].append("no destinations configured")
             return _finalize_project_run(
                 db, project_id, run_ref, run_id, project, summary,
@@ -1401,7 +1787,7 @@ def run_project(
                 field_map=dest.get("field_map") or {},
             )
 
-        if has_job_source and not clients:
+        if not clients:
             summary["errors"].append("no usable destinations (all secrets missing)")
             return _finalize_project_run(
                 db, project_id, run_ref, run_id, project, summary,
@@ -1496,67 +1882,14 @@ def run_project(
                         _write_lesson(db, project_id, run_id, source, src_record, started_at)
                         continue
 
-                    src_item_kind = str(source.get("item_kind") or "job")
-                    roles: list[Role] = []
-                    listings: list[ProductListing] = []
                     try:
                         parser = parser_cls(page)
-                        if src_item_kind == "product":
-                            if not isinstance(parser, JsonLdProductParser):
-                                raise RuntimeError(
-                                    f"parser {type(parser).__name__} does "
-                                    f"not support product extraction"
-                                )
-                            listings = parser.parse_products(
-                                source["__id"], src_name, src_url
-                            )
-                        else:
-                            roles = parser.parse(src_name, src_url)
+                        roles = parser.parse(src_name, src_url)
                     except Exception as e:
                         msg = f"{type(e).__name__}: {e}"
                         src_record["errors"].append(msg)
                         summary["errors"].append(f"{src_name}: {msg}")
                         _write_lesson(db, project_id, run_id, source, src_record, started_at)
-                        continue
-
-                    # Product path: write listings + upsert canonicals, then
-                    # move on. No destination POSTs, no dedup-by-slug — the
-                    # listing ID is deterministic (sha1 of retailer+url) and
-                    # write-once for canonical_id.
-                    if src_item_kind == "product":
-                        src_record["found"] = len(listings)
-                        summary["found"] += len(listings)
-                        for listing in listings:
-                            if dry_run:
-                                src_record["published"] += 1
-                                summary["published"] += 1
-                                summary["published_roles"].append({
-                                    "retailer": src_name,
-                                    "name": listing.name,
-                                    "brand": listing.brand,
-                                    "price": (
-                                        f"{listing.price_value:.2f} "
-                                        f"{listing.price_currency}"
-                                    ),
-                                    "gtin": listing.gtin or "",
-                                    "destination": "(dry-run)",
-                                })
-                                continue
-                            listing_id, is_new = _upsert_listing(
-                                db, project_id, listing, source
-                            )
-                            _upsert_canonical_gtin(
-                                db, project_id, listing, listing_id
-                            )
-                            if is_new:
-                                src_record["published"] += 1
-                                summary["published"] += 1
-                            else:
-                                src_record["skipped_duplicate"] += 1
-                                summary["skipped_duplicate"] += 1
-                        _write_lesson(
-                            db, project_id, run_id, source, src_record, started_at
-                        )
                         continue
 
                     src_record["found"] = len(roles)
@@ -1999,28 +2332,25 @@ def _upsert_finding(
         )
 
 
-def _upsert_listing(
+def _upsert_comparison_listing(
     db,
-    project_id: str,
+    owner_uid: str,
+    source_id: str,
     listing: ProductListing,
-    source: dict,
 ) -> tuple[str, bool]:
-    """
-    Upsert /listings/{listingId}. Returns (listing_id, is_new).
+    """Upsert /comparison_listings/{listingId}. Returns (listing_id, is_new).
 
-    Preserves:
-      - first_seen_at on re-scrapes
-      - canonical_id once set (matching is write-once; see plan §4)
+    Top-level collection (not under any project). Preserves first_seen_at
+    + canonical_id on re-scrapes — matching is write-once (plan v2 §4).
     """
     listing_id = listing_id_for(listing.retailer_id, listing.product_url)
-    ref = (
-        db.collection("projects").document(project_id)
-        .collection("listings").document(listing_id)
-    )
+    ref = db.collection("comparison_listings").document(listing_id)
     try:
         snap = ref.get()
         existing = snap.to_dict() if snap.exists else None
-        common = {
+        common: dict[str, Any] = {
+            "owner_uid": owner_uid,
+            "source_id": source_id,
             "retailer_id": listing.retailer_id,
             "retailer_name": listing.retailer_name,
             "product_url": listing.product_url,
@@ -2035,55 +2365,54 @@ def _upsert_listing(
             "unit_price_basis": listing.unit_price_basis,
             "in_stock": listing.in_stock,
             "image_url": listing.image_url,
-            "raw_jsonld": listing.raw_jsonld,
+            "raw_blob": listing.raw_jsonld,
             "last_seen_at": SERVER_TIMESTAMP,
         }
         if existing is None:
-            # First sighting: stamp first_seen_at; pre-link to GTIN canonical
-            # if available (the canonical doc itself is upserted by caller).
             ref.set({
                 **common,
                 "first_seen_at": SERVER_TIMESTAMP,
                 "canonical_id": listing.gtin if listing.gtin else None,
-                "source_id": source["__id"],
+                "status": "linked" if listing.gtin else "new",
             })
             return (listing_id, True)
-        # Re-scrape: refresh fields but do NOT overwrite canonical_id once
-        # set. The matching pipeline is write-once (see plan §4).
         updates = dict(common)
         if not existing.get("canonical_id") and listing.gtin:
             updates["canonical_id"] = listing.gtin
+            updates["status"] = "linked"
+        elif existing.get("canonical_id"):
+            updates["status"] = "linked"
         ref.update(updates)
         return (listing_id, False)
     except Exception as e:
         print(
-            f"failed to upsert /listings/{listing_id}: {type(e).__name__}: {e}",
+            f"failed to upsert /comparison_listings/{listing_id}: "
+            f"{type(e).__name__}: {e}",
             file=sys.stderr,
         )
         return (listing_id, False)
 
 
-def _upsert_canonical_gtin(
+def _upsert_comparison_canonical_gtin(
     db,
-    project_id: str,
+    owner_uid: str,
     listing: ProductListing,
     listing_id: str,
 ) -> None:
-    """
-    Upsert /canonicals/{gtin} when the listing has a GTIN. Adds this
-    listing_id + retailer_id to the canonical's denormalised arrays.
-    No-op if listing.gtin is None.
+    """Upsert /comparison_canonicals/{gtin} when the listing has a GTIN.
+
+    No-op if listing.gtin is None. Append-only listing_ids + retailer_ids
+    arrays (read-modify-write rather than ArrayUnion to stay dependency-
+    free). Plan v2 §4 — canonical matching is write-once.
     """
     if not listing.gtin:
         return
-    ref = (
-        db.collection("projects").document(project_id)
-        .collection("canonicals").document(listing.gtin)
-    )
+    ref = db.collection("comparison_canonicals").document(listing.gtin)
     try:
         snap = ref.get()
         if not snap.exists:
             ref.set({
+                "owner_uid": owner_uid,
                 "display_name": listing.name,
                 "brand": listing.brand,
                 "size_value": listing.size_value,
@@ -2095,8 +2424,6 @@ def _upsert_canonical_gtin(
                 "confirmed_by": "",  # GTIN-auto
             })
             return
-        # Use ArrayUnion-style merging without firestore.ArrayUnion to keep
-        # the dependency surface small. Re-read + dedup + write.
         data = snap.to_dict() or {}
         listing_ids = list(data.get("listing_ids") or [])
         retailer_ids = list(data.get("retailer_ids") or [])
@@ -2114,10 +2441,236 @@ def _upsert_canonical_gtin(
             })
     except Exception as e:
         print(
-            f"failed to upsert /canonicals/{listing.gtin}: "
+            f"failed to upsert /comparison_canonicals/{listing.gtin}: "
             f"{type(e).__name__}: {e}",
             file=sys.stderr,
         )
+
+
+# ---------------------------------------------------------------------------
+# Comparison-source runner (top-level, per-user)
+# ---------------------------------------------------------------------------
+
+def run_comparison_source(
+    db,
+    source_id: str,
+    trigger: str,
+    *,
+    dry_run: bool,
+    per_source_deadline: float,
+) -> dict:
+    """Run one comparison source end-to-end. Writes a /comparison_runs/{rid}
+    doc, upserts /comparison_listings, and (when a GTIN is present) upserts
+    /comparison_canonicals. Returns a summary dict the workflow logs.
+
+    Mirrors run_project's shape but is dramatically simpler: one source
+    per run, no destinations, no dedup-by-slug, no auth halts."""
+    started_at = utc_now_iso()
+    started_mono = time.monotonic()
+
+    source = load_comparison_source(db, source_id)
+    if source is None:
+        return {
+            "comparison_source_id": source_id,
+            "status": "error",
+            "error": "comparison source not found",
+        }
+
+    owner_uid = str(source.get("owner_uid") or "")
+    if not owner_uid:
+        return {
+            "comparison_source_id": source_id,
+            "status": "error",
+            "error": "comparison source has no owner_uid",
+        }
+
+    src_name = str(source.get("name") or source_id)
+    retailer_id = str(source.get("retailer_id") or source_id)
+    start_urls = source.get("start_urls") or []
+    if not isinstance(start_urls, list) or not start_urls:
+        return {
+            "comparison_source_id": source_id,
+            "status": "error",
+            "error": "comparison source has no start_urls",
+        }
+    extraction = source.get("extraction") or {}
+
+    print(
+        f"\n=== Comparison: {src_name} ({source_id}) trigger={trigger} "
+        f"dry={dry_run} ===",
+        file=sys.stderr,
+    )
+
+    # Pre-create /comparison_runs/{rid} so the UI sees it as running.
+    run_ref = db.collection("comparison_runs").document()
+    run_id = run_ref.id
+    run_ref.set({
+        "owner_uid": owner_uid,
+        "source_id": source_id,
+        "source_name": src_name,
+        "started_at": SERVER_TIMESTAMP,
+        "finished_at": None,
+        "duration_seconds": 0,
+        "status": "running",
+        "trigger": trigger,
+        "dry_run": dry_run,
+        "totals": {
+            "checked": 0,
+            "found": 0,
+            "extracted": 0,
+            "skipped_duplicate": 0,
+            "errors_count": 0,
+        },
+        "errors": [],
+    })
+
+    summary: dict[str, Any] = {
+        "found": 0,
+        "extracted": 0,
+        "skipped_duplicate": 0,
+        "errors": [],
+    }
+    diagnostics: dict[str, Any] = {
+        "links_discovered": 0,
+        "pages_visited": 0,
+        "extractor_hits": {
+            "jsonld_product": 0,
+            "microdata": 0,
+            "og_meta": 0,
+            "css": 0,
+        },
+        "http_errors": {},
+    }
+
+    overrun = False
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            ua = str(extraction.get("user_agent") or _DEFAULT_UA)
+            context = browser.new_context(user_agent=ua)
+            page = context.new_page()
+            try:
+                parser = ConfigurableProductParser(
+                    page, extraction, retailer_id, src_name
+                )
+                for url in start_urls:
+                    if time.monotonic() >= per_source_deadline:
+                        overrun = True
+                        summary["errors"].append(
+                            "per-source timeout reached"
+                        )
+                        break
+                    try:
+                        listings = parser.parse_products(str(url))
+                    except Exception as e:
+                        msg = f"{type(e).__name__}: {e}"
+                        summary["errors"].append(f"{url}: {msg}")
+                        continue
+                    summary["found"] += len(listings)
+                    for listing in listings:
+                        if dry_run:
+                            summary["extracted"] += 1
+                            continue
+                        lid, is_new = _upsert_comparison_listing(
+                            db, owner_uid, source_id, listing
+                        )
+                        _upsert_comparison_canonical_gtin(
+                            db, owner_uid, listing, lid
+                        )
+                        if is_new:
+                            summary["extracted"] += 1
+                        else:
+                            summary["skipped_duplicate"] += 1
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+
+        diagnostics = parser.diagnostics  # noqa: F821 — set inside the with-block
+    except Exception as e:
+        summary["errors"].append(
+            f"unexpected error: {type(e).__name__}: {e}"
+        )
+
+    duration = max(0, int(time.monotonic() - started_mono))
+    errors_count = len(summary["errors"])
+    if errors_count == 0:
+        status = "ok"
+    elif summary["extracted"] > 0:
+        status = "partial"
+    else:
+        status = "error"
+
+    totals = {
+        "checked": len(start_urls),
+        "found": summary["found"],
+        "extracted": summary["extracted"],
+        "skipped_duplicate": summary["skipped_duplicate"],
+        "errors_count": errors_count,
+    }
+
+    try:
+        run_ref.update({
+            "finished_at": SERVER_TIMESTAMP,
+            "duration_seconds": duration,
+            "status": status,
+            "totals": totals,
+            "errors": summary["errors"],
+            "overrun": overrun,
+            "diagnostics": diagnostics,
+        })
+    except Exception as e:
+        print(
+            f"failed to finalise /comparison_runs/{run_id}: "
+            f"{type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+    if not dry_run:
+        try:
+            db.collection("comparison_sources").document(source_id).update({
+                "last_run_at": SERVER_TIMESTAMP,
+                "last_run_summary": {
+                    "ts": SERVER_TIMESTAMP,
+                    "found": summary["found"],
+                    "extracted": summary["extracted"],
+                    "errors_count": errors_count,
+                },
+            })
+        except Exception as e:
+            print(
+                f"failed to update comparison source last_run_at: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    if trigger.startswith("request:"):
+        try:
+            update_run_request(
+                db,
+                trigger.split(":", 1)[1],
+                {
+                    "status": "done",
+                    "finished_at": SERVER_TIMESTAMP,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as e:
+            print(
+                f"failed to mark comparison run_request done: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    return {
+        "comparison_source_id": source_id,
+        "source_name": src_name,
+        "status": status,
+        "totals": totals,
+        "diagnostics": diagnostics,
+        "errors": summary["errors"][:10],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2156,24 +2709,35 @@ def main() -> int:
     except ValueError:
         per_project_timeout = DEFAULT_PER_PROJECT_TIMEOUT_S
 
+    only_comparison_source_id = (
+        os.environ.get("ONLY_COMPARISON_SOURCE_ID", "").strip() or None
+    )
+
     now = utc_now()
 
     # Build the work list.
     if only_project_id:
-        # If this dispatch satisfies a specific run-request, encode it
-        # into the trigger so the existing request-update logic flips
-        # the /run_requests doc to done at finalise time.
         trigger = f"request:{request_id}" if request_id else "manual"
-        work: list[tuple[str, str]] = [(only_project_id, trigger)]
+        work: list[tuple[str, str, str]] = [
+            ("project", only_project_id, trigger)
+        ]
         print(
             f"ONLY_PROJECT_ID={only_project_id} trigger={trigger} "
             f"dry_run={dry_run}",
             file=sys.stderr,
         )
+    elif only_comparison_source_id:
+        trigger = f"request:{request_id}" if request_id else "manual"
+        work = [("comparison_source", only_comparison_source_id, trigger)]
+        print(
+            f"ONLY_COMPARISON_SOURCE_ID={only_comparison_source_id} "
+            f"trigger={trigger} dry_run={dry_run}",
+            file=sys.stderr,
+        )
     else:
         work = find_due_work(db, now)[:max_projects]
         print(
-            f"found {len(work)} project(s) due "
+            f"found {len(work)} work item(s) due "
             f"(dry_run={dry_run}, max_per_tick={max_projects})",
             file=sys.stderr,
         )
@@ -2183,7 +2747,7 @@ def main() -> int:
         return 0
 
     # Mark requests as "running" up-front so the UI's Pending list clears.
-    for project_id, trigger in work:
+    for _kind, _id, trigger in work:
         if trigger.startswith("request:"):
             try:
                 update_run_request(
@@ -2200,18 +2764,28 @@ def main() -> int:
 
     results: list[dict] = []
     has_hard_failure = False
-    for project_id, trigger in work:
-        per_project_deadline = time.monotonic() + per_project_timeout
-        result = run_project(
-            db,
-            project_id,
-            trigger,
-            dry_run=dry_run,
-            per_project_deadline=per_project_deadline,
-        )
+    for kind, work_id, trigger in work:
+        per_item_deadline = time.monotonic() + per_project_timeout
+        if kind == "project":
+            result = run_project(
+                db,
+                work_id,
+                trigger,
+                dry_run=dry_run,
+                per_project_deadline=per_item_deadline,
+            )
+        elif kind == "comparison_source":
+            result = run_comparison_source(
+                db,
+                work_id,
+                trigger,
+                dry_run=dry_run,
+                per_source_deadline=per_item_deadline,
+            )
+        else:
+            print(f"unknown work kind '{kind}'; skipping", file=sys.stderr)
+            continue
         results.append(result)
-        # "partial" and "ok" are healthy enough not to fail the workflow
-        # run; "error" and "auth_halt" are hard failures.
         if result.get("status") in ("error", "auth_halt"):
             has_hard_failure = True
 
@@ -2219,7 +2793,7 @@ def main() -> int:
     print(json.dumps({
         "tick_finished_at": utc_now_iso(),
         "duration_seconds": total_duration,
-        "projects": len(results),
+        "items": len(results),
         "results": results,
     }, indent=2))
     return 2 if has_hard_failure else 0

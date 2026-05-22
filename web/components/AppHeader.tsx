@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
+import { QuickAddHeaderButton } from "./quick-add/QuickAddHeaderButton";
 import type { UserSession } from "@/lib/auth/session";
 
 interface Props {
@@ -31,16 +32,25 @@ export function AppHeader({ session }: Props) {
             >
               Projects
             </Link>
+            <Link
+              href="/comparison"
+              className="text-sm px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+            >
+              Comparison
+            </Link>
           </nav>
         </div>
 
-        <UserMenu
-          session={{
-            email: session.email,
-            name: session.name,
-            picture: session.picture,
-          }}
-        />
+        <div className="flex items-center gap-3">
+          <QuickAddHeaderButton />
+          <UserMenu
+            session={{
+              email: session.email,
+              name: session.name,
+              picture: session.picture,
+            }}
+          />
+        </div>
       </div>
     </header>
   );

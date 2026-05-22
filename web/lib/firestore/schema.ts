@@ -9,40 +9,18 @@ import { z } from "zod";
 // Common shapes -------------------------------------------------------------
 
 /**
- * The ATS / parser types the scraper supports. Adding a new value here
- * requires a corresponding entry in `PARSERS` in scrape.py.
+ * The ATS / parser types the per-project job scraper supports. Adding a
+ * new value here requires a corresponding entry in `PARSERS` in scrape.py.
  *
- * Job parsers: successfactors, jibe, unknown.
- * Product parsers: jsonld_product.
+ * Product extraction has moved to the top-level Comparison surface
+ * (/comparison_sources/{sid}) — it uses its own `extraction` config
+ * (see ExtractionConfigSchema below) and does NOT go through this enum.
  */
-export const AtsType = z.enum([
-  "successfactors",
-  "jibe",
-  "unknown",
-  "jsonld_product",
-]);
+export const AtsType = z.enum(["successfactors", "jibe", "unknown"]);
 export type AtsType = z.infer<typeof AtsType>;
 
 export const SourceKind = z.enum(["employer", "agency", "feed"]);
 export type SourceKind = z.infer<typeof SourceKind>;
-
-/**
- * Whether a source produces jobs (published to external destinations)
- * or products (stored as listings + canonicals for cross-retailer
- * comparison inside this app). Default is "job" so existing sources
- * need no migration.
- */
-export const ItemKind = z.enum(["job", "product"]);
-export type ItemKind = z.infer<typeof ItemKind>;
-
-const JOB_ATS = new Set<AtsType>(["successfactors", "jibe", "unknown"]);
-const PRODUCT_ATS = new Set<AtsType>(["jsonld_product"]);
-
-export function isValidKindAts(item_kind: ItemKind, ats: AtsType): boolean {
-  if (item_kind === "job") return JOB_ATS.has(ats);
-  if (item_kind === "product") return PRODUCT_ATS.has(ats);
-  return false;
-}
 
 export const RunStatus = z.enum(["ok", "error", "auth_halt", "running"]);
 export type RunStatus = z.infer<typeof RunStatus>;
@@ -119,7 +97,6 @@ export type ProjectPatch = z.infer<typeof ProjectPatchSchema>;
 
 export const SourceCreateSchema = z.object({
   name: z.string().min(1).max(120),
-  item_kind: ItemKind.default("job"),
   kind: SourceKind.default("employer"),
   ats: AtsType,
   careers_url: z.string().url(),
@@ -247,11 +224,132 @@ export const PublishedDocSchema = z.object({
 });
 export type PublishedDoc = z.infer<typeof PublishedDocSchema>;
 
-// /projects/{projectId}/listings/{listingId} --------------------------------
-// Per-retailer scraped product record. listingId is a deterministic hash
-// of (retailer_id + "|" + product_url) so re-scrapes upsert in place.
+// ---------------------------------------------------------------------------
+// Comparison (top-level, per-user product-comparison surface)
+// ---------------------------------------------------------------------------
+//
+// Lives entirely outside the /projects hierarchy. Every doc carries
+// owner_uid; API routes filter by it. Phase A of plan v2 — see
+// C:/Users/fuadj/.claude/plans/can-we-use-the-pure-narwhal.md
+//
+// /comparison_sources/{sid}      — operator-configured retailer source
+// /comparison_listings/{lid}     — per-retailer scraped product record
+// /comparison_canonicals/{cid}   — one row in the side-by-side compare table
+// /comparison_runs/{rid}         — per-source-per-tick scrape run
 
-export const ListingDocSchema = z.object({
+// ----- ExtractionConfig (per-source strategy) ------------------------------
+
+const LinkDiscoverySitemap = z.object({
+  mode: z.literal("sitemap"),
+  sitemap_url: z.string().url(),
+  href_includes: z.string().max(120).optional(),
+});
+
+const LinkDiscoveryCss = z.object({
+  mode: z.literal("css"),
+  link_selector: z.string().min(1).max(500),
+  href_includes: z.string().max(120).optional(),
+  next_page_selector: z.string().max(500).optional(),
+  max_pages: z.number().int().min(1).max(20).default(5),
+});
+
+const LinkDiscoveryCategorySeeds = z.object({
+  mode: z.literal("category_seeds"),
+  seed_urls: z.array(z.string().url()).min(1).max(50),
+  link_selector: z.string().min(1).max(500),
+  href_includes: z.string().max(120).optional(),
+  max_pages: z.number().int().min(1).max(20).default(3),
+});
+
+export const LinkDiscoverySchema = z.discriminatedUnion("mode", [
+  LinkDiscoverySitemap,
+  LinkDiscoveryCss,
+  LinkDiscoveryCategorySeeds,
+]);
+export type LinkDiscovery = z.infer<typeof LinkDiscoverySchema>;
+
+const ExtractorJsonLd = z.object({ type: z.literal("jsonld_product") });
+const ExtractorMicrodata = z.object({ type: z.literal("microdata") });
+const ExtractorOgMeta = z.object({ type: z.literal("og_meta") });
+const ExtractorCss = z.object({
+  type: z.literal("css"),
+  name_selector: z.string().min(1).max(500),
+  price_selector: z.string().min(1).max(500),
+  currency: z.string().length(3),
+  brand_selector: z.string().max(500).optional(),
+  size_selector: z.string().max(500).optional(),
+  image_selector: z.string().max(500).optional(),
+  gtin_selector: z.string().max(500).optional(),
+  in_stock_selector: z.string().max(500).optional(),
+  in_stock_text_match: z.string().max(120).optional(),
+});
+
+export const ExtractorSchema = z.discriminatedUnion("type", [
+  ExtractorJsonLd,
+  ExtractorMicrodata,
+  ExtractorOgMeta,
+  ExtractorCss,
+]);
+export type Extractor = z.infer<typeof ExtractorSchema>;
+
+export const ExtractionConfigSchema = z.object({
+  link_discovery: LinkDiscoverySchema,
+  extractors: z.array(ExtractorSchema).min(1).max(6),
+  user_agent: z.string().max(500).optional(),
+  wait_for_selector: z.string().max(500).optional(),
+  request_delay_ms: z.number().int().min(0).max(60000).default(1500),
+  respect_robots: z.boolean().default(true),
+});
+export type ExtractionConfig = z.infer<typeof ExtractionConfigSchema>;
+
+// ----- /comparison_sources/{sid} -------------------------------------------
+
+export const ComparisonSourceCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  // Stable slug used as the retailer key in listings + comparison columns
+  retailer_id: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9_-]+$/, "lowercase letters, digits, dash, underscore only"),
+  home_url: z.string().url(),
+  start_urls: z.array(z.string().url()).min(1).max(20),
+  extraction: ExtractionConfigSchema,
+  schedule_cron: CronExpressionSchema,
+  active: z.boolean().default(true),
+  notes: z.string().max(2000).default(""),
+});
+export type ComparisonSourceCreate = z.infer<
+  typeof ComparisonSourceCreateSchema
+>;
+
+export const ComparisonSourceDocSchema = ComparisonSourceCreateSchema.extend({
+  owner_uid: z.string().min(1),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  last_run_at: z.string().datetime().nullable().default(null),
+  last_run_summary: z
+    .object({
+      ts: z.string().datetime(),
+      found: z.number().int(),
+      extracted: z.number().int(),
+      errors_count: z.number().int(),
+    })
+    .nullable()
+    .default(null),
+});
+export type ComparisonSourceDoc = z.infer<typeof ComparisonSourceDocSchema>;
+
+export const ComparisonSourcePatchSchema =
+  ComparisonSourceCreateSchema.partial();
+export type ComparisonSourcePatch = z.infer<typeof ComparisonSourcePatchSchema>;
+
+// ----- /comparison_listings/{lid} ------------------------------------------
+// lid = sha1(retailer_id + "|" + product_url) — write-once, stable
+
+export const ComparisonListingDocSchema = z.object({
+  owner_uid: z.string(),
+  source_id: z.string(),
   retailer_id: z.string(),
   retailer_name: z.string().default(""),
   product_url: z.string().url(),
@@ -267,17 +365,20 @@ export const ListingDocSchema = z.object({
   in_stock: z.boolean().nullable().default(null),
   image_url: z.string().default(""),
   canonical_id: z.string().nullable().default(null),
+  status: z
+    .enum(["new", "linked", "stale", "failed_extract"])
+    .default("new"),
   first_seen_at: z.string().datetime(),
   last_seen_at: z.string().datetime(),
-  raw_jsonld: z.unknown().optional(),
+  raw_blob: z.unknown().optional(),
 });
-export type ListingDoc = z.infer<typeof ListingDocSchema>;
+export type ComparisonListingDoc = z.infer<typeof ComparisonListingDocSchema>;
 
-// /projects/{projectId}/canonicals/{canonicalId} ----------------------------
-// One row in the comparison table. canonicalId is the GTIN if known,
-// otherwise a generated nanoid created at manual-link time.
+// ----- /comparison_canonicals/{cid} ----------------------------------------
+// cid = gtin when known, else c-<base36-time>+<6-rand>
 
-export const CanonicalDocSchema = z.object({
+export const ComparisonCanonicalDocSchema = z.object({
+  owner_uid: z.string(),
   display_name: z.string(),
   brand: z.string().default(""),
   size_value: z.number().nullable().default(null),
@@ -288,10 +389,53 @@ export const CanonicalDocSchema = z.object({
   created_at: z.string().datetime(),
   confirmed_by: z.string().default(""),
 });
-export type CanonicalDoc = z.infer<typeof CanonicalDocSchema>;
+export type ComparisonCanonicalDoc = z.infer<
+  typeof ComparisonCanonicalDocSchema
+>;
 
-// POST /api/projects/[id]/listings/[lid]/match payload
-export const ListingMatchSchema = z.union([
+// ----- /comparison_runs/{rid} ----------------------------------------------
+
+export const ComparisonRunDocSchema = z.object({
+  owner_uid: z.string(),
+  source_id: z.string().nullable().default(null),
+  source_name: z.string().default(""),
+  started_at: z.string().datetime(),
+  finished_at: z.string().datetime().nullable(),
+  duration_seconds: z.number().int().min(0),
+  status: RunStatus,
+  trigger: z.string(),
+  dry_run: z.boolean().default(false),
+  totals: z.object({
+    checked: z.number().int().min(0),
+    found: z.number().int().min(0),
+    extracted: z.number().int().min(0),
+    skipped_duplicate: z.number().int().min(0),
+    errors_count: z.number().int().min(0),
+  }),
+  errors: z.array(z.string()).default([]),
+  diagnostics: z
+    .object({
+      links_discovered: z.number().int().min(0).default(0),
+      pages_visited: z.number().int().min(0).default(0),
+      extractor_hits: z.record(z.string(), z.number()).default({}),
+      http_errors: z.record(z.string(), z.number()).default({}),
+    })
+    .optional(),
+});
+export type ComparisonRunDoc = z.infer<typeof ComparisonRunDocSchema>;
+
+// ----- API payloads --------------------------------------------------------
+
+// POST /api/comparison/sources/test
+export const ComparisonTestSchema = z.object({
+  extraction: ExtractionConfigSchema,
+  sample_url: z.string().url().optional(),
+  start_urls: z.array(z.string().url()).max(20).optional(),
+});
+export type ComparisonTest = z.infer<typeof ComparisonTestSchema>;
+
+// POST /api/comparison/listings/[lid]/match
+export const ComparisonListingMatchSchema = z.union([
   z.object({ canonical_id: z.string().min(1) }),
   z.object({
     create_canonical: z.object({
@@ -302,17 +446,26 @@ export const ListingMatchSchema = z.union([
     }),
   }),
 ]);
-export type ListingMatch = z.infer<typeof ListingMatchSchema>;
+export type ComparisonListingMatch = z.infer<
+  typeof ComparisonListingMatchSchema
+>;
 
 // /run_requests/{requestId} -------------------------------------------------
 
+// /run_requests/{requestId} — one is built either for a project run or a
+// comparison-source run. Exactly one of project_id / comparison_source_id
+// must be set (refined at the API-route level since both validation paths
+// flow through the same collection).
+
 export const RunRequestCreateSchema = z.object({
-  project_id: z.string().min(1),
+  project_id: z.string().min(1).optional(),
+  comparison_source_id: z.string().min(1).optional(),
 });
 export type RunRequestCreate = z.infer<typeof RunRequestCreateSchema>;
 
 export const RunRequestDocSchema = z.object({
-  project_id: z.string(),
+  project_id: z.string().default(""),
+  comparison_source_id: z.string().default(""),
   requested_by_uid: z.string(),
   status: RunRequestStatus,
   created_at: z.string().datetime(),

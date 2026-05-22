@@ -1,6 +1,10 @@
-// Shared types + defaults for the source form. NOT marked "use client"
-// so that server components (e.g. the create page) can import the
-// factory function without hitting the client/server boundary.
+// Shared types + defaults for the per-project (HSE jobs) source form.
+// NOT marked "use client" so server components (e.g. the create page)
+// can import the factory function without hitting the client/server
+// boundary.
+//
+// Product/comparison sources have their own form
+// (ComparisonSourceForm.tsx) and don't share this shape.
 
 export interface SourceFormInitial {
   name: string;

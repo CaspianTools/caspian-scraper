@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { AppHeader } from "@/components/AppHeader";
+import { QuickAddProvider } from "@/components/quick-add/QuickAddProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,11 @@ export default async function AuthedLayout({
   if (!session) redirect("/signin");
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <AppHeader session={session} />
-      {children}
-    </div>
+    <QuickAddProvider>
+      <div className="min-h-screen bg-zinc-50 dark:bg-black">
+        <AppHeader session={session} />
+        {children}
+      </div>
+    </QuickAddProvider>
   );
 }

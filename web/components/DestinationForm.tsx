@@ -11,6 +11,12 @@ interface Props {
   destId?: string;
   initial: DestinationFormInitial;
   availableSecrets: string[];
+  /** When provided, called instead of navigating to the listing page on
+   *  successful create/edit. router.refresh() is still called. */
+  onSuccess?: () => void;
+  /** When provided, the Cancel control is a button calling this instead
+   *  of a Link to the listing page. */
+  onCancel?: () => void;
 }
 
 interface FieldErr {
@@ -23,6 +29,8 @@ export function DestinationForm({
   destId,
   initial,
   availableSecrets,
+  onSuccess,
+  onCancel,
 }: Props) {
   const router = useRouter();
   const isEdit = !!destId;
@@ -67,8 +75,12 @@ export function DestinationForm({
         }
         return;
       }
-      router.push(`/projects/${projectId}/destinations`);
       router.refresh();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push(`/projects/${projectId}/destinations`);
+      }
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
     } finally {
@@ -247,12 +259,22 @@ export function DestinationForm({
           <span />
         )}
         <div className="flex gap-2">
-          <Link
-            href={`/projects/${projectId}/destinations`}
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
-          >
-            Cancel
-          </Link>
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            >
+              Cancel
+            </button>
+          ) : (
+            <Link
+              href={`/projects/${projectId}/destinations`}
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            >
+              Cancel
+            </Link>
+          )}
           <button
             type="submit"
             disabled={busy || deleting}

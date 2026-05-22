@@ -4,7 +4,6 @@ import { getSessionFromBearer } from "@/lib/auth/session";
 import {
   SourceCreateSchema,
   SourceDocSchema,
-  isValidKindAts,
   type SourceDoc,
 } from "@/lib/firestore/schema";
 import {
@@ -89,20 +88,6 @@ export async function POST(
     );
   }
   const input = parsed.data;
-  if (!isValidKindAts(input.item_kind, input.ats)) {
-    return NextResponse.json(
-      {
-        error: "invalid source",
-        details: [
-          {
-            path: ["ats"],
-            message: `ats '${input.ats}' is not valid for item_kind '${input.item_kind}'`,
-          },
-        ],
-      },
-      { status: 400 }
-    );
-  }
 
   const now = new Date().toISOString();
   const doc: SourceDoc = {

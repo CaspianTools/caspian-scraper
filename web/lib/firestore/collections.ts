@@ -62,16 +62,45 @@ export function findingsCol(projectId: string): CollectionReference {
   return projectDoc(projectId).collection("findings");
 }
 
-export function listingsCol(projectId: string): CollectionReference {
-  return projectDoc(projectId).collection("listings");
-}
-
-export function canonicalsCol(projectId: string): CollectionReference {
-  return projectDoc(projectId).collection("canonicals");
-}
-
 export function runRequestsCol(): CollectionReference {
   return db().collection("run_requests");
+}
+
+// ---------------------------------------------------------------------------
+// Comparison surface (top-level, per-user)
+// See web/lib/firestore/schema.ts for the doc shapes.
+// ---------------------------------------------------------------------------
+
+export function comparisonSourcesCol(): CollectionReference {
+  return db().collection("comparison_sources");
+}
+
+export function comparisonSourceDoc(sourceId: string) {
+  return comparisonSourcesCol().doc(sourceId);
+}
+
+export function comparisonListingsCol(): CollectionReference {
+  return db().collection("comparison_listings");
+}
+
+export function comparisonListingDoc(listingId: string) {
+  return comparisonListingsCol().doc(listingId);
+}
+
+export function comparisonCanonicalsCol(): CollectionReference {
+  return db().collection("comparison_canonicals");
+}
+
+export function comparisonCanonicalDoc(canonicalId: string) {
+  return comparisonCanonicalsCol().doc(canonicalId);
+}
+
+export function comparisonRunsCol(): CollectionReference {
+  return db().collection("comparison_runs");
+}
+
+export function comparisonRunDoc(runId: string) {
+  return comparisonRunsCol().doc(runId);
 }
 
 // ---- slug generator -------------------------------------------------------

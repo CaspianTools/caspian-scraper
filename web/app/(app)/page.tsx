@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
+import { OpenQuickAddButton } from "@/components/quick-add/OpenQuickAddButton";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,7 @@ export default async function Home() {
               : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Link
-          href="/projects/new"
-          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 transition-colors"
-        >
-          + New project
-        </Link>
+        <OpenQuickAddButton kind="project">+ New project</OpenQuickAddButton>
       </div>
 
       {projects.length === 0 ? (
@@ -125,12 +121,9 @@ function EmptyState() {
         sources to scrape, one or more destinations to POST findings to,
         and a schedule.
       </p>
-      <Link
-        href="/projects/new"
-        className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-      >
+      <OpenQuickAddButton kind="project" size="sm">
         Create your first project
-      </Link>
+      </OpenQuickAddButton>
     </div>
   );
 }

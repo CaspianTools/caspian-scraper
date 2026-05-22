@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { destinationsCol } from "@/lib/firestore/collections";
+import { OpenQuickAddButton } from "@/components/quick-add/OpenQuickAddButton";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +48,9 @@ export default async function DestinationsListPage({ params }: PageProps) {
               : `${dests.length} destination${dests.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Link
-          href={`/projects/${id}/destinations/new`}
-          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-        >
+        <OpenQuickAddButton kind="destination" projectId={id}>
           + Add destination
-        </Link>
+        </OpenQuickAddButton>
       </div>
 
       {dests.length === 0 ? (
@@ -62,12 +60,9 @@ export default async function DestinationsListPage({ params }: PageProps) {
             Configure the base URL, the auth header, and which secret
             holds the API key.
           </p>
-          <Link
-            href={`/projects/${id}/destinations/new`}
-            className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-          >
+          <OpenQuickAddButton kind="destination" projectId={id} size="sm">
             Add a destination
-          </Link>
+          </OpenQuickAddButton>
         </div>
       ) : (
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">

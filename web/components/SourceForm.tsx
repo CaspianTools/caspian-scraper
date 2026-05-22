@@ -10,6 +10,12 @@ interface Props {
   projectId: string;
   sourceId?: string; // undefined → create mode; defined → edit mode
   initial: SourceFormInitial;
+  /** When provided, called instead of navigating to the listing page on
+   *  successful create/edit. router.refresh() is still called. */
+  onSuccess?: () => void;
+  /** When provided, the Cancel control is a button calling this instead
+   *  of a Link to the listing page. */
+  onCancel?: () => void;
 }
 
 interface FieldErr {
@@ -17,7 +23,13 @@ interface FieldErr {
   message: string;
 }
 
-export function SourceForm({ projectId, sourceId, initial }: Props) {
+export function SourceForm({
+  projectId,
+  sourceId,
+  initial,
+  onSuccess,
+  onCancel,
+}: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
   const [form, setForm] = useState<SourceFormInitial>(initial);
@@ -76,8 +88,12 @@ export function SourceForm({ projectId, sourceId, initial }: Props) {
         return;
       }
 
-      router.push(`/projects/${projectId}/sources`);
       router.refresh();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push(`/projects/${projectId}/sources`);
+      }
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
     } finally {
@@ -270,12 +286,22 @@ export function SourceForm({ projectId, sourceId, initial }: Props) {
           <span />
         )}
         <div className="flex gap-2">
-          <Link
-            href={`/projects/${projectId}/sources`}
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
-          >
-            Cancel
-          </Link>
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            >
+              Cancel
+            </button>
+          ) : (
+            <Link
+              href={`/projects/${projectId}/sources`}
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            >
+              Cancel
+            </Link>
+          )}
           <button
             type="submit"
             disabled={busy || deleting || !form.name.trim() || !form.careers_url.trim()}
