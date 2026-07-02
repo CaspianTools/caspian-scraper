@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 .env
 .DS_Store
+
+# Claude Code isolated worktrees (parallel sessions live under .claude/worktrees/).
+# Only this subfolder is ignored — a committed .claude/settings.json stays tracked.
+.claude/worktrees/
