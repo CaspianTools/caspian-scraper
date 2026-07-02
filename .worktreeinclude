@@ -1,0 +1,19 @@
+# .worktreeinclude — gitignored files copied into each new Claude Code worktree.
+#
+# Uses .gitignore syntax. A file is copied only when it BOTH matches a pattern
+# here AND is gitignored AND actually exists — tracked files are never
+# duplicated, and missing files are silently skipped (so unused patterns no-op).
+# Docs: https://code.claude.com/docs/en/worktrees#copy-gitignored-files-into-worktrees
+#
+# The scraper's only local secret is ENTIRELYSAFE_API_KEY, which lives in a
+# gitignored .env when running locally (in CI it comes from a GitHub secret).
+# The patterns below mirror that convention: if such a file exists locally, new
+# worktrees inherit it automatically; until then these lines do nothing.
+#
+# NOT copied on purpose: .venv/ and __pycache__/ (recreate per worktree —
+# `python -m venv .venv && pip install -r requirements.txt`).
+
+# Local environment / API-key files
+.env
+.env.local
+.env.*
