@@ -4,6 +4,12 @@ __pycache__/
 .env
 .DS_Store
 
+# Classifieds scraper: run outputs, incremental state, and login cookies
+classifieds_out/
+cars_out/
+fb_cookies.json
+seen.json
+
 # Claude Code isolated worktrees (parallel sessions live under .claude/worktrees/).
 # Only this subfolder is ignored — a committed .claude/settings.json stays tracked.
 .claude/worktrees/

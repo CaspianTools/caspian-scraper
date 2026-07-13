@@ -1,0 +1,94 @@
+name: Classifieds scrape
+
+# On-demand multi-site car classifieds scraper (OpenSooq / Dubizzle Oman /
+# Facebook Marketplace). Results are uploaded as a run artifact — nothing
+# is committed or published.
+#
+# Optional repo secrets:
+#   CLASSIFIEDS_AI_KEY   Anthropic API key for the AI extraction fallback.
+#   FB_COOKIES_JSON      Facebook cookies JSON (enables the facebook adapter).
+
+on:
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Adapter keys (comma-separated) or 'all'"
+        required: false
+        type: string
+        default: "all"
+      country:
+        description: "ISO-2 country code"
+        required: false
+        type: string
+        default: "om"
+      city:
+        description: "Optional city filter (e.g. muscat)"
+        required: false
+        type: string
+        default: ""
+      query:
+        description: "Optional free-text search (e.g. 'land cruiser')"
+        required: false
+        type: string
+        default: ""
+      max:
+        description: "Max listings per site"
+        required: false
+        type: string
+        default: "50"
+      download_images:
+        description: "Also download listing images"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Prepare Facebook cookies (if configured)
+        env:
+          FB_COOKIES_JSON: ${{ secrets.FB_COOKIES_JSON }}
+        run: |
+          if [ -n "$FB_COOKIES_JSON" ]; then
+            printf '%s' "$FB_COOKIES_JSON" > fb_cookies.json
+            echo "FB_COOKIES_ARG=--fb-cookies fb_cookies.json" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run classifieds scraper
+        env:
+          CLASSIFIEDS_AI_KEY: ${{ secrets.CLASSIFIEDS_AI_KEY }}
+        run: |
+          python -m classifieds \
+            --site "${{ inputs.site }}" \
+            --country "${{ inputs.country }}" \
+            --city "${{ inputs.city }}" \
+            --query "${{ inputs.query }}" \
+            --max "${{ inputs.max }}" \
+            $( [ "${{ inputs.download_images }}" = "true" ] && echo --download-images ) \
+            $FB_COOKIES_ARG \
+            --out classifieds_out
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: classifieds-results
+          path: classifieds_out/
+          retention-days: 14
