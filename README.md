@@ -153,6 +153,87 @@ by the slug + (title, company) dedup check.
 
 ---
 
+## Classifieds scraper (cars — Oman)
+
+A separate, self-contained module (`classifieds/`) scrapes **used-car
+classified ads** from several Oman sites into a single JSON/JSONL file. It is
+independent of the HSE job scraper above — its own CLI, its own GitHub Actions
+workflow (`.github/workflows/classifieds.yml`), and it publishes nothing to any
+API; results are written to disk (and uploaded as a workflow artifact).
+
+Each listing captures: **title, description, images, price, seller name, seller
+profile, phone number (where the site exposes it), location, posting date, and
+car attributes** (make / model / year / kilometers / …).
+
+### Supported sites
+
+| `--site` key | Site | Method | Phone number |
+|---|---|---|---|
+| `opensooq`   | OpenSooq Oman (`om.opensooq.com`)        | Playwright + `__NEXT_DATA__` JSON | masked only (site hides it; reveal key captured) |
+| `dubizzle`   | Dubizzle Oman (`dubizzle.com.om`)        | Playwright + `__NEXT_DATA__`, Cloudflare-gated | **yes** — via the `contactInfo` reveal endpoint |
+| `yallamotor` | YallaMotor Oman (`oman.yallamotor.com`)  | plain HTTP + JSON-LD (no browser) | when present in the page |
+| `facebook`   | Facebook Marketplace                      | Playwright, **requires your login cookies** | never (Facebook redacts phones) |
+
+`--site all` runs every site except `facebook` (which needs cookies — it is
+included automatically once `--fb-cookies` is given).
+
+### Running locally
+
+```bash
+# same venv as the HSE scraper (Playwright + requests already installed)
+python -m classifieds --site all --country om --city muscat --max 30
+python -m classifieds --site opensooq,dubizzle --query "land cruiser" --max 20
+python -m classifieds --site yallamotor --download-images --out cars_out
+```
+
+Output goes to `--out` (default `classifieds_out/`): `listings.jsonl` (one JSON
+object per line; use `--format json` for a single pretty array) plus an
+`images/` folder when `--download-images` is set. Pass `--state seen.json` to
+run **incrementally** — listing IDs seen on previous runs are skipped and the
+file is updated at the end.
+
+### Facebook Marketplace (optional, needs your session)
+
+Marketplace is login-walled, so the `facebook` adapter needs **your own**
+Facebook session cookies. Export them (a Playwright `storage_state.json`, or a
+Cookie-Editor JSON export for `.facebook.com` that includes `c_user` and `xs`)
+and pass the file:
+
+```bash
+python -m classifieds --site facebook --city muscat --fb-cookies fb_cookies.json
+```
+
+Notes: this is a **best-effort auxiliary source** — Facebook rotates its markup
+frequently, phone numbers are never available (contact is via Messenger), and
+scraping while logged in is against Facebook's ToS, so use a disposable account
+and a low rate. Without cookies the adapter is simply skipped.
+
+### Bring your own AI key (optional)
+
+If an environment variable `CLASSIFIEDS_AI_KEY` (or `ANTHROPIC_API_KEY`) is set,
+the adapters use Claude as a **fallback extractor** only when their structured
+parsing comes back with missing fields (e.g. after a site redesign) — it fills
+the blanks from the raw page HTML. Adapter-extracted values always take
+precedence; AI never overrides them. **With no key everything still works** —
+the fallback is skipped and normal structured extraction is used. Set
+`CLASSIFIEDS_AI_MODEL` to override the model (default: a small, cheap Claude).
+
+### In GitHub Actions
+
+Run **Actions → Classifieds scrape → Run workflow** and choose the site(s),
+country, city, query, and max. Results download as the `classifieds-results`
+artifact. Two optional repo secrets enable extra capabilities:
+
+- `CLASSIFIEDS_AI_KEY` — Anthropic API key for the AI fallback.
+- `FB_COOKIES_JSON` — your Facebook cookies JSON (enables the `facebook` site).
+
+> **Note on this environment:** live scraping needs open outbound network, which
+> the GitHub Actions runner has. Local test/CI runs here use hermetic fixtures
+> (`tests/test_classifieds.py`) rather than hitting the live sites, matching how
+> the HSE parser tests work.
+
+---
+
 ## Troubleshooting
 
 **`401 Unauthorized` — `MISSING_API_KEY` / `INVALID_API_KEY` /
