@@ -103,6 +103,34 @@ export function comparisonRunDoc(runId: string) {
   return comparisonRunsCol().doc(runId);
 }
 
+// ---------------------------------------------------------------------------
+// Cars surface (top-level, per-user). See web/lib/firestore/schema.ts.
+// ---------------------------------------------------------------------------
+
+export function carSourcesCol(): CollectionReference {
+  return db().collection("car_sources");
+}
+
+export function carSourceDoc(sourceId: string) {
+  return carSourcesCol().doc(sourceId);
+}
+
+export function carListingsCol(): CollectionReference {
+  return db().collection("car_listings");
+}
+
+export function carListingDoc(listingId: string) {
+  return carListingsCol().doc(listingId);
+}
+
+export function carRunsCol(): CollectionReference {
+  return db().collection("car_runs");
+}
+
+export function carRunDoc(runId: string) {
+  return carRunsCol().doc(runId);
+}
+
 // ---- slug generator -------------------------------------------------------
 
 /**

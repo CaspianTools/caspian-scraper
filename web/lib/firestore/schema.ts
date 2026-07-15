@@ -424,6 +424,119 @@ export const ComparisonRunDocSchema = z.object({
 });
 export type ComparisonRunDoc = z.infer<typeof ComparisonRunDocSchema>;
 
+// ---------------------------------------------------------------------------
+// Cars (car-classifieds surface, top-level, per-user)
+//
+// Reuses the standalone `classifieds/` scraper as the extraction engine
+// (scrape.py:run_car_source). Unlike comparison, a car source needs NO
+// extraction config — the site adapter (OpenSooq/…) is purpose-built.
+// ---------------------------------------------------------------------------
+
+export const CarSiteKey = z.enum(["opensooq", "dubizzle", "yallamotor"]);
+export type CarSite = z.infer<typeof CarSiteKey>;
+
+// ----- /car_sources/{sid} --------------------------------------------------
+
+export const CarSourceCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  site: CarSiteKey,
+  country: z.string().length(2).default("om"),
+  city: z.string().max(80).default(""),
+  category: z.string().max(40).default("cars"),
+  query: z.string().max(200).default(""),
+  max_listings: z.number().int().min(1).max(200).default(50),
+  with_details: z.boolean().default(true),
+  schedule_cron: CronExpressionSchema,
+  active: z.boolean().default(true),
+  notes: z.string().max(2000).default(""),
+});
+export type CarSourceCreate = z.infer<typeof CarSourceCreateSchema>;
+
+export const CarSourceDocSchema = CarSourceCreateSchema.extend({
+  owner_uid: z.string().min(1),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  last_run_at: z.string().datetime().nullable().default(null),
+  last_run_summary: z
+    .object({
+      ts: z.string().datetime(),
+      found: z.number().int(),
+      new: z.number().int(),
+      errors_count: z.number().int(),
+    })
+    .nullable()
+    .default(null),
+});
+export type CarSourceDoc = z.infer<typeof CarSourceDocSchema>;
+
+export const CarSourcePatchSchema = CarSourceCreateSchema.partial();
+export type CarSourcePatch = z.infer<typeof CarSourcePatchSchema>;
+
+// ----- /car_listings/{uid} -------------------------------------------------
+// uid = "<site>:<listing_id>" (classifieds.models.Listing.uid) — write-once
+
+export const CarSellerSchema = z.object({
+  name: z.string().default(""),
+  profile_url: z.string().default(""),
+  phone: z.string().default(""),
+  member_since: z.string().default(""),
+});
+
+export const CarListingDocSchema = z.object({
+  uid: z.string(),
+  site: z.string(),
+  listing_id: z.string().default(""),
+  url: z.string(),
+  title: z.string().default(""),
+  description: z.string().default(""),
+  price_raw: z.string().default(""),
+  price_value: z.number().nullable().default(null),
+  currency: z.string().default(""),
+  images: z.array(z.string()).default([]),
+  seller: CarSellerSchema.default({
+    name: "",
+    profile_url: "",
+    phone: "",
+    member_since: "",
+  }),
+  location: z.string().default(""),
+  posted_at: z.string().default(""),
+  // Free-form car facts (make/model/year/km/…) — key/value strings.
+  attributes: z.record(z.string(), z.string()).default({}),
+  scraped_at: z.string().default(""),
+  extras: z.record(z.string(), z.unknown()).default({}),
+  owner_uid: z.string(),
+  source_id: z.string(),
+  status: z.enum(["new", "seen"]).default("new"),
+  first_seen_at: z.string().datetime(),
+  last_seen_at: z.string().datetime(),
+});
+export type CarListingDoc = z.infer<typeof CarListingDocSchema>;
+
+// ----- /car_runs/{rid} -----------------------------------------------------
+
+export const CarRunDocSchema = z.object({
+  owner_uid: z.string(),
+  source_id: z.string().nullable().default(null),
+  source_name: z.string().default(""),
+  site: z.string().default(""),
+  started_at: z.string().datetime(),
+  finished_at: z.string().datetime().nullable(),
+  duration_seconds: z.number().int().min(0),
+  status: RunStatus,
+  trigger: z.string(),
+  dry_run: z.boolean().default(false),
+  totals: z.object({
+    found: z.number().int().min(0),
+    new: z.number().int().min(0),
+    updated: z.number().int().min(0),
+    errors_count: z.number().int().min(0),
+  }),
+  errors: z.array(z.string()).default([]),
+  overrun: z.boolean().default(false),
+});
+export type CarRunDoc = z.infer<typeof CarRunDocSchema>;
+
 // ----- API payloads --------------------------------------------------------
 
 // POST /api/comparison/sources/test
@@ -460,12 +573,14 @@ export type ComparisonListingMatch = z.infer<
 export const RunRequestCreateSchema = z.object({
   project_id: z.string().min(1).optional(),
   comparison_source_id: z.string().min(1).optional(),
+  car_source_id: z.string().min(1).optional(),
 });
 export type RunRequestCreate = z.infer<typeof RunRequestCreateSchema>;
 
 export const RunRequestDocSchema = z.object({
   project_id: z.string().default(""),
   comparison_source_id: z.string().default(""),
+  car_source_id: z.string().default(""),
   requested_by_uid: z.string(),
   status: RunRequestStatus,
   created_at: z.string().datetime(),

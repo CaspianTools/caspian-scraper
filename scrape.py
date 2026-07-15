@@ -1579,6 +1579,22 @@ def load_comparison_source(db, source_id: str) -> dict | None:
     return _doc_with_id(snap)
 
 
+def list_active_car_sources(db) -> list[dict]:
+    """Top-level /car_sources, active==True. Used by find_due_work
+    + the run-now request handler."""
+    q = db.collection("car_sources").where(
+        filter=FieldFilter("active", "==", True)
+    )
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def load_car_source(db, source_id: str) -> dict | None:
+    snap = db.collection("car_sources").document(source_id).get()
+    if not snap.exists:
+        return None
+    return _doc_with_id(snap)
+
+
 def _to_datetime(v: Any) -> datetime | None:
     """Coerce a Firestore timestamp / native datetime / None into UTC datetime."""
     if v is None:
@@ -1601,6 +1617,8 @@ def find_due_work(
       kind == "project"            → id is a project_id, dispatched to run_project
       kind == "comparison_source"  → id is a comparison_source_id, dispatched to
                                       run_comparison_source
+      kind == "car_source"         → id is a car_source_id, dispatched to
+                                      run_car_source
       trigger == "request:<request_id>"  queued ad-hoc run
       trigger == "schedule"              cron-due
 
@@ -1612,11 +1630,13 @@ def find_due_work(
     work: list[tuple[str, str, str]] = []
     seen_projects: set[str] = set()
     seen_comparison: set[str] = set()
+    seen_cars: set[str] = set()
 
     # Ad-hoc requests first — most user-visible.
     for req in list_pending_run_requests(db):
         pid = str(req.get("project_id") or "")
         csid = str(req.get("comparison_source_id") or "")
+        carsid = str(req.get("car_source_id") or "")
         trig = f"request:{req['__id']}"
         if pid and pid not in seen_projects:
             seen_projects.add(pid)
@@ -1624,6 +1644,9 @@ def find_due_work(
         elif csid and csid not in seen_comparison:
             seen_comparison.add(csid)
             work.append(("comparison_source", csid, trig))
+        elif carsid and carsid not in seen_cars:
+            seen_cars.add(carsid)
+            work.append(("car_source", carsid, trig))
 
     # Then schedule-due projects.
     for proj in list_enabled_projects(db):
@@ -1652,6 +1675,20 @@ def find_due_work(
             continue
         seen_comparison.add(sid)
         work.append(("comparison_source", sid, "schedule"))
+
+    # Then schedule-due car sources (top-level, per-user).
+    for src in list_active_car_sources(db):
+        sid = src["__id"]
+        if sid in seen_cars:
+            continue
+        cron = str(src.get("schedule_cron") or "").strip()
+        if not cron:
+            continue
+        last_dt = _to_datetime(src.get("last_run_at"))
+        if not _is_cron_due(cron, last_dt, now):
+            continue
+        seen_cars.add(sid)
+        work.append(("car_source", sid, "schedule"))
 
     return work
 
@@ -2674,6 +2711,234 @@ def run_comparison_source(
 
 
 # ---------------------------------------------------------------------------
+# Car-classifieds runner (top-level, per-user)
+#
+# Reuses the standalone `classifieds/` scraper as the extraction engine. The
+# site adapter (e.g. OpenSooq) owns its OWN Playwright browser via
+# classifieds.browser.browser_context(), so this runner must NOT open a
+# sync_playwright() context of its own — just build the spec, build the
+# adapter, and iterate its generator.
+# ---------------------------------------------------------------------------
+
+def _upsert_car_listing(
+    db,
+    owner_uid: str,
+    source_id: str,
+    listing: Any,
+) -> tuple[str, bool]:
+    """Upsert /car_listings/{uid}. Returns (uid, is_new). Doc id is the
+    classifieds Listing.uid (site:listing_id). Preserves first_seen_at on
+    re-scrapes; refreshes every mutable field + last_seen_at."""
+    uid = listing.uid
+    ref = db.collection("car_listings").document(uid)
+    try:
+        snap = ref.get()
+        data = listing.to_dict()
+        data.update({
+            "owner_uid": owner_uid,
+            "source_id": source_id,
+            "last_seen_at": SERVER_TIMESTAMP,
+        })
+        if not snap.exists:
+            ref.set({
+                **data,
+                "first_seen_at": SERVER_TIMESTAMP,
+                "status": "new",
+            })
+            return (uid, True)
+        data["status"] = "seen"
+        ref.update(data)
+        return (uid, False)
+    except Exception as e:
+        print(
+            f"failed to upsert /car_listings/{uid}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+        return (uid, False)
+
+
+def run_car_source(
+    db,
+    source_id: str,
+    trigger: str,
+    *,
+    dry_run: bool,
+    per_source_deadline: float,
+) -> dict:
+    """Run one car-classifieds source end-to-end via the `classifieds`
+    engine. Writes a /car_runs/{rid} doc and upserts /car_listings. One
+    source (site + country + city + query) per run."""
+    started_mono = time.monotonic()
+
+    source = load_car_source(db, source_id)
+    if source is None:
+        return {
+            "car_source_id": source_id,
+            "status": "error",
+            "error": "car source not found",
+        }
+    owner_uid = str(source.get("owner_uid") or "")
+    if not owner_uid:
+        return {
+            "car_source_id": source_id,
+            "status": "error",
+            "error": "car source has no owner_uid",
+        }
+
+    src_name = str(source.get("name") or source_id)
+    site_key = str(source.get("site") or "opensooq")
+
+    print(
+        f"\n=== Cars: {src_name} ({source_id}) site={site_key} "
+        f"trigger={trigger} dry={dry_run} ===",
+        file=sys.stderr,
+    )
+
+    # Pre-create /car_runs/{rid} so the UI sees it as running.
+    run_ref = db.collection("car_runs").document()
+    run_id = run_ref.id
+    run_ref.set({
+        "owner_uid": owner_uid,
+        "source_id": source_id,
+        "source_name": src_name,
+        "site": site_key,
+        "started_at": SERVER_TIMESTAMP,
+        "finished_at": None,
+        "duration_seconds": 0,
+        "status": "running",
+        "trigger": trigger,
+        "dry_run": dry_run,
+        "totals": {"found": 0, "new": 0, "updated": 0, "errors_count": 0},
+        "errors": [],
+    })
+
+    summary: dict[str, Any] = {"found": 0, "new": 0, "updated": 0, "errors": []}
+    overrun = False
+    try:
+        # Import lazily so non-car ticks don't pay the classifieds import.
+        from classifieds import sites as _sites
+        from classifieds.sites.base import SearchSpec as _SearchSpec
+
+        spec = _SearchSpec(
+            category=str(source.get("category") or "cars"),
+            country=str(source.get("country") or "om").lower(),
+            city=str(source.get("city") or ""),
+            query=str(source.get("query") or ""),
+            max_listings=int(source.get("max_listings") or 50),
+            with_details=bool(source.get("with_details", True)),
+        )
+        adapter = _sites.build(site_key)
+        started_iso = utc_now_iso()
+        seen: set[str] = set()
+        gen = adapter.search(spec)
+        try:
+            for listing in gen:
+                if time.monotonic() >= per_source_deadline:
+                    overrun = True
+                    summary["errors"].append("per-source timeout reached")
+                    break
+                if listing.uid in seen:
+                    continue
+                seen.add(listing.uid)
+                listing.scraped_at = started_iso
+                summary["found"] += 1
+                if dry_run:
+                    continue
+                _uid, is_new = _upsert_car_listing(
+                    db, owner_uid, source_id, listing
+                )
+                if is_new:
+                    summary["new"] += 1
+                else:
+                    summary["updated"] += 1
+        finally:
+            # Close the generator so its browser_context() cleans up promptly
+            # even when we break early on the per-source deadline.
+            gclose = getattr(gen, "close", None)
+            if callable(gclose):
+                gclose()
+    except Exception as e:
+        summary["errors"].append(
+            f"unexpected error: {type(e).__name__}: {e}"
+        )
+
+    duration = max(0, int(time.monotonic() - started_mono))
+    errors_count = len(summary["errors"])
+    if errors_count == 0:
+        status = "ok"
+    elif summary["found"] > 0:
+        status = "partial"
+    else:
+        status = "error"
+
+    totals = {
+        "found": summary["found"],
+        "new": summary["new"],
+        "updated": summary["updated"],
+        "errors_count": errors_count,
+    }
+
+    try:
+        run_ref.update({
+            "finished_at": SERVER_TIMESTAMP,
+            "duration_seconds": duration,
+            "status": status,
+            "totals": totals,
+            "errors": summary["errors"],
+            "overrun": overrun,
+        })
+    except Exception as e:
+        print(
+            f"failed to finalise /car_runs/{run_id}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+    if not dry_run:
+        try:
+            db.collection("car_sources").document(source_id).update({
+                "last_run_at": SERVER_TIMESTAMP,
+                "last_run_summary": {
+                    "ts": SERVER_TIMESTAMP,
+                    "found": summary["found"],
+                    "new": summary["new"],
+                    "errors_count": errors_count,
+                },
+            })
+        except Exception as e:
+            print(
+                f"failed to update car source last_run_at: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    if trigger.startswith("request:"):
+        try:
+            update_run_request(
+                db,
+                trigger.split(":", 1)[1],
+                {
+                    "status": "failed" if status == "error" else "done",
+                    "finished_at": SERVER_TIMESTAMP,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as e:
+            print(
+                f"failed to mark car run_request done: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    return {
+        "car_source_id": source_id,
+        "source_name": src_name,
+        "status": status,
+        "totals": totals,
+        "errors": summary["errors"][:10],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -2712,6 +2977,9 @@ def main() -> int:
     only_comparison_source_id = (
         os.environ.get("ONLY_COMPARISON_SOURCE_ID", "").strip() or None
     )
+    only_car_source_id = (
+        os.environ.get("ONLY_CAR_SOURCE_ID", "").strip() or None
+    )
 
     now = utc_now()
 
@@ -2731,6 +2999,14 @@ def main() -> int:
         work = [("comparison_source", only_comparison_source_id, trigger)]
         print(
             f"ONLY_COMPARISON_SOURCE_ID={only_comparison_source_id} "
+            f"trigger={trigger} dry_run={dry_run}",
+            file=sys.stderr,
+        )
+    elif only_car_source_id:
+        trigger = f"request:{request_id}" if request_id else "manual"
+        work = [("car_source", only_car_source_id, trigger)]
+        print(
+            f"ONLY_CAR_SOURCE_ID={only_car_source_id} "
             f"trigger={trigger} dry_run={dry_run}",
             file=sys.stderr,
         )
@@ -2776,6 +3052,14 @@ def main() -> int:
             )
         elif kind == "comparison_source":
             result = run_comparison_source(
+                db,
+                work_id,
+                trigger,
+                dry_run=dry_run,
+                per_source_deadline=per_item_deadline,
+            )
+        elif kind == "car_source":
+            result = run_car_source(
                 db,
                 work_id,
                 trigger,

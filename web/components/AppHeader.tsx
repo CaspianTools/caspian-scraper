@@ -38,6 +38,12 @@ export function AppHeader({ session }: Props) {
             >
               Comparison
             </Link>
+            <Link
+              href="/cars"
+              className="text-sm px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+            >
+              Cars
+            </Link>
           </nav>
         </div>
 
