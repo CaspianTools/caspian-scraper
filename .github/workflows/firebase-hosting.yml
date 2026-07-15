@@ -32,6 +32,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Skip (not fail) until PUBLIC_PROJECT_ID is configured, so the scheduled
+    # run doesn't red every 30 minutes before the one-time setup is done.
+    if: ${{ vars.PUBLIC_PROJECT_ID != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -3039,7 +3039,7 @@ def main() -> int:
                 )
 
     results: list[dict] = []
-    has_hard_failure = False
+    errored = 0
     for kind, work_id, trigger in work:
         per_item_deadline = time.monotonic() + per_project_timeout
         if kind == "project":
@@ -3071,16 +3071,29 @@ def main() -> int:
             continue
         results.append(result)
         if result.get("status") in ("error", "auth_halt"):
-            has_hard_failure = True
+            errored += 1
 
     total_duration = max(0, int(time.monotonic() - started_mono))
     print(json.dumps({
         "tick_finished_at": utc_now_iso(),
         "duration_seconds": total_duration,
         "items": len(results),
+        "errored": errored,
         "results": results,
     }, indent=2))
-    return 2 if has_hard_failure else 0
+    # Per-item errors (a misconfigured project, a site blocking a scrape, a
+    # transient timeout) are recorded in each run doc and surfaced in the
+    # dashboard's Runs views — they do NOT fail the tick. The workflow only
+    # exits non-zero for infrastructure failures (e.g. the Firestore-init
+    # guard near the top returns 1), so one bad source can't red the cron and
+    # spam the failure-issue alert every 15 minutes.
+    if errored:
+        print(
+            f"{errored}/{len(results)} item(s) finished with errors — see the "
+            "per-run docs / dashboard for details",
+            file=sys.stderr,
+        )
+    return 0
 
 
 if __name__ == "__main__":
