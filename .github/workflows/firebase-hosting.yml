@@ -1,0 +1,60 @@
+name: Deploy dashboard to Firebase Hosting
+
+# Regenerates docs/data.json from Firestore, then deploys the docs/ static
+# dashboard to the Firebase Hosting "caspianscraper" site. The scraper itself
+# is NOT deployed here — it stays the scrape-due.yml cron writing to Firestore.
+#
+# One-time setup by the repo owner:
+#   * Grant the service account behind FIREBASE_ADMIN_SA_JSON the
+#     "Firebase Hosting Admin" IAM role (it already has Firestore access).
+#   * Set repo variable PUBLIC_PROJECT_ID to the Firestore projects/{id} doc
+#     whose data should feed the public dashboard.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'firebase.json'
+      - '.firebaserc'
+      - 'export_dashboard.py'
+      - '.github/workflows/firebase-hosting.yml'
+  schedule:
+    - cron: '5,35 * * * *'   # twice hourly; tune to taste (scraper runs every 15 min)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-hosting
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Regenerate docs/data.json from Firestore
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_SA_JSON }}
+          FIRESTORE_DATABASE_ID: scraper
+          PUBLIC_PROJECT_ID: ${{ vars.PUBLIC_PROJECT_ID }}
+        run: python export_dashboard.py
+
+      - name: Deploy to Firebase Hosting (live)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_ADMIN_SA_JSON }}
+          projectId: caspian-tools
+          channelId: live

@@ -1,0 +1,15 @@
+{
+  "hosting": {
+    "site": "caspianscraper",
+    "public": "docs",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "sops/**"],
+    "headers": [
+      {
+        "source": "/data.json",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, max-age=0" }
+        ]
+      }
+    ]
+  }
+}
