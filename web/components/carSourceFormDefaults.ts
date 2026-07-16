@@ -2,12 +2,14 @@
 // so server components (the create + edit pages) can call the factory
 // without hitting the client/server boundary.
 
+// YallaMotor is intentionally omitted from the selectable sites: its listing
+// pages are behind a Cloudflare JS challenge that blocks server-side scraping
+// (the adapter stays in the repo and can be re-enabled behind a proxy).
 export type CarSiteValue = "opensooq" | "dubizzle" | "yallamotor";
 
 export const CAR_SITES: { value: CarSiteValue; label: string }[] = [
   { value: "opensooq", label: "OpenSooq (Oman)" },
   { value: "dubizzle", label: "Dubizzle (Oman)" },
-  { value: "yallamotor", label: "YallaMotor (Oman)" },
 ];
 
 export interface CarSourceFormInitial {

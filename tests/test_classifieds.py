@@ -170,6 +170,54 @@ def test_dubizzle_contact_info_parsing():
     assert nested["mobile"] == "99900011"
 
 
+def test_dubizzle_listing_from_window_state():
+    # Live path: results come from window.state Algolia hits, and the ad URL /
+    # contactInfo id is the hit's externalID (NOT the Algolia objectID).
+    import json
+    from datetime import date
+    hit = {
+        "id": 29634902, "objectID": 29634902, "externalID": 131289980,
+        "slug": "cadillac-escalade-2022", "title": "Cadillac Escalade 2022",
+        "description": "Luxury SUV", "createdAt": 1783438542.3,
+        "extraFields": {"price": 30800},
+        "formattedExtraFields": [
+            {"attribute": "make", "name_l1": "Brand", "formattedValue_l1": "Cadillac"},
+            {"attribute": "model", "name_l1": "Model", "formattedValue_l1": "Escalade"},
+            {"attribute": "year", "name_l1": "Year", "formattedValue_l1": "2022"},
+            {"attribute": "mileage", "name_l1": "Kilometers", "formattedValue_l1": "81000"},
+            {"attribute": "transmission", "name_l1": "Transmission", "formattedValue_l1": "Automatic"},
+            {"attribute": "price", "name_l1": "Price", "formattedValue_l1": "30,800"},
+        ],
+        "photos": [{"id": 27598213}, {"id": 27598214}],
+        "location": [
+            {"name": "Oman", "level": 0},
+            {"name": "Muscat", "level": 1},
+            {"name": "Al Ghubrah", "level": 2},
+        ],
+        "contactInfo": {"name": "Al Fajr Motors"},
+    }
+    state = {"algolia": {"results": [{"hits": [hit]}]}}
+    html = "<html><body>window.state = " + json.dumps(state) + ";</body></html>"
+
+    hits = dubizzle._hits(html)
+    assert len(hits) == 1
+    l = dubizzle.listing_from_hit(hits[0])
+    assert l is not None
+    assert l.listing_id == "131289980"          # externalID, not objectID
+    assert l.url.endswith("-ID131289980.html")
+    assert l.title == "Cadillac Escalade 2022"
+    assert l.price_value == 30800
+    assert l.attributes["make"] == "Cadillac"
+    assert l.attributes["kilometers"] == "81000"
+    assert l.attributes["transmission"] == "Automatic"
+    assert "price" not in l.attributes         # price handled separately
+    assert l.location == "Al Ghubrah, Muscat"  # level>=1, most-specific first
+    assert len(l.images) == 2
+    assert l.images[0].endswith("-800x600.jpeg") and "27598213" in l.images[0]
+    assert l.seller.name == "Al Fajr Motors"
+    assert isinstance(dubizzle._dz_created_date(hit), date)
+
+
 # ------------------------------------------------------------- YallaMotor
 
 def test_yallamotor_search_filters_used_only():

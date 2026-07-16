@@ -38,7 +38,7 @@ import os
 import re
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 from typing import Any, Protocol
 from urllib.parse import urljoin
@@ -216,6 +216,17 @@ class ProductListing:
     in_stock: bool | None = None
     image_url: str = ""
     raw_jsonld: dict = field(default_factory=dict)
+
+
+@dataclass
+class GenericRecord:
+    """Output of the config-driven generic (`fields`) extractor. Unlike
+    ProductListing this carries an arbitrary, user-declared field map so a
+    generic source can scrape any shape of data. See ConfigurableProductParser
+    ._extract_fields and run_generic_source."""
+    source_id: str
+    url: str
+    fields: dict = field(default_factory=dict)
 
 
 def listing_id_for(retailer_id: str, product_url: str) -> str:
@@ -709,6 +720,7 @@ class ConfigurableProductParser(BaseHtmlParser):
                 "microdata": 0,
                 "og_meta": 0,
                 "css": 0,
+                "fields": 0,
             },
             "http_errors": {},
         }
@@ -1133,10 +1145,65 @@ class ConfigurableProductParser(BaseHtmlParser):
         # Stubbed so the dispatch doesn't crash if a config lists it.
         return None
 
-    def _try_extractors(self, url: str) -> ProductListing | None:
+    def _eval_selector(self, expr: str) -> str:
+        """Evaluate a generic selector expression against the current page.
+
+        Grammar — split on the LAST '@':
+          "h1.title"       -> inner_text of the first match
+          "sel@text"       -> inner_text (explicit)
+          "sel@html"       -> inner_html
+          "time@datetime"  -> value of the `datetime` attribute
+        Returns "" when nothing matches. Never raises.
+        """
+        expr = str(expr or "").strip()
+        if not expr:
+            return ""
+        sel, at, suffix = expr.rpartition("@")
+        if not at:  # no '@' — the whole expression is a text selector
+            return self._first_text(self.page, [expr])
+        sel = sel.strip()
+        suffix = suffix.strip().lower()
+        if not sel:
+            return ""
+        if suffix in ("", "text", "innertext"):
+            return self._first_text(self.page, [sel])
+        if suffix == "html":
+            return self._first_html(self.page, [sel])
+        try:
+            el = self.page.query_selector(sel)
+        except Exception:
+            return ""
+        if not el:
+            return ""
+        try:
+            val = el.get_attribute(suffix)
+        except Exception:
+            return ""
+        return (val or "").strip()
+
+    def _extract_fields(self, url: str, cfg: dict) -> "GenericRecord | None":
+        """Config-driven generic extractor: {fieldName: selectorExpr} -> dict.
+
+        A record counts as a hit only when every required field is non-empty.
+        `required_fields` defaults to all declared fields when absent, so an
+        empty page yields None (no spurious blank records)."""
+        fields_cfg = cfg.get("fields")
+        if not isinstance(fields_cfg, dict) or not fields_cfg:
+            return None
+        required = cfg.get("required_fields")
+        if not isinstance(required, list) or not required:
+            required = list(fields_cfg.keys())
+        out: dict[str, str] = {}
+        for name, expr in fields_cfg.items():
+            out[str(name)] = self._eval_selector(str(expr))
+        if any(not out.get(str(r)) for r in required):
+            return None
+        return GenericRecord(source_id=self.retailer_id, url=url, fields=out)
+
+    def _try_extractors(self, url: str) -> "ProductListing | GenericRecord | None":
         for ex in self.extraction.get("extractors") or []:
             t = str(ex.get("type") or "")
-            listing: ProductListing | None = None
+            listing: "ProductListing | GenericRecord | None" = None
             if t == "jsonld_product":
                 listing = self._extract_jsonld(url)
             elif t == "og_meta":
@@ -1145,6 +1212,8 @@ class ConfigurableProductParser(BaseHtmlParser):
                 listing = self._extract_css(url, ex)
             elif t == "microdata":
                 listing = self._extract_microdata(url)
+            elif t == "fields":
+                listing = self._extract_fields(url, ex)
             if listing is not None:
                 self.diagnostics["extractor_hits"][t] = (
                     self.diagnostics["extractor_hits"].get(t, 0) + 1
@@ -1154,7 +1223,7 @@ class ConfigurableProductParser(BaseHtmlParser):
 
     # ----- Top-level entry ------------------------------------------------
 
-    def parse_one(self, url: str) -> ProductListing | None:
+    def parse_one(self, url: str) -> "ProductListing | GenericRecord | None":
         """Load `url`, run the extractor chain, return the first hit (or None).
         Surfaces upstream HTTP errors into self.diagnostics so the run-detail
         page can explain zero-found outcomes."""
@@ -1185,7 +1254,9 @@ class ConfigurableProductParser(BaseHtmlParser):
                 pass
         return self._try_extractors(url)
 
-    def parse_products(self, start_url: str) -> list[ProductListing]:
+    def parse_products(
+        self, start_url: str
+    ) -> "list[ProductListing | GenericRecord]":
         ua = self._user_agent()
         try:
             self.page.context.set_extra_http_headers({"User-Agent": ua})
@@ -1203,7 +1274,7 @@ class ConfigurableProductParser(BaseHtmlParser):
             return []
 
         delay_ms = int(self.extraction.get("request_delay_ms") or 1500)
-        out: list[ProductListing] = []
+        out: "list[ProductListing | GenericRecord]" = []
         for link in links:
             try:
                 listing = self.parse_one(link)
@@ -1595,6 +1666,23 @@ def load_car_source(db, source_id: str) -> dict | None:
     return _doc_with_id(snap)
 
 
+def list_active_generic_sources(db) -> list[dict]:
+    """Top-level /generic_sources, active==True. Used by find_due_work
+    + the run-now request handler. Adapter-strategy sources stay active==False
+    until their generated module is merged, so they never appear here early."""
+    q = db.collection("generic_sources").where(
+        filter=FieldFilter("active", "==", True)
+    )
+    return [_doc_with_id(d) for d in q.stream()]
+
+
+def load_generic_source(db, source_id: str) -> dict | None:
+    snap = db.collection("generic_sources").document(source_id).get()
+    if not snap.exists:
+        return None
+    return _doc_with_id(snap)
+
+
 def _to_datetime(v: Any) -> datetime | None:
     """Coerce a Firestore timestamp / native datetime / None into UTC datetime."""
     if v is None:
@@ -1619,24 +1707,27 @@ def find_due_work(
                                       run_comparison_source
       kind == "car_source"         → id is a car_source_id, dispatched to
                                       run_car_source
+      kind == "generic_source"     → id is a generic_source_id, dispatched to
+                                      run_generic_source
       trigger == "request:<request_id>"  queued ad-hoc run
       trigger == "schedule"              cron-due
 
     Deduplicates: if a target has both a pending request AND its cron is
-    due, the request wins. Comparison sources and projects have separate
-    seen-sets so a comparison-source request doesn't suppress a project
-    or vice versa.
+    due, the request wins. Each kind has its own seen-set so a request for
+    one doesn't suppress a due item of another.
     """
     work: list[tuple[str, str, str]] = []
     seen_projects: set[str] = set()
     seen_comparison: set[str] = set()
     seen_cars: set[str] = set()
+    seen_generic: set[str] = set()
 
     # Ad-hoc requests first — most user-visible.
     for req in list_pending_run_requests(db):
         pid = str(req.get("project_id") or "")
         csid = str(req.get("comparison_source_id") or "")
         carsid = str(req.get("car_source_id") or "")
+        gsid = str(req.get("generic_source_id") or "")
         trig = f"request:{req['__id']}"
         if pid and pid not in seen_projects:
             seen_projects.add(pid)
@@ -1647,6 +1738,9 @@ def find_due_work(
         elif carsid and carsid not in seen_cars:
             seen_cars.add(carsid)
             work.append(("car_source", carsid, trig))
+        elif gsid and gsid not in seen_generic:
+            seen_generic.add(gsid)
+            work.append(("generic_source", gsid, trig))
 
     # Then schedule-due projects.
     for proj in list_enabled_projects(db):
@@ -1689,6 +1783,20 @@ def find_due_work(
             continue
         seen_cars.add(sid)
         work.append(("car_source", sid, "schedule"))
+
+    # Then schedule-due generic sources (top-level, per-user).
+    for src in list_active_generic_sources(db):
+        sid = src["__id"]
+        if sid in seen_generic:
+            continue
+        cron = str(src.get("schedule_cron") or "").strip()
+        if not cron:
+            continue
+        last_dt = _to_datetime(src.get("last_run_at"))
+        if not _is_cron_due(cron, last_dt, now):
+            continue
+        seen_generic.add(sid)
+        work.append(("generic_source", sid, "schedule"))
 
     return work
 
@@ -2767,6 +2875,12 @@ def _diag_search_url(site: str, source: dict) -> str:
         if query:
             return base + "?search=" + query.replace(" ", "+")
         return base
+    if site == "dubizzle":
+        base = "https://www.dubizzle.com.om/en/vehicles/cars-for-sale/"
+        query = str(source.get("query") or "").strip()
+        if query:
+            return base + "?q=" + query.replace(" ", "%20")
+        return base
     return ""
 
 
@@ -2853,6 +2967,8 @@ def run_car_source(
                 "html_len": len(_html),
                 "has_next_data": "__NEXT_DATA__" in _html,
                 "has_serp": "serpApiResponse" in _html,
+                "has_window_state": "window.state" in _html,
+                "has_hits": '"objectID"' in _html,
                 "title": (_tm.group(1)[:120] if _tm else ""),
             }
         except Exception as e:
@@ -2990,6 +3106,359 @@ def run_car_source(
 
 
 # ---------------------------------------------------------------------------
+# Generic-source runner (top-level, per-user) — the any-schema surface the
+# AI-driven config feature (python -m aiconfig) writes to.
+#
+# Two strategies, one runner:
+#   strategy.mode == "config"   → ConfigurableProductParser with a `fields`
+#                                 extraction config (or any extractor); records
+#                                 are normalised to flat dicts. No code change.
+#   strategy.mode == "adapter"  → a generated module in adapters/, built by key.
+#                                 The module must be merged to `main` before it
+#                                 imports, so adapter sources stay active:false
+#                                 until then and never reach this runner early.
+# ---------------------------------------------------------------------------
+
+def _generic_record_to_data(rec: Any) -> dict:
+    """Normalise a parser/adapter record into a flat {field: value} dict for
+    /generic_records.data. Handles GenericRecord, ProductListing (and any
+    dataclass), an adapter's {"data": {...}} envelope, and a bare dict."""
+    if isinstance(rec, GenericRecord):
+        return dict(rec.fields)
+    if isinstance(rec, dict):
+        inner = rec.get("data")
+        return dict(inner) if isinstance(inner, dict) else dict(rec)
+    if is_dataclass(rec):
+        d = asdict(rec)
+        d.pop("raw_jsonld", None)
+        return d
+    return {}
+
+
+def _upsert_generic_record(
+    db,
+    owner_uid: str,
+    source_id: str,
+    source_key: str,
+    url: str,
+    data: dict,
+) -> tuple[str, bool]:
+    """Upsert /generic_records/{uid}. Returns (uid, is_new). Doc id is
+    "{source_key}:{sha1(url)[:32]}" — write-once, preserves first_seen_at,
+    refreshes data + last_seen_at on re-scrape."""
+    uid = f"{source_key}:{listing_id_for(source_key, url)}"
+    ref = db.collection("generic_records").document(uid)
+    try:
+        snap = ref.get()
+        payload = {
+            "uid": uid,
+            "owner_uid": owner_uid,
+            "source_id": source_id,
+            "source_key": source_key,
+            "url": url,
+            "data": data,
+            "last_seen_at": SERVER_TIMESTAMP,
+        }
+        if not snap.exists:
+            ref.set({
+                **payload,
+                "first_seen_at": SERVER_TIMESTAMP,
+                "status": "new",
+            })
+            return (uid, True)
+        payload["status"] = "seen"
+        ref.update(payload)
+        return (uid, False)
+    except Exception as e:
+        print(
+            f"failed to upsert /generic_records/{uid}: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+        return (uid, False)
+
+
+def _generic_records_config(
+    extraction: dict,
+    start_urls: list,
+    source_key: str,
+    src_name: str,
+    *,
+    per_source_deadline: float,
+) -> tuple[list[tuple[str, dict]], dict, list[str]]:
+    """Config strategy: drive ConfigurableProductParser over start_urls and
+    return (records, diagnostics, errors). Each record is (url, data-dict).
+    Owns its own Playwright session, mirroring run_comparison_source."""
+    records: list[tuple[str, dict]] = []
+    errors: list[str] = []
+    diagnostics: dict = {}
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        ua = str(extraction.get("user_agent") or _DEFAULT_UA)
+        context = browser.new_context(user_agent=ua)
+        page = context.new_page()
+        try:
+            parser = ConfigurableProductParser(
+                page, extraction, source_key, src_name
+            )
+            for url in start_urls:
+                if time.monotonic() >= per_source_deadline:
+                    errors.append("per-source timeout reached")
+                    break
+                try:
+                    items = parser.parse_products(str(url))
+                except Exception as e:
+                    errors.append(f"{url}: {type(e).__name__}: {e}")
+                    continue
+                for item in items:
+                    item_url = getattr(item, "url", "") or getattr(
+                        item, "product_url", ""
+                    ) or str(url)
+                    records.append(
+                        (item_url, _generic_record_to_data(item))
+                    )
+            diagnostics = parser.diagnostics
+        finally:
+            try:
+                browser.close()
+            except Exception:
+                pass
+    return records, diagnostics, errors
+
+
+def _generic_records_adapter(
+    adapter_key: str,
+    source: dict,
+    *,
+    per_source_deadline: float,
+) -> tuple[list[tuple[str, dict]], dict, list[str]]:
+    """Adapter strategy: build a generated module by key and iterate its
+    records. The adapters/ package lands in Phase 2; until then (or on an
+    unknown key) this returns a clear error rather than crashing the tick."""
+    records: list[tuple[str, dict]] = []
+    errors: list[str] = []
+    try:
+        from adapters import build as _build_adapter  # type: ignore
+    except Exception:
+        return (
+            records,
+            {},
+            [
+                f"adapter '{adapter_key}' unavailable: the adapters/ package is "
+                "not present (its module must be merged to main first)"
+            ],
+        )
+    try:
+        adapter = _build_adapter(adapter_key)
+    except Exception as e:
+        return (records, {}, [f"unknown adapter '{adapter_key}': {e}"])
+    try:
+        for rec in adapter.fetch(source):
+            if time.monotonic() >= per_source_deadline:
+                errors.append("per-source timeout reached")
+                break
+            data = _generic_record_to_data(rec)
+            url = ""
+            if isinstance(rec, dict):
+                url = str(rec.get("url") or "")
+            url = url or str(data.get("url") or "")
+            records.append((url, data))
+    except Exception as e:
+        errors.append(f"adapter error: {type(e).__name__}: {e}")
+    return records, {}, errors
+
+
+def run_generic_source(
+    db,
+    source_id: str,
+    trigger: str,
+    *,
+    dry_run: bool,
+    per_source_deadline: float,
+) -> dict:
+    """Run one generic (any-schema) source end-to-end. Writes a
+    /generic_runs/{rid} doc and upserts /generic_records. One source per run.
+    Mirrors run_comparison_source's shape."""
+    started_mono = time.monotonic()
+
+    source = load_generic_source(db, source_id)
+    if source is None:
+        return {
+            "generic_source_id": source_id,
+            "status": "error",
+            "error": "generic source not found",
+        }
+    owner_uid = str(source.get("owner_uid") or "")
+    if not owner_uid:
+        return {
+            "generic_source_id": source_id,
+            "status": "error",
+            "error": "generic source has no owner_uid",
+        }
+
+    src_name = str(source.get("name") or source_id)
+    source_key = str(source.get("source_key") or source_id)
+    start_urls = source.get("start_urls") or []
+    if not isinstance(start_urls, list) or not start_urls:
+        return {
+            "generic_source_id": source_id,
+            "status": "error",
+            "error": "generic source has no start_urls",
+        }
+    strategy = source.get("strategy") or {}
+    mode = str(strategy.get("mode") or "config")
+
+    print(
+        f"\n=== Generic: {src_name} ({source_id}) mode={mode} "
+        f"trigger={trigger} dry={dry_run} ===",
+        file=sys.stderr,
+    )
+
+    # Pre-create /generic_runs/{rid} so the UI sees it as running.
+    run_ref = db.collection("generic_runs").document()
+    run_id = run_ref.id
+    run_ref.set({
+        "owner_uid": owner_uid,
+        "source_id": source_id,
+        "source_name": src_name,
+        "started_at": SERVER_TIMESTAMP,
+        "finished_at": None,
+        "duration_seconds": 0,
+        "status": "running",
+        "trigger": trigger,
+        "dry_run": dry_run,
+        "totals": {
+            "checked": 0,
+            "found": 0,
+            "extracted": 0,
+            "skipped_duplicate": 0,
+            "errors_count": 0,
+        },
+        "errors": [],
+    })
+
+    summary: dict[str, Any] = {
+        "found": 0,
+        "extracted": 0,
+        "skipped_duplicate": 0,
+        "errors": [],
+    }
+    diagnostics: dict[str, Any] = {}
+
+    try:
+        if mode == "adapter":
+            records, diagnostics, errs = _generic_records_adapter(
+                str(strategy.get("adapter_key") or ""),
+                source,
+                per_source_deadline=per_source_deadline,
+            )
+        else:
+            records, diagnostics, errs = _generic_records_config(
+                source.get("strategy", {}).get("extraction")
+                or source.get("extraction")
+                or {},
+                start_urls,
+                source_key,
+                src_name,
+                per_source_deadline=per_source_deadline,
+            )
+        summary["errors"].extend(errs)
+        summary["found"] = len(records)
+        for url, data in records:
+            if dry_run:
+                summary["extracted"] += 1
+                continue
+            _uid, is_new = _upsert_generic_record(
+                db, owner_uid, source_id, source_key, url, data
+            )
+            if is_new:
+                summary["extracted"] += 1
+            else:
+                summary["skipped_duplicate"] += 1
+    except Exception as e:
+        summary["errors"].append(
+            f"unexpected error: {type(e).__name__}: {e}"
+        )
+
+    duration = max(0, int(time.monotonic() - started_mono))
+    errors_count = len(summary["errors"])
+    if errors_count == 0:
+        status = "ok"
+    elif summary["extracted"] > 0:
+        status = "partial"
+    else:
+        status = "error"
+
+    totals = {
+        "checked": len(start_urls),
+        "found": summary["found"],
+        "extracted": summary["extracted"],
+        "skipped_duplicate": summary["skipped_duplicate"],
+        "errors_count": errors_count,
+    }
+
+    try:
+        run_ref.update({
+            "finished_at": SERVER_TIMESTAMP,
+            "duration_seconds": duration,
+            "status": status,
+            "totals": totals,
+            "errors": summary["errors"],
+            "diagnostics": diagnostics,
+        })
+    except Exception as e:
+        print(
+            f"failed to finalise /generic_runs/{run_id}: "
+            f"{type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+    if not dry_run:
+        try:
+            db.collection("generic_sources").document(source_id).update({
+                "last_run_at": SERVER_TIMESTAMP,
+                "last_run_summary": {
+                    "ts": SERVER_TIMESTAMP,
+                    "found": summary["found"],
+                    "extracted": summary["extracted"],
+                    "errors_count": errors_count,
+                },
+            })
+        except Exception as e:
+            print(
+                f"failed to update generic source last_run_at: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    if trigger.startswith("request:"):
+        try:
+            update_run_request(
+                db,
+                trigger.split(":", 1)[1],
+                {
+                    "status": "failed" if status == "error" else "done",
+                    "finished_at": SERVER_TIMESTAMP,
+                    "run_id": run_id,
+                },
+            )
+        except Exception as e:
+            print(
+                f"failed to mark generic run_request done: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+
+    return {
+        "generic_source_id": source_id,
+        "source_name": src_name,
+        "status": status,
+        "totals": totals,
+        "diagnostics": diagnostics,
+        "errors": summary["errors"][:10],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -3031,6 +3500,9 @@ def main() -> int:
     only_car_source_id = (
         os.environ.get("ONLY_CAR_SOURCE_ID", "").strip() or None
     )
+    only_generic_source_id = (
+        os.environ.get("ONLY_GENERIC_SOURCE_ID", "").strip() or None
+    )
 
     now = utc_now()
 
@@ -3058,6 +3530,14 @@ def main() -> int:
         work = [("car_source", only_car_source_id, trigger)]
         print(
             f"ONLY_CAR_SOURCE_ID={only_car_source_id} "
+            f"trigger={trigger} dry_run={dry_run}",
+            file=sys.stderr,
+        )
+    elif only_generic_source_id:
+        trigger = f"request:{request_id}" if request_id else "manual"
+        work = [("generic_source", only_generic_source_id, trigger)]
+        print(
+            f"ONLY_GENERIC_SOURCE_ID={only_generic_source_id} "
             f"trigger={trigger} dry_run={dry_run}",
             file=sys.stderr,
         )
@@ -3111,6 +3591,14 @@ def main() -> int:
             )
         elif kind == "car_source":
             result = run_car_source(
+                db,
+                work_id,
+                trigger,
+                dry_run=dry_run,
+                per_source_deadline=per_item_deadline,
+            )
+        elif kind == "generic_source":
+            result = run_generic_source(
                 db,
                 work_id,
                 trigger,

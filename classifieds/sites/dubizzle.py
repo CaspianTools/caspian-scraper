@@ -19,8 +19,9 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from typing import Iterator
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from .. import extract
 from ..models import Listing, Seller
@@ -30,9 +31,26 @@ KEY = "dubizzle"
 LABEL = "Dubizzle Oman"
 BASE = "https://www.dubizzle.com.om"
 IMG_CDN = "https://images.dubizzle.com.om/thumbnails/"
+IMG_SIZE = "800x600"
 
 _SUPPORTED_COUNTRIES = {"om"}
 _AD_RE = re.compile(r"(?:/[a-z]{2})?/ad/[^\"'\s]*-ID(\d+)\.html", re.I)
+
+# Dubizzle serves the full results as a JSON blob in `window.state` (Algolia
+# hits). Each hit carries title, price (extraFields.price), a rich English
+# spec table (formattedExtraFields), the photo gallery, location, description,
+# seller name and a Unix `createdAt` — everything a listing needs. The seller
+# phone comes from the public, unauthenticated contactInfo API.
+
+# Dubizzle formattedExtraFields `attribute` -> our clean key.
+_DZ_ATTR = {
+    "make": "make", "model": "model", "year": "year",
+    "mileage": "kilometers", "transmission": "transmission",
+    "petrol": "fuel", "color": "color", "body_type": "body_type",
+    "seats": "seats", "new_used": "condition", "interior": "interior",
+    "doors": "doors", "source": "regional_specs", "owners": "owners",
+    "has_warranty": "warranty",
+}
 
 
 def _search_url(spec: SearchSpec, page: int) -> str:
@@ -194,6 +212,123 @@ def _num(v) -> float | None:
         return None
 
 
+def _window_state(html: str) -> dict | None:
+    """Parse the `window.state = {...}` JSON blob (Algolia results + config)."""
+    m = re.search(r"window\.state\s*=\s*", html)
+    if not m:
+        return None
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(html, m.end())
+        return obj if isinstance(obj, dict) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _hits(html: str) -> list[dict]:
+    """The listing hits array from window.state (first list of dicts whose
+    items carry an objectID)."""
+    state = _window_state(html)
+    if not state:
+        return []
+    found: list[dict] = []
+
+    def walk(node, depth=0):
+        nonlocal found
+        if found or depth > 12:
+            return
+        if (
+            isinstance(node, list)
+            and node
+            and isinstance(node[0], dict)
+            and any(isinstance(x, dict) and "objectID" in x for x in node[:3])
+        ):
+            found = [x for x in node if isinstance(x, dict)]
+            return
+        if isinstance(node, dict):
+            for v in node.values():
+                walk(v, depth + 1)
+        elif isinstance(node, list):
+            for v in node[:6]:
+                walk(v, depth + 1)
+
+    walk(state)
+    return found
+
+
+def _dz_created_date(hit: dict):
+    ts = hit.get("createdAt") or hit.get("timestamp")
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).date()
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _dz_images(hit: dict) -> list[str]:
+    photos = hit.get("photos")
+    if not isinstance(photos, list) or not photos:
+        cp = hit.get("coverPhoto")
+        photos = [cp] if isinstance(cp, dict) else []
+    out: list[str] = []
+    for ph in photos:
+        pid = ph.get("id") if isinstance(ph, dict) else None
+        if pid is not None:
+            out.append(f"{IMG_CDN}{pid}-{IMG_SIZE}.jpeg")
+    return out
+
+
+def _dz_location(hit: dict) -> str:
+    loc = hit.get("location")
+    if isinstance(loc, list):
+        names = [
+            str(x.get("name"))
+            for x in loc
+            if isinstance(x, dict) and x.get("level", 0) >= 1 and x.get("name")
+        ]
+        return ", ".join(reversed(names)) if names else ""
+    return ""
+
+
+def listing_from_hit(hit: dict) -> Listing | None:
+    """Build a full Listing from one Dubizzle search hit — no detail fetch."""
+    # externalID is the public ad ID used in the URL and the contactInfo API;
+    # `id`/`objectID` are the Algolia-internal index ids (they 404 the API).
+    lid = str(hit.get("externalID") or hit.get("id") or hit.get("objectID") or "")
+    if not lid:
+        return None
+    slug = str(hit.get("slug") or "")
+    url = f"{BASE}/en/ad/{quote(slug)}-ID{lid}.html" if slug else f"{BASE}/en/ad/-ID{lid}.html"
+    amount = (hit.get("extraFields") or {}).get("price")
+    attrs: dict[str, str] = {}
+    price_raw = ""
+    for f in hit.get("formattedExtraFields") or []:
+        if not isinstance(f, dict):
+            continue
+        val = f.get("formattedValue_l1") or f.get("formattedValue") or ""
+        if f.get("attribute") == "price":
+            price_raw = str(val)
+            continue
+        key = _DZ_ATTR.get(f.get("attribute")) or f.get("attribute")
+        if key and val:
+            attrs.setdefault(str(key), str(val).strip())
+    d = _dz_created_date(hit)
+    contact = hit.get("contactInfo") if isinstance(hit.get("contactInfo"), dict) else {}
+    return Listing(
+        site=KEY,
+        listing_id=lid,
+        url=url,
+        title=str(hit.get("title") or ""),
+        description=str(hit.get("description") or ""),
+        price_raw=(f"{price_raw} OMR" if price_raw else (f"{amount} OMR" if amount else "")),
+        price_value=_num(amount),
+        currency="OMR",
+        images=_dz_images(hit),
+        location=_dz_location(hit),
+        posted_at=(d.isoformat() if d else ""),
+        attributes=attrs,
+        seller=Seller(name=str(contact.get("name") or "")),
+    )
+
+
 class DubizzleAdapter:
     key = KEY
     label = LABEL
@@ -204,43 +339,59 @@ class DubizzleAdapter:
     def search(self, spec: SearchSpec) -> Iterator[Listing]:
         if spec.country not in _SUPPORTED_COUNTRIES:
             raise ValueError(f"{LABEL} adapter only covers Oman (om), got {spec.country!r}")
-        from ..browser import browser_context, fetch_html
+        # Plain HTTP: Dubizzle serves the full results JSON in window.state.
+        from ..http import polite_session, get
 
+        session = polite_session()
+        today = datetime.now(timezone.utc).date()
         emitted = 0
-        with browser_context() as ctx:
-            page = 1
-            while emitted < spec.max_listings and page <= 20:
-                html = fetch_html(ctx, _search_url(spec, page))
-                stubs = parse_search_html(html)
-                if not stubs:
+        page = 1
+        empty_streak = 0
+        while emitted < spec.max_listings and page <= 40:
+            r = get(session, _search_url(spec, page), site=KEY)
+            hits = _hits(r.text or "")
+            if not hits:
+                break
+            in_window = 0
+            for hit in hits:
+                if emitted >= spec.max_listings:
                     break
-                for stub in stubs:
-                    if emitted >= spec.max_listings:
-                        break
-                    if spec.with_details:
-                        dhtml = fetch_html(ctx, stub["url"])
-                        listing = parse_detail_html(dhtml, stub["url"])
-                        if listing is None:
-                            continue
-                        self._reveal_phone(ctx, listing)
-                    else:
-                        listing = Listing(site=KEY, listing_id=stub["listing_id"],
-                                          url=stub["url"], currency="OMR", seller=Seller())
-                    emitted += 1
-                    yield listing
-                page += 1
+                if spec.posted_within_days > 0:
+                    d = _dz_created_date(hit)
+                    if d is not None and (today - d).days >= spec.posted_within_days:
+                        continue
+                listing = listing_from_hit(hit)
+                if listing is None:
+                    continue
+                in_window += 1
+                if spec.with_details:
+                    self._reveal_phone(session, listing)
+                emitted += 1
+                yield listing
+            if spec.posted_within_days > 0:
+                empty_streak = empty_streak + 1 if in_window == 0 else 0
+                if empty_streak >= 2:
+                    break
+            page += 1
 
-    def _reveal_phone(self, ctx, listing: Listing) -> None:
+    def _reveal_phone(self, session, listing: Listing) -> None:
+        # Dubizzle's contactInfo API is public + unauthenticated (no masking to
+        # circumvent) and returns the seller's number the site itself serves.
         lid = listing.listing_id
         if not lid:
             return
         try:
-            resp = ctx.request.get(f"{BASE}/api/listing/{lid}/contactInfo/")
-            if resp.ok:
-                info = parse_contact_info(resp.text())
-                if info.get("mobile"):
-                    listing.seller.phone = info["mobile"]
-                if info.get("whatsapp"):
-                    listing.extras["whatsapp"] = info["whatsapp"]
+            from ..http import get
+            r = get(
+                session,
+                f"{BASE}/api/listing/{lid}/contactInfo/",
+                site=KEY,
+                headers={"Accept": "application/json"},
+            )
+            info = parse_contact_info(r.text)
+            if info.get("mobile"):
+                listing.seller.phone = info["mobile"]
+            if info.get("whatsapp"):
+                listing.extras["whatsapp"] = info["whatsapp"]
         except Exception:
             pass
