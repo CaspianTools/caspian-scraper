@@ -26,6 +26,10 @@ on:
         description: "Run-request ID this dispatch satisfies (optional). When set, the runner marks /run_requests/<id> done at finish."
         required: false
         type: string
+      car_source_id:
+        description: "Run only this car source (Firestore doc ID). Leave blank to process all due work."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -56,6 +60,7 @@ jobs:
           ONLY_PROJECT_ID: ${{ inputs.project_id }}
           DRY_RUN: ${{ inputs.dry_run }}
           REQUEST_ID: ${{ inputs.request_id }}
+          ONLY_CAR_SOURCE_ID: ${{ inputs.car_source_id }}
         run: python scrape.py
 
       - name: Open issue on failure

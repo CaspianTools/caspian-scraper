@@ -2757,6 +2757,19 @@ def _upsert_car_listing(
         return (uid, False)
 
 
+def _diag_search_url(site: str, source: dict) -> str:
+    """Best-effort public search URL for a diagnostic pre-flight GET.
+    Currently OpenSooq only; returns '' to skip the pre-flight otherwise."""
+    if site == "opensooq":
+        category = str(source.get("category") or "cars")
+        base = f"https://om.opensooq.com/en/{category}/cars-for-sale"
+        query = str(source.get("query") or "").strip()
+        if query:
+            return base + "?search=" + query.replace(" ", "+")
+        return base
+    return ""
+
+
 def run_car_source(
     db,
     source_id: str,
@@ -2814,6 +2827,38 @@ def run_car_source(
 
     summary: dict[str, Any] = {"found": 0, "new": 0, "updated": 0, "errors": []}
     overrun = False
+
+    # Diagnostic pre-flight: a plain-HTTP GET of the site's public search page
+    # from THIS runner. Recorded on the run doc + printed to the logs so we can
+    # tell an anti-bot / datacenter-IP block ("0 found") apart from a parser or
+    # schema problem. `has_serp`/`has_next_data` true + a real title means the
+    # page is reachable and structured as expected from here; the real scrape
+    # below still goes through the classifieds adapter (Playwright).
+    diag: dict[str, Any] = {}
+    _diag_url = _diag_search_url(site_key, source)
+    if _diag_url:
+        try:
+            import requests as _rq
+            _ua = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            )
+            _r = _rq.get(_diag_url, headers={"User-Agent": _ua}, timeout=30)
+            _html = _r.text or ""
+            _tm = re.search(r"<title[^>]*>([^<]*)</title>", _html, re.I)
+            diag = {
+                "preflight_url": _diag_url,
+                "http_status": _r.status_code,
+                "final_url": str(_r.url),
+                "html_len": len(_html),
+                "has_next_data": "__NEXT_DATA__" in _html,
+                "has_serp": "serpApiResponse" in _html,
+                "title": (_tm.group(1)[:120] if _tm else ""),
+            }
+        except Exception as e:
+            diag = {"preflight_error": f"{type(e).__name__}: {e}"}
+        print(f"car preflight {site_key}: {json.dumps(diag)}", file=sys.stderr)
+
     try:
         # Import lazily so non-car ticks don't pay the classifieds import.
         from classifieds import sites as _sites
@@ -2865,7 +2910,7 @@ def run_car_source(
     duration = max(0, int(time.monotonic() - started_mono))
     errors_count = len(summary["errors"])
     if errors_count == 0:
-        status = "ok"
+        status = "ok" if summary["found"] > 0 else "zero_found"
     elif summary["found"] > 0:
         status = "partial"
     else:
@@ -2886,6 +2931,7 @@ def run_car_source(
             "totals": totals,
             "errors": summary["errors"],
             "overrun": overrun,
+            "diagnostics": diag,
         })
     except Exception as e:
         print(
@@ -2934,6 +2980,7 @@ def run_car_source(
         "source_name": src_name,
         "status": status,
         "totals": totals,
+        "diagnostics": diag,
         "errors": summary["errors"][:10],
     }
 
