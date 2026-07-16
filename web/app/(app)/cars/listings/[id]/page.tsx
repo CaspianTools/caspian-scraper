@@ -10,6 +10,14 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 function tsToIso(v: unknown): string {
   if (!v) return "";
   const t = v as { toDate?: () => Date };
@@ -60,9 +68,17 @@ export default async function CarListingDetailPage({ params }: PageProps) {
   if (!session) redirect("/signin");
   const { id } = await params;
 
-  const snap = await carListingDoc(id).get();
-  if (!snap.exists) notFound();
-  const data = snap.data();
+  // The doc id is "<site>:<listing_id>" (e.g. "opensooq:284135018"); the colon
+  // is percent-encoded in the URL and may or may not be decoded back into the
+  // route param, so try the decoded form first, then the raw one.
+  let data: FirebaseFirestore.DocumentData | undefined;
+  for (const cand of Array.from(new Set([safeDecode(id), id]))) {
+    const snap = await carListingDoc(cand).get();
+    if (snap.exists) {
+      data = snap.data();
+      break;
+    }
+  }
   if (!data || data.owner_uid !== session.uid) notFound();
 
   const title = String(data.title ?? "(untitled)");
