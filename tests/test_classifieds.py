@@ -69,6 +69,52 @@ def test_opensooq_search_listings_full_fields():
     assert lst[1].price_value == 6900
 
 
+def test_opensooq_detail_approuter_full_spec():
+    # OpenSooq listing pages are App Router now: the full spec + gallery live
+    # in the self.__next_f RSC stream, description in og tags.
+    hash_a = "a" * 40
+    hash_sq = "c" * 40
+    payload = (
+        '{"label":"Car Make","value":"Toyota","type":"select","fieldName":"car_make"},'
+        '{"label":"Year","value":"2022","type":"select","fieldName":"Car_Year"},'
+        '{"label":"Kilometers","value":"30,000","type":"n","fieldName":"Kilometers_Cars"},'
+        '{"label":"Transmission","value":"Automatic","type":"s","fieldName":"Tramsmission_Cars"},'
+        '{"label":"Exterior Color","value":"White","type":"s","fieldName":"Car_Color"},'
+        '{"label":"VIN Number","value":"Request VIN Number","type":"v","fieldName":"vin_number"} '
+        f"https://opensooq-images.os-cdn.com/previews/1024x0/aa/bb/{hash_a}.jpg.webp "
+        f"https://opensooq-images.os-cdn.com/previews/400x0/aa/bb/{hash_a}.jpg.webp "
+        f"https://opensooq-images.os-cdn.com/previews/300x300/cc/dd/{hash_sq}.png.jpg"
+    )
+    html = (
+        '<html><head>'
+        '<meta property="og:description" content="Clean Toyota, one owner">'
+        '<meta property="og:image" content="https://x/og.jpg">'
+        "</head><body>"
+        "self.__next_f.push([1," + __import__("json").dumps(payload) + "])"
+        "</body></html>"
+    )
+    d = opensooq.parse_detail_approuter(html)
+    assert d["attributes"]["make"] == "Toyota"
+    assert d["attributes"]["year"] == "2022"
+    assert d["attributes"]["kilometers"] == "30,000"
+    assert d["attributes"]["transmission"] == "Automatic"
+    assert d["attributes"]["exterior_color"] == "White"
+    # VIN value is a CTA ("Request VIN Number") -> skipped
+    assert "vin" not in d["attributes"]
+    # gallery: same photo deduped across sizes -> largest kept; square logo dropped
+    assert len(d["images"]) == 1
+    assert d["images"][0].startswith("https://opensooq-images.os-cdn.com/previews/1024x0/")
+    assert d["description"] == "Clean Toyota, one owner"
+
+
+def test_opensooq_inserted_date_parsing():
+    from datetime import date
+    assert opensooq._inserted_date({"inserted_date": "2026-07-16"}) == date(2026, 7, 16)
+    assert opensooq._inserted_date({"inserted_date": "2026-07-16T09:00"}) == date(2026, 7, 16)
+    assert opensooq._inserted_date({"inserted_date": ""}) is None
+    assert opensooq._inserted_date({}) is None
+
+
 def test_opensooq_detail_full_fields():
     l = opensooq.parse_detail_html(_read("opensooq_detail.html"),
                                    "https://om.opensooq.com/en/cars/cars-for-sale/x-265930847")

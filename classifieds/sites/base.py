@@ -17,6 +17,8 @@ class SearchSpec:
     query: str = ""            # optional free-text search
     max_listings: int = 50
     with_details: bool = True  # fetch each detail page (desc, images, phone)
+    posted_within_days: int = 0  # 0 = no filter; N = only listings first
+    #                              posted within the last N days (by creation)
 
 
 class SiteAdapter(Protocol):

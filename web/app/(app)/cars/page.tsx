@@ -37,6 +37,15 @@ function attr(attrs: Record<string, unknown>, ...keys: string[]): string {
   return "";
 }
 
+/** A small CDN-resized thumbnail from an OpenSooq image URL (the size lives
+ * in the path); falls back to the original URL for anything else. */
+function carThumb(url: string): string {
+  return url.replace(
+    /(https:\/\/opensooq-images\.os-cdn\.com\/previews\/)\d+x\d+(\/)/,
+    "$1200x0$2"
+  );
+}
+
 const FETCH_CAP = 3000;
 
 export default async function CarListingsPage() {
@@ -64,10 +73,13 @@ export default async function CarListingsPage() {
         (typeof priceValue === "number"
           ? `${priceValue.toLocaleString()} ${currency}`.trim()
           : "");
+      const imgList = Array.isArray(data.images) ? (data.images as unknown[]) : [];
+      const image = imgList.length ? String(imgList[0]) : "";
       return {
         id: d.id,
         title: String(data.title ?? "(untitled)"),
         url: String(data.url ?? ""),
+        image,
         site: String(data.site ?? ""),
         car: [make, model].filter(Boolean).join(" "),
         year,
@@ -118,6 +130,7 @@ export default async function CarListingsPage() {
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
+                <th className="text-left px-4 py-2 font-medium w-20">Photo</th>
                 <th className="text-left px-4 py-2 font-medium">Title</th>
                 <th className="text-left px-4 py-2 font-medium">Car</th>
                 <th className="text-left px-4 py-2 font-medium">Year</th>
@@ -130,6 +143,19 @@ export default async function CarListingsPage() {
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {rows.map((r) => (
                 <tr key={r.id}>
+                  <td className="px-4 py-3">
+                    {r.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={carThumb(r.image)}
+                        alt=""
+                        loading="lazy"
+                        className="w-16 h-12 object-cover rounded-md bg-zinc-100 dark:bg-zinc-800"
+                      />
+                    ) : (
+                      <div className="w-16 h-12 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                    )}
+                  </td>
                   <td className="px-4 py-3 max-w-xs">
                     {r.url ? (
                       <a

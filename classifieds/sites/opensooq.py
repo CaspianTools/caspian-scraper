@@ -19,7 +19,9 @@ Parsing is split into pure functions (parse_search_listings / parse_search_html
 
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime, timezone
 from typing import Iterator
 from urllib.parse import urljoin
 
@@ -296,24 +298,141 @@ def _listing_from_serp(it: dict) -> Listing | None:
     )
 
 
+def _serp_items(html: str) -> list[dict]:
+    """Raw serp item dicts from the search page's __NEXT_DATA__."""
+    data = extract.next_data(html)
+    if not data:
+        return []
+    for node in extract.walk(data, {"items"}):
+        cand = node["items"]
+        if isinstance(cand, list) and cand and isinstance(cand[0], dict):
+            if any(k in cand[0] for k in ("post_url", "id", "listing_id", "title")):
+                return [it for it in cand if isinstance(it, dict)]
+    return []
+
+
 def parse_search_listings(html: str) -> list[Listing]:
     """Full Listings straight from the search serp items — no detail fetch."""
-    data = extract.next_data(html)
-    items: list = []
-    if data:
-        for node in extract.walk(data, {"items"}):
-            cand = node["items"]
-            if isinstance(cand, list) and cand and isinstance(cand[0], dict):
-                if any(k in cand[0] for k in ("post_url", "id", "listing_id", "title")):
-                    items = cand
-                    break
     out: list[Listing] = []
-    for it in items:
-        if isinstance(it, dict):
-            lst = _listing_from_serp(it)
-            if lst is not None:
-                out.append(lst)
+    for it in _serp_items(html):
+        lst = _listing_from_serp(it)
+        if lst is not None:
+            out.append(lst)
     return out
+
+
+def _inserted_date(it: dict):
+    """The listing's creation date (day granularity), e.g. '2026-07-16'.
+    `inserted_date` is the original post date; `posted_at` reflects bumps."""
+    raw = str(it.get("inserted_date") or "").strip()[:10]
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Detail-page (App Router) full extraction
+#
+# OpenSooq listing pages moved to the Next.js App Router: no `__NEXT_DATA__`,
+# but the server-streamed RSC payload (self.__next_f.push([...])) embeds the
+# full spec table as {"label","value","fieldName"} objects plus the image
+# gallery. We fetch over plain HTTP and mine those out.
+# ---------------------------------------------------------------------------
+
+# OpenSooq spec fieldName -> our clean attribute key.
+_ATTR_KEYS = {
+    "car_make": "make",
+    "car_model": "model",
+    "car_trim": "trim",
+    "Car_Year": "year",
+    "Kilometers_Cars": "kilometers",
+    "Tramsmission_Cars": "transmission",
+    "Fuel_Cars": "fuel",
+    "Car_Color": "exterior_color",
+    "Interior_Color": "interior_color",
+    "Cars_body_types": "body_type",
+    "Seats_Number": "seats",
+    "Car_Engine_Size": "engine_size",
+    "regional_specs": "regional_specs",
+    "ConditionUsed": "condition",
+    "body_condition": "body_condition",
+    "CarLicense": "license",
+    "CarInsurance": "insurance",
+    "Payment_Method": "payment_method",
+}
+_FIELD_RE = re.compile(
+    r'\{"label":"(?:[^"\\]|\\.)*","value":"((?:[^"\\]|\\.)*)"[^}]*?"fieldName":"([^"]*)"'
+)
+_IMG_RE = re.compile(
+    r"https://opensooq-images\.os-cdn\.com/previews/([0-9]+)x([0-9]+)/"
+    r"[0-9a-f]{2}/[0-9a-f]{2}/([0-9a-f]{16,})(?:\.[a-z]+)*"
+)
+
+
+def _rsc_payload(html: str) -> str:
+    parts: list[str] = []
+    for c in re.findall(r'self\.__next_f\.push\(\[\d+,("(?:[^"\\]|\\.)*")\]\)', html):
+        try:
+            parts.append(json.loads(c))
+        except (ValueError, TypeError):
+            pass
+    return "".join(parts)
+
+
+def _unesc(s: str) -> str:
+    try:
+        return json.loads('"' + s + '"')
+    except ValueError:
+        return s
+
+
+def parse_detail_approuter(html: str) -> dict:
+    """Best-effort full detail from an OpenSooq App-Router listing page:
+    the mapped spec fields + the image gallery + the og description."""
+    payload = _rsc_payload(html)
+    attributes: dict[str, str] = {}
+    for value, fname in _FIELD_RE.findall(payload):
+        key = _ATTR_KEYS.get(fname)
+        if key is None:
+            continue
+        val = _unesc(value)
+        if not val or val.startswith(("Request ", "Show ", "Ask ")):
+            continue
+        attributes.setdefault(key, val)
+    # image gallery: one URL per distinct image (keyed by content hash), at
+    # the largest available size. Skip square crops (w == h) — those are shop
+    # logos / avatars, not car photos.
+    best: dict[str, tuple[int, str]] = {}
+    for m in _IMG_RE.finditer(payload):
+        w, h = int(m.group(1)), int(m.group(2))
+        if w and h and w == h:
+            continue
+        hsh = m.group(3)
+        size = max(w, h)
+        if hsh not in best or size > best[hsh][0]:
+            best[hsh] = (size, m.group(0))
+    images = [u for _, u in best.values()]
+    meta = extract.meta_tags(html)
+    if not images and meta.get("og:image"):
+        images = [meta["og:image"]]
+    return {
+        "attributes": attributes,
+        "images": images,
+        "description": meta.get("og:description") or "",
+    }
+
+
+def _enrich_from_detail(listing: Listing, html: str) -> None:
+    """Fold full detail-page data into a serp-built Listing (detail wins for
+    the structured specs; serp keeps price/location/seller)."""
+    d = parse_detail_approuter(html)
+    if d["images"]:
+        listing.images = d["images"]
+    if d["description"]:
+        listing.description = d["description"]
+    if d["attributes"]:
+        listing.attributes.update(d["attributes"])
 
 
 class OpenSooqAdapter:
@@ -328,21 +447,48 @@ class OpenSooqAdapter:
             raise ValueError(f"{LABEL} adapter only covers Oman (om), got {spec.country!r}")
         # Plain HTTP, not Playwright: OpenSooq serves the full search serp JSON
         # in the initial HTML but blocks headless-browser fingerprints (0
-        # results). The serp is rich enough that no per-listing detail fetch is
-        # needed, so `spec.with_details` is a no-op here.
+        # results). Detail pages (App Router) are also fetched over plain HTTP.
         from ..http import polite_session, get
 
         session = polite_session()
+        today = datetime.now(timezone.utc).date()
         emitted = 0
         page = 1
-        while emitted < spec.max_listings and page <= 20:
+        empty_streak = 0
+        # A generous page cap; results are also bounded by max_listings and,
+        # when a date window is set, by the early-stop below.
+        while emitted < spec.max_listings and page <= 40:
             resp = get(session, _search_url(spec, page), site=KEY)
-            listings = parse_search_listings(resp.text or "")
-            if not listings:
+            items = _serp_items(resp.text or "")
+            if not items:
                 break
-            for listing in listings:
+            in_window = 0
+            for it in items:
                 if emitted >= spec.max_listings:
                     break
+                if spec.posted_within_days > 0:
+                    d = _inserted_date(it)
+                    # Skip listings created outside the window. Items with an
+                    # unparseable date fall through (kept) rather than dropped.
+                    if d is not None and (today - d).days >= spec.posted_within_days:
+                        continue
+                listing = _listing_from_serp(it)
+                if listing is None:
+                    continue
+                in_window += 1
+                if spec.with_details:
+                    try:
+                        dhtml = get(session, listing.url, site=KEY).text or ""
+                        _enrich_from_detail(listing, dhtml)
+                    except Exception:  # detail is best-effort; keep serp data
+                        pass
                 emitted += 1
                 yield listing
+            # The serp is sorted by recent activity, so once a couple of pages
+            # yield nothing inside the date window we've paged past the fresh
+            # listings — stop early instead of walking all 40 pages.
+            if spec.posted_within_days > 0:
+                empty_streak = empty_streak + 1 if in_window == 0 else 0
+                if empty_streak >= 2:
+                    break
             page += 1

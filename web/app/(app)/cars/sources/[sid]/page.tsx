@@ -34,6 +34,7 @@ export default async function EditCarSourcePage({ params }: PageProps) {
     query: String(data.query ?? ""),
     max_listings: Number(data.max_listings ?? 50),
     with_details: data.with_details !== false,
+    posted_within_days: Number(data.posted_within_days ?? 1),
     schedule_cron: String(data.schedule_cron ?? "30 4 * * *"),
     active: data.active !== false,
     notes: String(data.notes ?? ""),

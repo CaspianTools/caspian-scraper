@@ -19,6 +19,7 @@ export interface CarSourceFormInitial {
   query: string;
   max_listings: number;
   with_details: boolean;
+  posted_within_days: number;
   schedule_cron: string;
   active: boolean;
   notes: string;
@@ -34,6 +35,7 @@ export function emptyCarSourceInitial(): CarSourceFormInitial {
     query: "",
     max_listings: 50,
     with_details: true,
+    posted_within_days: 1,
     schedule_cron: "30 4 * * *",
     active: true,
     notes: "",

@@ -446,6 +446,9 @@ export const CarSourceCreateSchema = z.object({
   query: z.string().max(200).default(""),
   max_listings: z.number().int().min(1).max(200).default(50),
   with_details: z.boolean().default(true),
+  // Only keep listings first posted within the last N days (by creation
+  // date). 1 = today's new listings only; 0 = no date filter.
+  posted_within_days: z.number().int().min(0).max(30).default(1),
   schedule_cron: CronExpressionSchema,
   active: z.boolean().default(true),
   notes: z.string().max(2000).default(""),

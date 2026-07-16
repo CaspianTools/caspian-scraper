@@ -45,6 +45,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
         ...form,
         country: form.country.trim().toLowerCase(),
         max_listings: Number(form.max_listings) || 50,
+        posted_within_days: Number(form.posted_within_days),
       });
       const url = isEdit
         ? `/api/cars/sources/${sourceId}`
@@ -226,14 +227,29 @@ export function CarSourceForm({ initial, sourceId }: Props) {
               className="w-4 h-4"
             />
             <label htmlFor="with_details" className="text-sm">
-              Fetch detail pages{" "}
+              Fetch full details{" "}
               <span className="text-zinc-500">
-                — description, images, seller
+                — specs, photo gallery, description
               </span>
             </label>
           </div>
         </div>
       </div>
+
+      <Row
+        label="New listings only (days)"
+        error={errFor("posted_within_days")}
+        hint="Keep only cars first posted within this many days. 1 = today's new listings only; 0 = every listing (no date filter)."
+      >
+        <input
+          type="number"
+          min={0}
+          max={30}
+          value={form.posted_within_days}
+          onChange={(e) => set("posted_within_days", Number(e.target.value))}
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm tabular-nums"
+        />
+      </Row>
 
       <Row
         label="Schedule (cron)"

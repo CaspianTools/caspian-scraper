@@ -2864,6 +2864,9 @@ def run_car_source(
         from classifieds import sites as _sites
         from classifieds.sites.base import SearchSpec as _SearchSpec
 
+        # Default the date window to 1 (today's new listings) when the field
+        # is absent (older source docs), else honour it (0 = no filter).
+        _pwd = source.get("posted_within_days")
         spec = _SearchSpec(
             category=str(source.get("category") or "cars"),
             country=str(source.get("country") or "om").lower(),
@@ -2871,6 +2874,7 @@ def run_car_source(
             query=str(source.get("query") or ""),
             max_listings=int(source.get("max_listings") or 50),
             with_details=bool(source.get("with_details", True)),
+            posted_within_days=(int(_pwd) if _pwd is not None else 1),
         )
         adapter = _sites.build(site_key)
         started_iso = utc_now_iso()
