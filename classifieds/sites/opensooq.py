@@ -1,23 +1,25 @@
 """OpenSooq Oman adapter (om.opensooq.com).
 
-OpenSooq is a Next.js SSR app: both the search page and each listing page
-embed a `__NEXT_DATA__` JSON blob that IS the API payload. We render the
-page with Playwright (robust to any client hydration) and read:
+OpenSooq's search page is a Next.js SSR page whose `__NEXT_DATA__` blob embeds
+the full search API payload — `props.pageProps.serpApiResponse.listings.items[]`
+— and each serp item already carries price, mileage, location, image, seller
+and (masked) phone. We fetch that page over **plain HTTP** (not Playwright):
+OpenSooq blocks headless-browser fingerprints (returns 0 results to them) while
+serving the real serp JSON to an ordinary GET, and the serp is rich enough that
+no per-listing detail fetch is needed. (Detail pages have since moved to the
+App Router and no longer embed `__NEXT_DATA__`, so `parse_detail_html` is kept
+only for the fallback/OG path and older captures.)
 
-  search : props.pageProps.serpApiResponse.listings.items[]
-  detail : props.pageProps.postData.{listing, seller}
+Phone: the serp exposes `phone_number` (masked) plus a `phone_reveal_key`.
+There is no unauthenticated reveal, so we surface the masked value and the key.
 
-Phone: the web JSON only exposes `masked_local_phone` (last digits hidden)
-plus a `listing_reveal_phone_key`. There is no unauthenticated reveal, so
-we surface the masked value and the key; a caller with an app session can
-complete the reveal. Everything else comes straight from the JSON.
-
-Parsing is split into pure functions (parse_search_html / parse_detail_html)
-so they can be unit-tested against saved fixtures without a network.
+Parsing is split into pure functions (parse_search_listings / parse_search_html
+/ parse_detail_html) so they can be unit-tested against fixtures with no network.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Iterator
 from urllib.parse import urljoin
 
@@ -224,6 +226,96 @@ def _num(s: str) -> float | None:
         return None
 
 
+def _title_attrs(title: str) -> dict[str, str]:
+    """Best-effort year/make/model split from an OpenSooq title like
+    '2021 Mazda 6 Luxe' -> {year: 2021, make: Mazda, model: 6 Luxe}."""
+    attrs: dict[str, str] = {}
+    toks = str(title).split()
+    if toks and re.fullmatch(r"(19|20)\d{2}", toks[0]):
+        attrs["year"] = toks[0]
+        toks = toks[1:]
+    if toks:
+        attrs["make"] = toks[0]
+        if len(toks) > 1:
+            attrs["model"] = " ".join(toks[1:])
+    return attrs
+
+
+def _listing_from_serp(it: dict) -> Listing | None:
+    """Build a full Listing from one search-result (serp) item. The OpenSooq
+    search payload already carries price, mileage, location, image, seller and
+    (masked) phone — so no detail-page fetch is needed."""
+    post_url = str(it.get("post_url") or it.get("share_deep_link") or "")
+    if not post_url:
+        return None
+    if not post_url.startswith("http"):
+        # serp post_url may be locale-less ("/search/<id>") or already carry a
+        # locale prefix ("/en/..."); normalize both without doubling "/en/".
+        post_url = (
+            urljoin(BASE + "/", post_url.lstrip("/"))
+            if post_url.startswith("/en/")
+            else urljoin(BASE + "/en/", post_url.lstrip("/"))
+        )
+    title = it.get("title") or it.get("secondary_title") or ""
+    amount = it.get("price_amount")
+    currency = it.get("price_currency_iso") or "OMR"
+    # price_amount is already display-formatted (e.g. "5,400 OMR"); use it as-is
+    # and parse the numeric value out of it.
+    price_raw = str(amount) if amount not in (None, "") else ""
+    price_value = extract.parse_omr_price(price_raw) or _num(price_raw)
+    attrs = _title_attrs(title)
+    km = it.get("kilometers_Cars_value_i")
+    if km not in (None, ""):
+        attrs["kilometers"] = str(km)
+    images = _media_to_urls([it.get("image_uri")]) if it.get("image_uri") else []
+    return Listing(
+        site=KEY,
+        listing_id=str(it.get("id") or it.get("listing_id") or ""),
+        url=post_url,
+        title=title,
+        description=it.get("masked_description") or "",
+        price_raw=price_raw,
+        price_value=price_value,
+        currency=currency,
+        images=images,
+        location=", ".join(
+            x for x in [it.get("city_label"), it.get("nhood_label")] if x
+        ),
+        posted_at=str(it.get("posted_at") or it.get("inserted_date") or ""),
+        attributes=attrs,
+        seller=Seller(
+            name=it.get("member_display_name") or it.get("member_user_name") or "",
+            profile_url="",
+            phone=str(it.get("phone_number") or ""),
+            member_since="",
+        ),
+        extras={
+            "reveal_phone_key": it.get("phone_reveal_key") or "",
+            "phone_masked": bool(it.get("phone_number")),
+        },
+    )
+
+
+def parse_search_listings(html: str) -> list[Listing]:
+    """Full Listings straight from the search serp items — no detail fetch."""
+    data = extract.next_data(html)
+    items: list = []
+    if data:
+        for node in extract.walk(data, {"items"}):
+            cand = node["items"]
+            if isinstance(cand, list) and cand and isinstance(cand[0], dict):
+                if any(k in cand[0] for k in ("post_url", "id", "listing_id", "title")):
+                    items = cand
+                    break
+    out: list[Listing] = []
+    for it in items:
+        if isinstance(it, dict):
+            lst = _listing_from_serp(it)
+            if lst is not None:
+                out.append(lst)
+    return out
+
+
 class OpenSooqAdapter:
     key = KEY
     label = LABEL
@@ -234,33 +326,23 @@ class OpenSooqAdapter:
     def search(self, spec: SearchSpec) -> Iterator[Listing]:
         if spec.country not in _SUPPORTED_COUNTRIES:
             raise ValueError(f"{LABEL} adapter only covers Oman (om), got {spec.country!r}")
-        from ..browser import browser_context, fetch_html
+        # Plain HTTP, not Playwright: OpenSooq serves the full search serp JSON
+        # in the initial HTML but blocks headless-browser fingerprints (0
+        # results). The serp is rich enough that no per-listing detail fetch is
+        # needed, so `spec.with_details` is a no-op here.
+        from ..http import polite_session, get
 
+        session = polite_session()
         emitted = 0
-        with browser_context() as ctx:
-            page = 1
-            while emitted < spec.max_listings and page <= 20:
-                html = fetch_html(ctx, _search_url(spec, page),
-                                  wait_selector="script#__NEXT_DATA__")
-                stubs = parse_search_html(html)
-                if not stubs:
+        page = 1
+        while emitted < spec.max_listings and page <= 20:
+            resp = get(session, _search_url(spec, page), site=KEY)
+            listings = parse_search_listings(resp.text or "")
+            if not listings:
+                break
+            for listing in listings:
+                if emitted >= spec.max_listings:
                     break
-                for stub in stubs:
-                    if emitted >= spec.max_listings:
-                        break
-                    if spec.with_details:
-                        dhtml = fetch_html(ctx, stub["url"],
-                                           wait_selector="script#__NEXT_DATA__")
-                        listing = parse_detail_html(dhtml, stub["url"])
-                        if listing is None:
-                            continue
-                    else:
-                        listing = Listing(
-                            site=KEY, listing_id=stub["listing_id"], url=stub["url"],
-                            title=stub["title"], price_raw=stub["price_raw"],
-                            price_value=_num(stub["price_raw"]), currency="OMR",
-                            images=stub["images"],
-                        )
-                    emitted += 1
-                    yield listing
-                page += 1
+                emitted += 1
+                yield listing
+            page += 1

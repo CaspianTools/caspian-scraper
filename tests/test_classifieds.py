@@ -43,6 +43,32 @@ def test_opensooq_search_parses_stubs():
     assert first["images"] and first["images"][0].endswith(".jpg.webp")
 
 
+def test_opensooq_search_listings_full_fields():
+    # The live adapter builds full Listings straight from the search serp
+    # items (plain HTTP, no detail fetch). This fixture mirrors the real
+    # serp field names.
+    lst = opensooq.parse_search_listings(_read("opensooq_serp.html"))
+    assert len(lst) == 2
+    a = lst[0]
+    assert a.title == "2021 Mazda 6 Luxe"
+    assert a.price_value == 5400
+    assert a.currency == "OMR"
+    assert a.attributes["year"] == "2021"
+    assert a.attributes["make"] == "Mazda"
+    assert a.attributes["model"] == "6 Luxe"
+    assert a.attributes["kilometers"] == "71000"
+    assert a.location == "Muscat, Bosher"
+    assert a.seller.name == "TAJ MOTORS"
+    assert a.seller.phone == "713003XX"  # masked by OpenSooq, key preserved
+    assert a.extras["reveal_phone_key"] == "reveal-xyz"
+    assert a.url == "https://om.opensooq.com/en/search/282165972"
+    assert a.images and a.images[0].endswith(".jpg.webp")
+    assert a.uid == "opensooq:282165972"
+    # second item: no seller phone -> empty, still parses
+    assert lst[1].attributes["make"] == "Chevrolet"
+    assert lst[1].price_value == 6900
+
+
 def test_opensooq_detail_full_fields():
     l = opensooq.parse_detail_html(_read("opensooq_detail.html"),
                                    "https://om.opensooq.com/en/cars/cars-for-sale/x-265930847")
