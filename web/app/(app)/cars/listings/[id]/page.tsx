@@ -186,14 +186,22 @@ export default async function CarListingDetailPage({ params }: PageProps) {
             </div>
             <div>
               <div className="text-xs text-zinc-500">Phone</div>
-              <div className="font-medium font-mono">
-                {sellerPhone || "—"}
-                {sellerPhone && phoneMasked && (
-                  <span className="ml-1 text-xs font-sans text-zinc-500">
-                    (masked — reveal on the ad)
-                  </span>
-                )}
-              </div>
+              <div className="font-medium font-mono">{sellerPhone || "—"}</div>
+              {sellerPhone && phoneMasked && (
+                <div className="mt-1 text-xs font-sans text-zinc-500">
+                  OpenSooq masks the last digits.{" "}
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Reveal the full number on the ad ↗
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
             {sellerSince && (
               <div>
