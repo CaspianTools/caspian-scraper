@@ -144,31 +144,30 @@ export default async function CarListingsPage() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3">
-                    {r.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={carThumb(r.image)}
-                        alt=""
-                        loading="lazy"
-                        className="w-16 h-12 object-cover rounded-md bg-zinc-100 dark:bg-zinc-800"
-                      />
-                    ) : (
-                      <div className="w-16 h-12 rounded-md bg-zinc-100 dark:bg-zinc-800" />
-                    )}
+                    <Link
+                      href={`/cars/listings/${encodeURIComponent(r.id)}`}
+                      className="block"
+                    >
+                      {r.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={carThumb(r.image)}
+                          alt=""
+                          loading="lazy"
+                          className="w-16 h-12 object-cover rounded-md bg-zinc-100 dark:bg-zinc-800"
+                        />
+                      ) : (
+                        <div className="w-16 h-12 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                      )}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 max-w-xs">
-                    {r.url ? (
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium hover:underline line-clamp-1"
-                      >
-                        {r.title}
-                      </a>
-                    ) : (
-                      <span className="font-medium line-clamp-1">{r.title}</span>
-                    )}
+                    <Link
+                      href={`/cars/listings/${encodeURIComponent(r.id)}`}
+                      className="font-medium hover:underline line-clamp-1"
+                    >
+                      {r.title}
+                    </Link>
                     <div className="text-xs text-zinc-500">{r.site}</div>
                   </td>
                   <td className="px-4 py-3">{r.car || "—"}</td>
