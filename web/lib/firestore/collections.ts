@@ -174,6 +174,21 @@ export function configJobDoc(jobId: string) {
   return configJobsCol().doc(jobId);
 }
 
+// ---------------------------------------------------------------------------
+// Per-user AI (Anthropic) key. Write-only via the admin API route; the value
+// is never returned to clients and is read only by the aiconfig Actions job
+// (service account). One doc per user, keyed by uid. See schema.ts + the note
+// in firestore.rules.
+// ---------------------------------------------------------------------------
+
+export function aiconfigKeysCol(): CollectionReference {
+  return db().collection("aiconfig_keys");
+}
+
+export function aiconfigKeyDoc(uid: string) {
+  return aiconfigKeysCol().doc(uid);
+}
+
 // ---- slug generator -------------------------------------------------------
 
 /**

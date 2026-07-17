@@ -24,8 +24,21 @@ export async function POST(
   const { sid } = await ctx.params;
 
   const srcSnap = await genericSourcesCol().doc(sid).get();
-  if (!srcSnap.exists || srcSnap.data()?.owner_uid !== session.uid) {
+  const src = srcSnap.data();
+  if (!srcSnap.exists || src?.owner_uid !== session.uid) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  // Adapter-strategy sources can't run until their generated Python module is
+  // merged to main — queuing a run would just produce a guaranteed-error run.
+  if (src?.strategy?.mode === "adapter") {
+    return NextResponse.json(
+      {
+        error:
+          "this source uses a generated adapter that must be merged to main before it can run",
+      },
+      { status: 409 }
+    );
   }
 
   const ref = await runRequestsCol().add({

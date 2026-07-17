@@ -240,11 +240,40 @@ def _run_job_mode(job_id: str) -> int:
         print(f"config_jobs/{job_id} not found", file=sys.stderr)
         return 1
     job = snap.to_dict() or {}
+    owner_uid = str(job.get("owner_uid") or "")
     intent = str(job.get("intent") or "")
     url = str(job.get("url") or "")
     sample_urls = job.get("sample_urls") or []
     hint = str(job.get("record_schema_hint") or "")
     detail_url = str(sample_urls[0]) if isinstance(sample_urls, list) and sample_urls else ""
+
+    # Resolve the AI key: the job OWNER's key (saved via the web UI) takes
+    # precedence so their job runs on their own key, not the shared org key. The
+    # Actions workflow always injects an org key into the env, so we must
+    # actively override it here when the owner has their own; the ambient org key
+    # is only a fallback for owners who haven't configured one. Fail the job
+    # clearly if neither exists.
+    if owner_uid:
+        try:
+            key_snap = db.collection("aiconfig_keys").document(owner_uid).get()
+            stored = (key_snap.to_dict() or {}).get("value") if key_snap.exists else None
+            if isinstance(stored, str) and stored.strip():
+                import os as _os
+
+                _os.environ["ANTHROPIC_API_KEY"] = stored.strip()
+                # ai_key() checks CLASSIFIEDS_AI_KEY first; drop any ambient one
+                # so it can't shadow the owner's key.
+                _os.environ.pop("CLASSIFIEDS_AI_KEY", None)
+        except Exception as e:  # noqa: BLE001
+            print(f"failed to read owner key: {e}", file=sys.stderr)
+    if not ai_enabled():
+        ref.update({
+            "status": "failed",
+            "error": "no Anthropic API key configured — add one in AI Setup → API key",
+            "finished_at": SERVER_TIMESTAMP,
+            "updated_at": SERVER_TIMESTAMP,
+        })
+        return 2
 
     def set_status(status: str) -> None:
         ref.update({"status": status, "updated_at": SERVER_TIMESTAMP})

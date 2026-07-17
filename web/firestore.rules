@@ -121,6 +121,16 @@ service cloud.firestore {
     // read exclusively through the Admin SDK (API routes + the scraper),
     // which bypasses these rules. Clients get the default deny.
 
+    // ---- /aiconfig_keys/{uid} ----
+    // Per-user Anthropic API key for the AI config agent. NO client rules
+    // (default deny): the value is write-only via the admin-SDK route
+    // /api/aiconfig/key (owner-guarded) and read only by the aiconfig Actions
+    // job (service account). Clients can never read or write it directly, so a
+    // stored key can't leak back to the browser.
+    match /aiconfig_keys/{uid} {
+      allow read, write: if false;
+    }
+
     // ---- helpers ----
     function isSignedIn() {
       return request.auth != null;
