@@ -13,8 +13,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-
-from . import llm
+from typing import Any
 
 _REPO = Path(__file__).resolve().parents[1]
 
@@ -121,26 +120,29 @@ def generate_adapter(
     record_schema: list[dict],
     search_html: str,
     detail_html: str,
-    model: str | None = None,
+    provider: Any = None,
 ) -> dict:
     """Return {adapter_key, adapter_py, test_py, search_fixture, detail_fixture}.
-    Raises llm.LLMError on API failure or ValueError on an unparseable/invalid
-    response. Does NOT write or execute anything."""
+    Uses the given `provider` (any aiconfig.providers adapter; defaults to one
+    built from the environment). Raises ProviderError on API failure or
+    ValueError on an unparseable/invalid response. Does NOT write or execute."""
     if not _valid_key(key):
         raise ValueError(f"invalid adapter key {key!r} (need ^[a-z][a-z0-9_]+[a-z0-9]$)")
-    model = model or llm.REASONER_MODEL
+    if provider is None:
+        from .providers import default_provider_from_env
+
+        provider = default_provider_from_env()
     prompt = _prompt(
         intent=intent, url=url, key=key, record_schema=record_schema,
         search_html=search_html, detail_html=detail_html,
     )
-    resp = llm.messages_create(
-        model=model,
+    resp = provider.complete(
         system="You are a careful Python engineer. Output only the requested JSON.",
         tools=[],
-        messages=[{"role": "user", "content": prompt}],
+        history=[{"role": "user", "text": prompt}],
         max_tokens=8000,
     )
-    text = llm.text_blocks(resp)
+    text = resp.text
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError("model did not return a JSON object")

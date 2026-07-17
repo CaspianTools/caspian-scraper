@@ -24,24 +24,51 @@ function millis(v: unknown): number {
 }
 
 function fmtWhen(ms: number): string {
-  if (!ms) return "";
-  return new Date(ms).toLocaleString();
+  return ms ? new Date(ms).toLocaleString() : "";
 }
+
+const PROVIDERS: { id: string; label: string }[] = [
+  { id: "anthropic", label: "Anthropic (Claude)" },
+  { id: "openai", label: "OpenAI (GPT)" },
+  { id: "gemini", label: "Google (Gemini)" },
+  { id: "openai_compatible", label: "OpenAI-compatible (custom endpoint)" },
+];
+
+// Suggested models per provider — free text is allowed too (datalist).
+const MODELS: Record<string, string[]> = {
+  anthropic: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
+  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini", "o3"],
+  gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+  openai_compatible: [],
+};
+
+const KEY_HINTS: Record<string, string> = {
+  anthropic: "Anthropic key (starts with sk-ant-) — console.anthropic.com",
+  openai: "OpenAI key (starts with sk-) — platform.openai.com",
+  gemini: "Google AI Studio key (starts with AIza) — aistudio.google.com",
+  openai_compatible: "API key for your endpoint (OpenRouter, Groq, DeepSeek, local vLLM/Ollama, …)",
+};
 
 interface KeyState {
   configured: boolean;
+  provider?: string;
+  model?: string;
+  base_url?: string;
   hint?: string;
   updated_at?: unknown;
 }
 
 /**
- * Anthropic API key card. The key is stored write-only: GET only ever reports
- * whether one is set plus a masked hint, never the raw value. Reads/writes go
- * through /api/aiconfig/key (admin-SDK route; owner == session.uid enforced).
+ * AI provider + key card. Pick a provider (Anthropic / OpenAI / Gemini / any
+ * OpenAI-compatible endpoint) and a model. The key is stored write-only: GET
+ * reports only whether one is set + a masked hint, never the raw value.
  */
 export function KeySettings() {
   const [state, setState] = useState<KeyState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [provider, setProvider] = useState("anthropic");
+  const [model, setModel] = useState(MODELS.anthropic[0]);
+  const [baseUrl, setBaseUrl] = useState("");
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -57,11 +84,13 @@ export function KeySettings() {
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);
         return;
       }
-      setState({
-        configured: !!b.configured,
-        hint: b.hint,
-        updated_at: b.updated_at,
-      });
+      setState(b as KeyState);
+      if (b.configured) {
+        setProvider(b.provider || "anthropic");
+        // Reflect exactly what's saved (don't substitute a default for "").
+        setModel(b.model || "");
+        setBaseUrl(b.base_url || "");
+      }
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
     } finally {
@@ -72,7 +101,6 @@ export function KeySettings() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
         const res = await authedFetch("/api/aiconfig/key");
         const b = await res.json().catch(() => ({}));
@@ -81,14 +109,14 @@ export function KeySettings() {
           setErrors([{ message: b.error || `Request failed (${res.status})` }]);
           return;
         }
-        setState({
-          configured: !!b.configured,
-          hint: b.hint,
-          updated_at: b.updated_at,
-        });
+        setState(b as KeyState);
+        if (b.configured) {
+          setProvider(b.provider || "anthropic");
+          setModel(b.model || MODELS[b.provider as string]?.[0] || "");
+          setBaseUrl(b.base_url || "");
+        }
       } catch (e) {
-        if (!cancelled)
-          setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
+        if (!cancelled) setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -98,6 +126,13 @@ export function KeySettings() {
     };
   }, []);
 
+  function onProviderChange(next: string) {
+    setProvider(next);
+    // Snap the model to the new provider's first suggestion.
+    setModel(MODELS[next]?.[0] ?? "");
+    if (next !== "openai_compatible") setBaseUrl("");
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setErrors([]);
@@ -106,7 +141,7 @@ export function KeySettings() {
     try {
       const res = await authedFetch("/api/aiconfig/key", {
         method: "PUT",
-        body: JSON.stringify({ value }),
+        body: JSON.stringify({ provider, model, base_url: baseUrl, value }),
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -123,7 +158,7 @@ export function KeySettings() {
         return;
       }
       setValue("");
-      setSavedMsg("Key saved. It's stored write-only and won't be shown again.");
+      setSavedMsg("Saved. The key is stored write-only and won't be shown again.");
       await load();
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
@@ -133,7 +168,7 @@ export function KeySettings() {
   }
 
   async function handleRemove() {
-    if (!confirm("Remove the stored Anthropic API key? The AI setup agent will stop working until you set a new one.")) {
+    if (!confirm("Remove the stored key? The AI setup agent will stop working until you set a new one.")) {
       return;
     }
     setErrors([]);
@@ -155,22 +190,27 @@ export function KeySettings() {
     }
   }
 
-  const errFor = (field: string) =>
-    errors.find((e) => e.field === field)?.message;
-  const generalErrors = errors.filter((e) => !e.field);
+  const errFor = (field: string) => errors.find((e) => e.field === field)?.message;
+  // General bucket = field-less errors PLUS any field error we don't render next
+  // to a specific input, so nothing is silently swallowed.
+  const RENDERED_FIELDS = ["base_url", "value", "model"];
+  const generalErrors = errors.filter(
+    (e) => !e.field || !RENDERED_FIELDS.includes(e.field)
+  );
   const updatedMs = state?.updated_at ? millis(state.updated_at) : 0;
+  const providerLabel =
+    PROVIDERS.find((p) => p.id === state?.provider)?.label || state?.provider;
+  const inputBase =
+    "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm";
 
   return (
     <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5">
       <div>
-        <h3 className="text-sm font-semibold tracking-tight">
-          Anthropic API key
-        </h3>
+        <h3 className="text-sm font-semibold tracking-tight">AI provider &amp; key</h3>
         <p className="text-xs text-zinc-500 mt-1 max-w-xl">
-          Used only by the AI setup agent (the GitHub Actions job) to inspect
-          sites and propose scraper configs. It&apos;s stored{" "}
-          <strong>write-only</strong> — encrypted at rest and never returned to
-          the browser, so it can&apos;t be shown again after you save it.
+          Choose the model provider the AI setup agent uses. The key is stored{" "}
+          <strong>write-only</strong> — encrypted at rest and never returned to the
+          browser, so it can&apos;t be shown again after you save it.
         </p>
       </div>
 
@@ -188,15 +228,17 @@ export function KeySettings() {
           >
             {state?.configured ? "Configured" : "No key set"}
           </span>
+          {state?.configured && (
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">
+              {providerLabel}
+              {state.model ? ` · ${state.model}` : ""}
+            </span>
+          )}
           {state?.configured && state.hint && (
-            <code className="text-xs text-zinc-600 dark:text-zinc-400">
-              {state.hint}
-            </code>
+            <code className="text-xs text-zinc-500">{state.hint}</code>
           )}
           {state?.configured && updatedMs > 0 && (
-            <span className="text-xs text-zinc-500">
-              updated {fmtWhen(updatedMs)}
-            </span>
+            <span className="text-xs text-zinc-500">updated {fmtWhen(updatedMs)}</span>
           )}
           {state?.configured && (
             <button
@@ -211,23 +253,81 @@ export function KeySettings() {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-3">
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="ai-provider">
+              Provider
+            </label>
+            <select
+              id="ai-provider"
+              value={provider}
+              onChange={(e) => onProviderChange(e.target.value)}
+              className={inputBase}
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="ai-model">
+              Model
+            </label>
+            <input
+              id="ai-model"
+              list="ai-model-options"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="model id"
+              className={`${inputBase} font-mono`}
+            />
+            <datalist id="ai-model-options">
+              {(MODELS[provider] ?? []).map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            {errFor("model") && (
+              <p className="mt-1 text-xs text-red-600">{errFor("model")}</p>
+            )}
+          </div>
+        </div>
+
+        {provider === "openai_compatible" && (
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="ai-base-url">
+              Base URL
+            </label>
+            <input
+              id="ai-base-url"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://openrouter.ai/api/v1"
+              className={`${inputBase} font-mono`}
+            />
+            {errFor("base_url") && (
+              <p className="mt-1 text-xs text-red-600">{errFor("base_url")}</p>
+            )}
+          </div>
+        )}
+
         <div>
-          <label className="block text-sm font-medium mb-1" htmlFor="aiconfig-key">
-            {state?.configured ? "Replace key" : "API key"}
+          <label className="block text-sm font-medium mb-1" htmlFor="ai-key">
+            {state?.configured ? "Replace API key" : "API key"}
           </label>
           <p className="text-xs text-zinc-500 mb-2">
-            Starts with <code className="text-xs">sk-</code>. Paste it once; it
-            won&apos;t be displayed again.
+            {KEY_HINTS[provider]} — paste once; it won&apos;t be displayed again.
           </p>
           <input
-            id="aiconfig-key"
+            id="ai-key"
             type="password"
             autoComplete="off"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="sk-ant-…"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            placeholder="paste your API key"
+            className={`${inputBase} font-mono`}
           />
           {errFor("value") && (
             <p className="mt-1 text-xs text-red-600">{errFor("value")}</p>
@@ -239,11 +339,8 @@ export function KeySettings() {
             {e.message}
           </p>
         ))}
-
         {savedMsg && (
-          <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            {savedMsg}
-          </p>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">{savedMsg}</p>
         )}
 
         <div className="flex justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800">
@@ -252,7 +349,7 @@ export function KeySettings() {
             disabled={busy || !value.trim()}
             className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
-            {busy ? "Saving…" : state?.configured ? "Replace key" : "Save key"}
+            {busy ? "Saving…" : state?.configured ? "Update" : "Save key"}
           </button>
         </div>
       </form>

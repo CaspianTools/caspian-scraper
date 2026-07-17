@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSessionFromBearer } from "@/lib/auth/session";
-import { SecretWriteSchema } from "@/lib/firestore/schema";
+import { AiKeyWriteSchema } from "@/lib/firestore/schema";
 import { aiconfigKeyDoc } from "@/lib/firestore/collections";
 
 /**
@@ -15,9 +15,11 @@ import { aiconfigKeyDoc } from "@/lib/firestore/collections";
  */
 
 function maskKey(value: string): string {
+  // Reveal at most the last 4 chars, and only for a comfortably long key, so a
+  // short secret is never mostly exposed by the hint.
   const v = String(value || "");
-  if (v.length <= 8) return "••••";
-  return `${v.slice(0, 4)}…${v.slice(-4)}`;
+  if (v.length <= 12) return "••••";
+  return `••••${v.slice(-4)}`;
 }
 
 /** GET — is a key configured? Returns a masked hint, never the value. */
@@ -33,6 +35,9 @@ export async function GET(req: NextRequest) {
   const data = snap.data()!;
   return NextResponse.json({
     configured: true,
+    provider: data.provider ?? "anthropic",
+    model: data.model ?? "",
+    base_url: data.base_url ?? "",
     hint: maskKey(String(data.value)),
     updated_at: data.updated_at ?? null,
   });
@@ -50,19 +55,17 @@ export async function PUT(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-  const parsed = SecretWriteSchema.safeParse(body);
+  const parsed = AiKeyWriteSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid key", details: parsed.error.issues },
       { status: 400 }
     );
   }
-  // Light sanity check so obvious mistakes fail fast (Anthropic keys are long
-  // and start with "sk-"); not authoritative — the agent is the real check.
   const value = parsed.data.value.trim();
-  if (!value.startsWith("sk-") || value.length < 20) {
+  if (value.length < 8) {
     return NextResponse.json(
-      { error: "that does not look like an Anthropic API key (expected 'sk-...')" },
+      { error: "that key looks too short", details: [{ path: ["value"], message: "too short" }] },
       { status: 400 }
     );
   }
@@ -72,13 +75,22 @@ export async function PUT(req: NextRequest) {
   const now = FieldValue.serverTimestamp();
   await ref.set(
     {
+      provider: parsed.data.provider,
+      model: parsed.data.model.trim(),
+      base_url: parsed.data.base_url.trim(),
       value,
       created_at: existing.exists ? existing.data()?.created_at : now,
       updated_at: now,
     },
     { merge: false }
   );
-  return NextResponse.json({ configured: true, hint: maskKey(value) });
+  return NextResponse.json({
+    configured: true,
+    provider: parsed.data.provider,
+    model: parsed.data.model.trim(),
+    base_url: parsed.data.base_url.trim(),
+    hint: maskKey(value),
+  });
 }
 
 /** DELETE — remove the caller's key. */

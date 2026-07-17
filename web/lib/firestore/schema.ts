@@ -681,6 +681,34 @@ export const ConfigJobDocSchema = ConfigJobCreateSchema.extend({
 export type ConfigJobDoc = z.infer<typeof ConfigJobDocSchema>;
 
 // ---------------------------------------------------------------------------
+// Per-user AI provider + key (/aiconfig_keys/{uid}) — write-only, admin-SDK
+// only. Mirrored in aiconfig/providers (Python). The agent supports Anthropic,
+// OpenAI, Google Gemini, or any OpenAI-compatible endpoint (base_url).
+// ---------------------------------------------------------------------------
+
+export const AiProvider = z.enum([
+  "anthropic",
+  "openai",
+  "gemini",
+  "openai_compatible",
+]);
+export type AiProvider = z.infer<typeof AiProvider>;
+
+export const AiKeyWriteSchema = z
+  .object({
+    provider: AiProvider.default("anthropic"),
+    model: z.string().max(120).default(""),
+    // Only used for openai_compatible (OpenRouter/Groq/DeepSeek/local/…).
+    base_url: z.string().max(300).default(""),
+    value: z.string().min(1).max(4096),
+  })
+  .refine(
+    (d) => d.provider !== "openai_compatible" || d.base_url.trim().length > 0,
+    { message: "an OpenAI-compatible provider needs a base URL", path: ["base_url"] }
+  );
+export type AiKeyWrite = z.infer<typeof AiKeyWriteSchema>;
+
+// ---------------------------------------------------------------------------
 // Cars (car-classifieds surface, top-level, per-user)
 //
 // Reuses the standalone `classifieds/` scraper as the extraction engine

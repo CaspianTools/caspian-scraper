@@ -10,16 +10,31 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import Any
-
-from classifieds.ai import ai_enabled
 
 from . import persist
 from .agent import run_agent
 from .inspector import inspect_url
+from .providers import build_provider, default_provider_from_env, key_env_for
+from .providers.base import ProviderError
 
 REPO_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[1])
+
+
+def _provider_from_args(args: argparse.Namespace):
+    """Build an LLM provider from CLI flags, falling back to env vars. Raises
+    ProviderError (missing key / bad provider) with an actionable message."""
+    provider = (
+        getattr(args, "provider", "")
+        or os.environ.get("AICONFIG_PROVIDER")
+        or "anthropic"
+    )
+    model = getattr(args, "model", "") or os.environ.get("AICONFIG_MODEL", "")
+    base_url = getattr(args, "base_url", "") or os.environ.get("AICONFIG_BASE_URL", "")
+    api_key = getattr(args, "api_key", "") or key_env_for(provider)
+    return build_provider(provider, api_key=api_key, model=model, base_url=base_url)
 
 
 # --------------------------------------------------------------------------
@@ -50,9 +65,14 @@ def _print_result(result: Any, *, listing_url: str) -> None:
 
 
 def _cmd_new(args: argparse.Namespace) -> int:
-    if not ai_enabled():
-        print("No Anthropic API key. Set CLASSIFIEDS_AI_KEY or ANTHROPIC_API_KEY.",
-              file=sys.stderr)
+    try:
+        provider = _provider_from_args(args)
+    except ProviderError as e:
+        print(
+            f"{e}. Set the provider's key (OPENAI_API_KEY / GEMINI_API_KEY / "
+            "ANTHROPIC_API_KEY) or pass --api-key.",
+            file=sys.stderr,
+        )
         return 2
 
     print(f"Inspecting {args.url} ...", file=sys.stderr)
@@ -70,7 +90,7 @@ def _cmd_new(args: argparse.Namespace) -> int:
         detail_url=args.detail_url or "",
         record_schema_hint=args.schema or "",
         evidence=listing_ev,
-        model=args.model or None,
+        provider=provider,
     )
 
     _print_result(result, listing_url=args.url)
@@ -149,9 +169,14 @@ def _capture_html(url: str, wait_selector: str = "") -> str:
 
 
 def _cmd_adapter(args: argparse.Namespace) -> int:
-    if not ai_enabled():
-        print("No Anthropic API key. Set CLASSIFIEDS_AI_KEY or ANTHROPIC_API_KEY.",
-              file=sys.stderr)
+    try:
+        provider = _provider_from_args(args)
+    except ProviderError as e:
+        print(
+            f"{e}. Set the provider's key (OPENAI_API_KEY / GEMINI_API_KEY / "
+            "ANTHROPIC_API_KEY) or pass --api-key.",
+            file=sys.stderr,
+        )
         return 2
     from .generate import generate_adapter
     from .worktree import build_adapter_in_worktree
@@ -185,7 +210,7 @@ def _cmd_adapter(args: argparse.Namespace) -> int:
             intent=args.intent, url=args.url, key=args.key,
             record_schema=record_schema,
             search_html=search_html, detail_html=detail_html,
-            model=args.model or None,
+            provider=provider,
         )
     except Exception as e:  # noqa: BLE001
         print(f"generation failed: {type(e).__name__}: {e}", file=sys.stderr)
@@ -247,29 +272,47 @@ def _run_job_mode(job_id: str) -> int:
     hint = str(job.get("record_schema_hint") or "")
     detail_url = str(sample_urls[0]) if isinstance(sample_urls, list) and sample_urls else ""
 
-    # Resolve the AI key: the job OWNER's key (saved via the web UI) takes
-    # precedence so their job runs on their own key, not the shared org key. The
-    # Actions workflow always injects an org key into the env, so we must
-    # actively override it here when the owner has their own; the ambient org key
-    # is only a fallback for owners who haven't configured one. Fail the job
-    # clearly if neither exists.
+    # Build the LLM provider from the job OWNER's saved settings (provider,
+    # model, key, base_url in /aiconfig_keys/{uid}) so their job runs on the
+    # provider + model THEY chose. Fall back to the environment (a shared org
+    # key) only when the owner hasn't configured one. Fail clearly if neither
+    # yields a usable provider.
+    provider = None
+    provider_err = ""
     if owner_uid:
         try:
             key_snap = db.collection("aiconfig_keys").document(owner_uid).get()
-            stored = (key_snap.to_dict() or {}).get("value") if key_snap.exists else None
-            if isinstance(stored, str) and stored.strip():
-                import os as _os
-
-                _os.environ["ANTHROPIC_API_KEY"] = stored.strip()
-                # ai_key() checks CLASSIFIEDS_AI_KEY first; drop any ambient one
-                # so it can't shadow the owner's key.
-                _os.environ.pop("CLASSIFIEDS_AI_KEY", None)
+            kd = (key_snap.to_dict() or {}) if key_snap.exists else {}
         except Exception as e:  # noqa: BLE001
             print(f"failed to read owner key: {e}", file=sys.stderr)
-    if not ai_enabled():
+            kd = {}
+        stored_key = str(kd.get("value") or "").strip()
+        if stored_key:
+            # The owner HAS configured a key/provider: use it, and if it can't be
+            # built (e.g. openai_compatible without a base_url), FAIL — do not
+            # silently fall back to the shared org key and bill the wrong account.
+            try:
+                provider = build_provider(
+                    str(kd.get("provider") or "anthropic"),
+                    api_key=stored_key,
+                    model=str(kd.get("model") or ""),
+                    base_url=str(kd.get("base_url") or ""),
+                )
+            except ProviderError as e:
+                provider_err = f"your saved AI provider config is invalid: {e}"
+    if provider is None and not provider_err:
+        # Owner hasn't configured a key — fall back to the shared org env key.
+        try:
+            provider = default_provider_from_env()
+        except ProviderError:
+            provider = None
+    if provider is None:
         ref.update({
             "status": "failed",
-            "error": "no Anthropic API key configured — add one in AI Setup → API key",
+            "error": provider_err or (
+                "no AI provider configured — add a provider + API key in "
+                "AI Setup → API key"
+            ),
             "finished_at": SERVER_TIMESTAMP,
             "updated_at": SERVER_TIMESTAMP,
         })
@@ -305,6 +348,7 @@ def _run_job_mode(job_id: str) -> int:
             detail_url=detail_url,
             record_schema_hint=hint,
             evidence=listing_ev,
+            provider=provider,
             on_event=on_event,
         )
     except Exception as e:  # noqa: BLE001
@@ -374,7 +418,14 @@ def _build_parser() -> argparse.ArgumentParser:
     new.add_argument("--name", default="", help="name for the source")
     new.add_argument("--cron", default="0 * * * *",
                      help="schedule cron (fixed minute; default hourly)")
-    new.add_argument("--model", default="", help="override the reasoning model")
+    new.add_argument("--model", default="", help="model id (else provider default)")
+    new.add_argument("--provider", default="",
+                     help="anthropic | openai | gemini | openai_compatible "
+                          "(default: anthropic or $AICONFIG_PROVIDER)")
+    new.add_argument("--base-url", default="",
+                     help="base URL for openai_compatible / custom endpoints")
+    new.add_argument("--api-key", default="",
+                     help="API key (else the provider's env var)")
     new.add_argument("--json", default="", help="write the session artifact here")
 
     adp = sub.add_parser(
@@ -390,7 +441,13 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="skip the sandboxed live smoke test")
     adp.add_argument("--open-pr", action="store_true",
                      help="commit + push the branch and open a PR when green")
-    adp.add_argument("--model", default="", help="override the model")
+    adp.add_argument("--model", default="", help="model id (else provider default)")
+    adp.add_argument("--provider", default="",
+                     help="anthropic | openai | gemini | openai_compatible")
+    adp.add_argument("--base-url", default="",
+                     help="base URL for openai_compatible / custom endpoints")
+    adp.add_argument("--api-key", default="",
+                     help="API key (else the provider's env var)")
     return p
 
 

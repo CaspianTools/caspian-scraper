@@ -11,12 +11,13 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import llm
 from .config_schema import derive_output_schema, validate_extraction
 from .evidence import PageEvidence
 from .inspector import inspect_url
 from .preview import run_preview
 from .presets import PRESETS
+from .providers import default_provider_from_env
+from .providers.base import ProviderError
 
 # Harness-enforced caps (never trust the model to self-limit).
 MAX_TURNS = 12
@@ -191,7 +192,7 @@ def run_agent(
     detail_url: str = "",
     record_schema_hint: str = "",
     evidence: Any = None,
-    model: str | None = None,
+    provider: Any = None,
     max_turns: int = MAX_TURNS,
     max_previews: int = MAX_PREVIEWS,
     max_fetches: int = MAX_FETCHES,
@@ -199,9 +200,13 @@ def run_agent(
     on_event: Callable[[str, str], None] | None = None,
     impl: dict[str, Callable] | None = None,
 ) -> AgentResult:
-    """Drive the loop to a final config (or an adapter escalation). Never raises
-    for API/tool errors — those land in AgentResult.error / .incomplete."""
-    model = model or llm.REASONER_MODEL
+    """Drive the loop to a final config (or an adapter escalation).
+
+    Provider-agnostic: pass any `provider` (see aiconfig.providers — Anthropic /
+    OpenAI / Gemini / OpenAI-compatible); defaults to one built from the
+    environment. Never raises for API/tool errors — those land in
+    AgentResult.error / .incomplete.
+    """
     impl = impl or _default_impl()
     result = AgentResult()
 
@@ -213,8 +218,15 @@ def run_agent(
             except Exception:
                 pass
 
-    system = [{"type": "text", "text": _system_prompt(),
-               "cache_control": {"type": "ephemeral"}}]
+    if provider is None:
+        try:
+            provider = default_provider_from_env()
+        except ProviderError as e:
+            result.error = str(e)
+            result.incomplete = True
+            return result
+
+    system = _system_prompt()
 
     seed = {
         "intent": intent,
@@ -223,9 +235,10 @@ def run_agent(
         "record_schema_hint": record_schema_hint or None,
         "listing_evidence": _evidence_to_json(evidence) if evidence else None,
     }
-    messages: list[dict] = [{
+    # Provider-neutral conversation history (see aiconfig.providers.base).
+    history: list[dict] = [{
         "role": "user",
-        "content": (
+        "text": (
             "Configure the scraper for this request. Inspect further with "
             "fetch_page if you need a detail page, then propose_config, "
             "run_preview, and finish.\n\n"
@@ -244,66 +257,48 @@ def run_agent(
     for turn in range(max_turns):
         result.turns_used = turn + 1
         # Cost hard-stop at the top so it applies on EVERY path (including the
-        # non-tool_use nudge path) before another paid request is made.
+        # no-tool-call nudge path) before another paid request is made.
         if result.cost_usd >= usd_hard_stop:
             result.incomplete = True
             result.error = f"cost hard-stop hit (${result.cost_usd:.2f})"
             break
         try:
-            resp = llm.messages_create(
-                model=model, system=system, tools=TOOLS, messages=messages
-            )
-        except llm.LLMError as e:
+            resp = provider.complete(system=system, tools=TOOLS, history=history)
+        except ProviderError as e:
             result.error = str(e)
             result.incomplete = True
             break
 
-        result.cost_usd += llm.usage_cost_usd(model, resp.get("usage", {}))
-        assistant_content = resp.get("content", [])
-        messages.append({"role": "assistant", "content": assistant_content})
+        result.cost_usd += resp.cost_usd
+        history.append({
+            "role": "assistant",
+            "text": resp.text,
+            "tool_calls": resp.tool_calls,
+        })
+        if resp.text:
+            emit("proposing_config", resp.text[:500])
 
-        note = llm.text_blocks(resp).strip()
-        if note:
-            emit("proposing_config", note[:500])
-
-        if resp.get("stop_reason") != "tool_use":
+        if not resp.tool_calls:
+            # No tool call this turn (final text or a truncated response). Nudge
+            # once, else give up. No orphan-tool concern — the provider always
+            # pairs the assistant's tool calls with their results in history.
             if turn >= max_turns - 1:
                 result.incomplete = True
                 break
-            # The model may have been truncated mid tool_use (e.g. max_tokens).
-            # Every tool_use block still needs a tool_result or the next request
-            # 400s — answer any dangling ones, otherwise send a plain nudge.
-            pending = [
-                b for b in assistant_content
-                if isinstance(b, dict) and b.get("type") == "tool_use"
-            ]
-            if pending:
-                messages.append({"role": "user", "content": [
-                    {"type": "tool_result", "tool_use_id": b.get("id"),
-                     "content": json.dumps({
-                         "error": "your previous response was cut off before the "
-                                  "tool call completed; retry with a smaller "
-                                  "argument"})}
-                    for b in pending
-                ]})
-            else:
-                messages.append({
-                    "role": "user",
-                    "content": (
-                        "You have not called finish or escalate_adapter yet. "
-                        "Run a preview and then finish, or escalate."
-                    ),
-                })
+            history.append({
+                "role": "user",
+                "text": (
+                    "You have not called finish or escalate_adapter yet. Run a "
+                    "preview and then finish, or escalate."
+                ),
+            })
             continue
 
         tool_results: list[dict] = []
         stop_loop = False
-        for block in assistant_content:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            name = block.get("name")
-            args = block.get("input") or {}
-            tuid = block.get("id")
+        for tc in resp.tool_calls:
+            name = tc.name
+            args = tc.input or {}
 
             if name == "finish":
                 result.path = "config"
@@ -360,8 +355,8 @@ def run_agent(
                      f"preview #{previews}: {len(recs)} record(s)")
 
             tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tuid,
+                "id": tc.id,
+                "name": name,
                 "content": json.dumps(content)[:20000],
             })
 
@@ -369,7 +364,7 @@ def run_agent(
             break
 
         if tool_results:
-            messages.append({"role": "user", "content": tool_results})
+            history.append({"role": "tool", "results": tool_results})
 
     # Exited without an explicit finish (ran out of turns, API error, cost stop,
     # or gave up): that's incomplete. Surface the best working preview if any.
