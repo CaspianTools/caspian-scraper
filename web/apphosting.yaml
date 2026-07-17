@@ -68,6 +68,15 @@ env:
     availability:
       - RUNTIME
 
+  # Client-side Firestore database id (public, baked into the bundle so the
+  # AI-config wizard's onSnapshot targets the same named DB as the backend).
+  # Non-sensitive — must match FIRESTORE_DATABASE_ID.
+  - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
+    value: scraper
+    availability:
+      - BUILD
+      - RUNTIME
+
   # GitHub fine-grained PAT with Actions:read+write on the caspian-scraper
   # repo. When set, "Run scrape now" fires a workflow_dispatch immediately
   # (~1 min latency) instead of waiting for the next 15-minute cron tick.

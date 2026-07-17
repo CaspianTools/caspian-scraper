@@ -8,6 +8,7 @@ import {
   signOut as fbSignOut,
   type User,
 } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -24,6 +25,19 @@ function app(): FirebaseApp {
 
 export function firebaseAuth() {
   return getAuth(app());
+}
+
+/**
+ * Client Firestore, bound to the same named database the backend uses
+ * (FIRESTORE_DATABASE_ID = "scraper"). Only used for realtime reads
+ * (onSnapshot) of docs the signed-in user owns — writes still go through
+ * the API routes (admin SDK). The database id defaults to "scraper";
+ * override with NEXT_PUBLIC_FIRESTORE_DATABASE_ID if ever renamed.
+ */
+export function firebaseDb(): Firestore {
+  const dbId =
+    process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID?.trim() || "scraper";
+  return getFirestore(app(), dbId);
 }
 
 /**

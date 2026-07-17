@@ -22,7 +22,15 @@ export type AtsType = z.infer<typeof AtsType>;
 export const SourceKind = z.enum(["employer", "agency", "feed"]);
 export type SourceKind = z.infer<typeof SourceKind>;
 
-export const RunStatus = z.enum(["ok", "error", "auth_halt", "running"]);
+// "partial" is written by the project/comparison/car/generic run writers in
+// scrape.py when a run has some errors but also some successful extractions.
+export const RunStatus = z.enum([
+  "ok",
+  "error",
+  "auth_halt",
+  "running",
+  "partial",
+]);
 export type RunStatus = z.infer<typeof RunStatus>;
 
 export const Verdict = z.enum(["ok", "errors", "zero_found", "no_new"]);
@@ -284,11 +292,31 @@ const ExtractorCss = z.object({
   in_stock_text_match: z.string().max(120).optional(),
 });
 
+// Generic, any-schema extractor. The AI (or a human) defines an arbitrary
+// {fieldName -> selectorExpr} map; the parser emits a flat record dict.
+// Selector grammar (scrape.py:_eval_selector — split on the LAST "@"):
+//   "h1.title"       -> inner_text of the first match
+//   "sel@text"       -> inner_text (explicit)
+//   "sel@html"       -> inner_html
+//   "time@datetime"  -> value of the `datetime` attribute
+// This is what powers /generic_sources; product configs never list it, so
+// the comparison pipeline still only ever produces ProductListing.
+const ExtractorFields = z.object({
+  type: z.literal("fields"),
+  fields: z
+    .record(z.string(), z.string().min(1).max(500))
+    .refine((o) => Object.keys(o).length > 0, "at least one field"),
+  // Fields that must be non-empty for a record to count as a hit.
+  // Defaults to every declared field when omitted.
+  required_fields: z.array(z.string()).max(50).optional(),
+});
+
 export const ExtractorSchema = z.discriminatedUnion("type", [
   ExtractorJsonLd,
   ExtractorMicrodata,
   ExtractorOgMeta,
   ExtractorCss,
+  ExtractorFields,
 ]);
 export type Extractor = z.infer<typeof ExtractorSchema>;
 
@@ -423,6 +451,234 @@ export const ComparisonRunDocSchema = z.object({
     .optional(),
 });
 export type ComparisonRunDoc = z.infer<typeof ComparisonRunDocSchema>;
+
+// ---------------------------------------------------------------------------
+// Generic sources (any-schema surface, top-level, per-user)
+//
+// The AI-driven config feature (python -m aiconfig) writes these. Unlike the
+// product-specific comparison surface, a generic source declares its OWN
+// output field schema and can run one of two strategies:
+//   mode:"config"   selector/field-map driven — runs ConfigurableProductParser
+//                   with an ExtractionConfig (usually a `fields` extractor);
+//                   goes live on the next cron tick, no code change.
+//   mode:"adapter"  references a generated Python module in adapters/ by key;
+//                   needs that module merged to `main` first (a code change),
+//                   so adapter sources are created active:false until merge.
+// See scrape.py:run_generic_source.
+// ---------------------------------------------------------------------------
+
+export const GenericFieldType = z.enum(["string", "number", "bool", "url"]);
+export type GenericFieldType = z.infer<typeof GenericFieldType>;
+
+export const GenericFieldSpecSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_]+$/, "lowercase letters, digits, underscore only"),
+  type: GenericFieldType.default("string"),
+  required: z.boolean().default(false),
+});
+export type GenericFieldSpec = z.infer<typeof GenericFieldSpecSchema>;
+
+const GenericStrategyConfig = z.object({
+  mode: z.literal("config"),
+  extraction: ExtractionConfigSchema,
+});
+const GenericStrategyAdapter = z.object({
+  mode: z.literal("adapter"),
+  adapter_key: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_]+$/, "lowercase letters, digits, underscore only"),
+  adapter_pr_url: z.string().url().optional(),
+});
+export const GenericStrategySchema = z.discriminatedUnion("mode", [
+  GenericStrategyConfig,
+  GenericStrategyAdapter,
+]);
+export type GenericStrategy = z.infer<typeof GenericStrategySchema>;
+
+export const GenericSourceCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  // Stable prefix for record uids (like comparison's retailer_id).
+  source_key: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9_-]+$/, "lowercase letters, digits, dash, underscore only"),
+  record_schema: z.array(GenericFieldSpecSchema).min(1).max(40),
+  strategy: GenericStrategySchema,
+  start_urls: z.array(z.string().url()).min(1).max(20),
+  schedule_cron: CronExpressionSchema,
+  destination_id: z.string().max(200).optional(),
+  active: z.boolean().default(true),
+  notes: z.string().max(2000).default(""),
+});
+export type GenericSourceCreate = z.infer<typeof GenericSourceCreateSchema>;
+
+export const GenericSourceDocSchema = GenericSourceCreateSchema.extend({
+  owner_uid: z.string().min(1),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  last_run_at: z.string().datetime().nullable().default(null),
+  last_run_summary: z
+    .object({
+      ts: z.string().datetime(),
+      found: z.number().int(),
+      extracted: z.number().int(),
+      errors_count: z.number().int(),
+    })
+    .nullable()
+    .default(null),
+  // How the source was created — useful for the wizard/CLI audit trail.
+  origin: z
+    .object({
+      via: z.enum(["cli", "wizard"]),
+      config_job_id: z.string().optional(),
+    })
+    .optional(),
+});
+export type GenericSourceDoc = z.infer<typeof GenericSourceDocSchema>;
+
+export const GenericSourcePatchSchema = GenericSourceCreateSchema.partial();
+export type GenericSourcePatch = z.infer<typeof GenericSourcePatchSchema>;
+
+// ----- /generic_records/{uid} ----------------------------------------------
+// uid = "{source_key}:{sha1(url)[:32]}" — write-once, upsert on re-scrape.
+
+export const GenericRecordDocSchema = z.object({
+  uid: z.string(),
+  owner_uid: z.string(),
+  source_id: z.string(),
+  source_key: z.string(),
+  url: z.string().url(),
+  data: z.record(z.string(), z.unknown()).default({}),
+  status: z.enum(["new", "seen"]).default("new"),
+  first_seen_at: z.string().datetime(),
+  last_seen_at: z.string().datetime(),
+});
+export type GenericRecordDoc = z.infer<typeof GenericRecordDocSchema>;
+
+// ----- /generic_runs/{rid} -------------------------------------------------
+
+export const GenericRunDocSchema = z.object({
+  owner_uid: z.string(),
+  source_id: z.string().nullable().default(null),
+  source_name: z.string().default(""),
+  started_at: z.string().datetime(),
+  finished_at: z.string().datetime().nullable(),
+  duration_seconds: z.number().int().min(0),
+  status: RunStatus,
+  trigger: z.string(),
+  dry_run: z.boolean().default(false),
+  totals: z.object({
+    checked: z.number().int().min(0),
+    found: z.number().int().min(0),
+    extracted: z.number().int().min(0),
+    skipped_duplicate: z.number().int().min(0),
+    errors_count: z.number().int().min(0),
+  }),
+  errors: z.array(z.string()).default([]),
+  diagnostics: z
+    .object({
+      links_discovered: z.number().int().min(0).default(0),
+      pages_visited: z.number().int().min(0).default(0),
+      extractor_hits: z.record(z.string(), z.number()).default({}),
+      http_errors: z.record(z.string(), z.number()).default({}),
+    })
+    .optional(),
+});
+export type GenericRunDoc = z.infer<typeof GenericRunDocSchema>;
+
+// ---------------------------------------------------------------------------
+// Config jobs (AI scraper-config wizard, top-level, per-user)
+//
+// The web chat wizard writes /config_jobs/{id}; a GitHub Actions job running
+// `python -m aiconfig --job <id>` reads it, drives the browser, and writes
+// back its progress (turns/status/proposed_config/…); the wizard UI
+// subscribes to the doc via client onSnapshot. On Approve the API route
+// materialises `proposed_config` into a real /generic_sources/{sid} doc.
+//
+// Mirrored manually in the Python `aiconfig` package — keep the two in sync.
+// ---------------------------------------------------------------------------
+
+export const ConfigJobStatus = z.enum([
+  "queued",
+  "inspecting",
+  "proposing_config",
+  "previewing",
+  "escalating_adapter",
+  "generating_adapter",
+  "validating",
+  "proposed",
+  "approved",
+  "failed",
+]);
+export type ConfigJobStatus = z.infer<typeof ConfigJobStatus>;
+
+// One line of the agent/user chat transcript.
+export const ConfigJobTurnSchema = z.object({
+  role: z.enum(["agent", "user", "system"]),
+  text: z.string(),
+  ts: z.string(),
+});
+export type ConfigJobTurn = z.infer<typeof ConfigJobTurnSchema>;
+
+// Present only when the job escalated to the adapter path (generated Python
+// module + PR). The source is created active:false until the PR merges.
+export const ConfigJobAdapterSchema = z.object({
+  key: z.string(),
+  pr_url: z.string(),
+  branch: z.string(),
+  ast_gate: z.object({
+    passed: z.boolean(),
+    findings: z.array(z.string()).default([]),
+  }),
+  validation_report: z.string(),
+});
+export type ConfigJobAdapter = z.infer<typeof ConfigJobAdapterSchema>;
+
+export const ConfigJobDiagnosticsSchema = z.object({
+  pages_visited: z.number().int().min(0).optional(),
+  extractor_hits: z.record(z.string(), z.number()).optional(),
+  http_errors: z.record(z.string(), z.number()).optional(),
+  escalation_reason: z.string().optional(),
+});
+export type ConfigJobDiagnostics = z.infer<typeof ConfigJobDiagnosticsSchema>;
+
+// Owner-suppliable fields (what the wizard form POSTs).
+export const ConfigJobCreateSchema = z.object({
+  // Natural-language description of what to scrape.
+  intent: z.string().min(1).max(4000),
+  // Primary listing URL to inspect.
+  url: z.string().url(),
+  // Optional extra sample/detail URLs the agent may inspect.
+  sample_urls: z.array(z.string().url()).max(20).default([]),
+  // Optional shorthand schema, e.g. "title:string,deadline:string,amount:number".
+  record_schema_hint: z.string().max(2000).default(""),
+});
+export type ConfigJobCreate = z.infer<typeof ConfigJobCreateSchema>;
+
+export const ConfigJobDocSchema = ConfigJobCreateSchema.extend({
+  owner_uid: z.string().min(1),
+  status: ConfigJobStatus,
+  // Which resolution path the agent took. null until it decides.
+  path: z.enum(["config", "adapter"]).nullable().default(null),
+  turns: z.array(ConfigJobTurnSchema).default([]),
+  // Draft GenericSource the agent proposes; validated again on Approve.
+  proposed_config: GenericSourceCreateSchema.nullable().default(null),
+  sample_records: z.array(z.record(z.string(), z.unknown())).default([]),
+  diagnostics: ConfigJobDiagnosticsSchema.default({}),
+  adapter: ConfigJobAdapterSchema.nullable().default(null),
+  created_at: z.string().datetime().nullable().default(null),
+  updated_at: z.string().datetime().nullable().default(null),
+  dispatched_at: z.string().datetime().nullable().default(null),
+  finished_at: z.string().datetime().nullable().default(null),
+  error: z.string().default(""),
+});
+export type ConfigJobDoc = z.infer<typeof ConfigJobDocSchema>;
 
 // ---------------------------------------------------------------------------
 // Cars (car-classifieds surface, top-level, per-user)
@@ -577,6 +833,7 @@ export const RunRequestCreateSchema = z.object({
   project_id: z.string().min(1).optional(),
   comparison_source_id: z.string().min(1).optional(),
   car_source_id: z.string().min(1).optional(),
+  generic_source_id: z.string().min(1).optional(),
 });
 export type RunRequestCreate = z.infer<typeof RunRequestCreateSchema>;
 
@@ -584,6 +841,7 @@ export const RunRequestDocSchema = z.object({
   project_id: z.string().default(""),
   comparison_source_id: z.string().default(""),
   car_source_id: z.string().default(""),
+  generic_source_id: z.string().default(""),
   requested_by_uid: z.string(),
   status: RunRequestStatus,
   created_at: z.string().datetime(),

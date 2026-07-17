@@ -12,6 +12,7 @@
 const REPO_OWNER = "CaspianTools";
 const REPO_NAME = "caspian-scraper";
 const WORKFLOW_FILE = "scrape-due.yml";
+const AICONFIG_WORKFLOW_FILE = "aiconfig.yml";
 
 export interface DispatchResult {
   attempted: boolean;
@@ -54,6 +55,58 @@ export async function dispatchScrapeWorkflow(opts: {
           project_id: opts.projectId,
           dry_run: opts.dryRun ? "true" : "false",
           ...(opts.requestId ? { request_id: opts.requestId } : {}),
+        },
+      }),
+    });
+    // GitHub returns 204 No Content on success.
+    if (res.status === 204) {
+      return { attempted: true, ok: true, status: 204 };
+    }
+    const body = await res.text().catch(() => "");
+    return {
+      attempted: true,
+      ok: false,
+      status: res.status,
+      error: body.slice(0, 200),
+    };
+  } catch (e) {
+    return {
+      attempted: true,
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
+ * Trigger a workflow_dispatch on aiconfig.yml — the AI scraper-config
+ * wizard runner (`python -m aiconfig --job <id>`). Never throws; returns
+ * `{ attempted: false }` when GH_DISPATCH_TOKEN is unset (the cron/manual
+ * dispatch is the fallback). Fire-and-forget after writing the config_job.
+ */
+export async function dispatchAiconfigWorkflow(opts: {
+  jobId: string;
+}): Promise<DispatchResult> {
+  const token = process.env.GH_DISPATCH_TOKEN?.trim();
+  if (!token) return { attempted: false };
+
+  const url =
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}` +
+    `/actions/workflows/${AICONFIG_WORKFLOW_FILE}/dispatches`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `token ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ref: "main",
+        inputs: {
+          job_id: opts.jobId,
         },
       }),
     });

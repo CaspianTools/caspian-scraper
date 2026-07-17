@@ -44,6 +44,12 @@ export function AppHeader({ session }: Props) {
             >
               Cars
             </Link>
+            <Link
+              href="/aiconfig"
+              className="text-sm px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+            >
+              AI Setup
+            </Link>
           </nav>
         </div>
 

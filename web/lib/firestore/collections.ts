@@ -131,6 +131,49 @@ export function carRunDoc(runId: string) {
   return carRunsCol().doc(runId);
 }
 
+// ---------------------------------------------------------------------------
+// Generic sources surface (any-schema, top-level, per-user).
+// Written by the AI-config feature (python -m aiconfig) + the scraper.
+// See web/lib/firestore/schema.ts.
+// ---------------------------------------------------------------------------
+
+export function genericSourcesCol(): CollectionReference {
+  return db().collection("generic_sources");
+}
+
+export function genericSourceDoc(sourceId: string) {
+  return genericSourcesCol().doc(sourceId);
+}
+
+export function genericRecordsCol(): CollectionReference {
+  return db().collection("generic_records");
+}
+
+export function genericRecordDoc(recordId: string) {
+  return genericRecordsCol().doc(recordId);
+}
+
+export function genericRunsCol(): CollectionReference {
+  return db().collection("generic_runs");
+}
+
+export function genericRunDoc(runId: string) {
+  return genericRunsCol().doc(runId);
+}
+
+// ---------------------------------------------------------------------------
+// Config jobs (AI scraper-config wizard, top-level, per-user).
+// See web/lib/firestore/schema.ts.
+// ---------------------------------------------------------------------------
+
+export function configJobsCol(): CollectionReference {
+  return db().collection("config_jobs");
+}
+
+export function configJobDoc(jobId: string) {
+  return configJobsCol().doc(jobId);
+}
+
 // ---- slug generator -------------------------------------------------------
 
 /**
