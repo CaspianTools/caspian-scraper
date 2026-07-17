@@ -101,9 +101,37 @@ export async function POST(req: NextRequest) {
     updated_at: FieldValue.serverTimestamp(),
   });
 
-  // Fire-and-forget: nudge the runner. The cron / manual dispatch is the
-  // fallback when GH_DISPATCH_TOKEN is unset or the call fails.
-  await dispatchAiconfigWorkflow({ jobId: ref.id });
+  // Start the runner. Unlike scrape-due, aiconfig.yml has NO cron fallback — it
+  // only runs via this dispatch — so if we can't dispatch, the job would sit at
+  // "queued" forever. Fail it with an actionable message instead.
+  const dispatch = await dispatchAiconfigWorkflow({ jobId: ref.id });
+  let status = writeParsed.data.status;
+  if (dispatch.attempted && dispatch.ok) {
+    await ref.update({
+      dispatched_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+  } else {
+    status = "failed";
+    const error = !dispatch.attempted
+      ? "The AI agent couldn't be started: automatic dispatch isn't configured " +
+        "(GH_DISPATCH_TOKEN is unset). An admin can set that token, or run the " +
+        "'aiconfig' GitHub Actions workflow manually with this job id."
+      : `The AI agent couldn't be started (GitHub dispatch failed: ${dispatch.status ?? ""} ${dispatch.error ?? ""}).`;
+    await ref.update({
+      status,
+      error,
+      finished_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+    return NextResponse.json(
+      { id: ref.id, ...writeParsed.data, status, error },
+      { status: 201 }
+    );
+  }
 
-  return NextResponse.json({ id: ref.id, ...writeParsed.data }, { status: 201 });
+  return NextResponse.json(
+    { id: ref.id, ...writeParsed.data, status },
+    { status: 201 }
+  );
 }
