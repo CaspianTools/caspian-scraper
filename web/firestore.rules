@@ -97,23 +97,14 @@ service cloud.firestore {
     }
 
     // ---- /config_jobs/{jobId} ----
-    // AI scraper-config wizard jobs. The owner creates a fresh, queued job
-    // (empty transcript, no proposal/adapter yet). After that the agent
-    // (service account, bypasses rules) drives the whole thing — clients can
-    // never write, so they can't forge agent turns or an approved proposal.
-    // Reads are owner-only; the wizard subscribes live via onSnapshot.
+    // AI scraper-config wizard jobs. NO client rules (default deny): the doc is
+    // created + driven by admin-SDK routes / the agent (service account), and
+    // the wizard reads status by polling the owner-guarded route
+    // GET /api/aiconfig/jobs/[id] — not a client Firestore read. Keeping this
+    // admin-SDK-only matches /generic_* and means clients can never forge agent
+    // turns or an approved proposal.
     match /config_jobs/{jobId} {
-      allow read: if isSignedIn()
-        && request.auth.uid == resource.data.owner_uid;
-      allow create: if isSignedIn()
-        && request.resource.data.owner_uid == request.auth.uid
-        && request.resource.data.status == 'queued'
-        && request.resource.data.turns.size() == 0
-        && (!('proposed_config' in request.resource.data)
-            || request.resource.data.proposed_config == null)
-        && (!('adapter' in request.resource.data)
-            || request.resource.data.adapter == null);
-      allow update, delete: if false;   // service account only
+      allow read, write: if false;
     }
 
     // NOTE: /generic_sources, /generic_records, /generic_runs carry no

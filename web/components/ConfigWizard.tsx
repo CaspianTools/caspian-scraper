@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { firebaseAuth, firebaseDb } from "@/lib/firebase/client";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 
 // Loose client-side mirror of /config_jobs/{id}. The authoritative schema
@@ -78,29 +76,43 @@ export function ConfigWizard() {
   const [approving, setApproving] = useState(false);
   const [approveMsg, setApproveMsg] = useState<string | null>(null);
 
-  // Subscribe to the config job doc once we have an id.
+  // Poll the config job doc (owner-guarded admin-SDK route) until it reaches a
+  // terminal status. We poll rather than use a client Firestore onSnapshot so
+  // the wizard needs NO client rules on /config_jobs — consistent with the rest
+  // of the app, which is admin-SDK-only, and avoids a named-database client
+  // read that would otherwise require deployed rules to permit it.
   useEffect(() => {
     if (!jobId) return;
-    let unsub: (() => void) | undefined;
     let cancelled = false;
-    (async () => {
-      // Ensure the client SDK has restored auth before subscribing —
-      // the security rules gate reads on request.auth.uid == owner_uid.
-      await firebaseAuth().authStateReady();
-      if (cancelled) return;
-      unsub = onSnapshot(
-        doc(firebaseDb(), "config_jobs", jobId),
-        (snap) => {
-          setJob((snap.data() as JobDoc | undefined) ?? null);
-        },
-        (err) => {
-          setErrors([{ message: `Live updates failed: ${err.message}` }]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function poll() {
+      try {
+        const res = await authedFetch(`/api/aiconfig/jobs/${jobId}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}));
+          setErrors([
+            { message: b.error || `Failed to load job (${res.status})` },
+          ]);
+          return; // stop on a hard error (401/404)
         }
-      );
-    })();
+        const data = (await res.json()) as JobDoc;
+        if (cancelled) return;
+        setJob(data);
+        if (!TERMINAL[data.status ?? ""]) {
+          timer = setTimeout(poll, 1500);
+        }
+      } catch {
+        // transient network error — keep trying at a slower cadence
+        if (!cancelled) timer = setTimeout(poll, 2500);
+      }
+    }
+    poll();
+
     return () => {
       cancelled = true;
-      unsub?.();
+      if (timer) clearTimeout(timer);
     };
   }, [jobId]);
 
