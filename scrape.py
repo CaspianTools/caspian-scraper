@@ -3142,11 +3142,21 @@ def _upsert_generic_record(
     source_key: str,
     url: str,
     data: dict,
-) -> tuple[str, bool]:
-    """Upsert /generic_records/{uid}. Returns (uid, is_new). Doc id is
-    "{source_key}:{sha1(url)[:32]}" — write-once, preserves first_seen_at,
-    refreshes data + last_seen_at on re-scrape."""
-    uid = f"{source_key}:{listing_id_for(source_key, url)}"
+) -> tuple[str, str]:
+    """Upsert /generic_records/{uid}. Returns (uid, result) where result is
+    "new", "seen", or "error". Doc id is "{source_key}:{id}" where id is derived
+    from the url, or — for url-less adapter records — a stable hash of the record
+    data, so distinct records never collide into one document. Write-once
+    (preserves first_seen_at), refreshes data + last_seen_at on re-scrape.
+
+    A write failure returns "error" (not silently "seen") so the runner records
+    it instead of miscounting total data loss as skipped duplicates."""
+    if url:
+        record_id = listing_id_for(source_key, url)
+    else:
+        blob = json.dumps(data, sort_keys=True, default=str)
+        record_id = hashlib.sha1(f"{source_key}|{blob}".encode("utf-8")).hexdigest()[:32]
+    uid = f"{source_key}:{record_id}"
     ref = db.collection("generic_records").document(uid)
     try:
         snap = ref.get()
@@ -3165,16 +3175,16 @@ def _upsert_generic_record(
                 "first_seen_at": SERVER_TIMESTAMP,
                 "status": "new",
             })
-            return (uid, True)
+            return (uid, "new")
         payload["status"] = "seen"
         ref.update(payload)
-        return (uid, False)
+        return (uid, "seen")
     except Exception as e:
         print(
             f"failed to upsert /generic_records/{uid}: {type(e).__name__}: {e}",
             file=sys.stderr,
         )
-        return (uid, False)
+        return (uid, "error")
 
 
 def _generic_records_config(
@@ -3238,6 +3248,7 @@ def _generic_records_adapter(
     errors: list[str] = []
     try:
         from adapters import build as _build_adapter  # type: ignore
+        from adapters.base import FetchSpec as _FetchSpec  # type: ignore
     except Exception:
         return (
             records,
@@ -3251,8 +3262,9 @@ def _generic_records_adapter(
         adapter = _build_adapter(adapter_key)
     except Exception as e:
         return (records, {}, [f"unknown adapter '{adapter_key}': {e}"])
+    spec = _FetchSpec.from_source(source)
     try:
-        for rec in adapter.fetch(source):
+        for rec in adapter.fetch(spec):
             if time.monotonic() >= per_source_deadline:
                 errors.append("per-source timeout reached")
                 break
@@ -3353,7 +3365,9 @@ def run_generic_source(
             )
         else:
             records, diagnostics, errs = _generic_records_config(
-                source.get("strategy", {}).get("extraction")
+                # None-safe: reuse the already-sanitised `strategy` local; a doc
+                # with strategy:null would make source.get("strategy", {}) None.
+                strategy.get("extraction")
                 or source.get("extraction")
                 or {},
                 start_urls,
@@ -3363,17 +3377,24 @@ def run_generic_source(
             )
         summary["errors"].extend(errs)
         summary["found"] = len(records)
+        write_errors = 0
         for url, data in records:
             if dry_run:
                 summary["extracted"] += 1
                 continue
-            _uid, is_new = _upsert_generic_record(
+            _uid, outcome = _upsert_generic_record(
                 db, owner_uid, source_id, source_key, url, data
             )
-            if is_new:
+            if outcome == "new":
                 summary["extracted"] += 1
-            else:
+            elif outcome == "seen":
                 summary["skipped_duplicate"] += 1
+            else:  # "error" — a write failed; never miscount as a duplicate
+                write_errors += 1
+        if write_errors:
+            summary["errors"].append(
+                f"{write_errors} record write(s) failed (see logs)"
+            )
     except Exception as e:
         summary["errors"].append(
             f"unexpected error: {type(e).__name__}: {e}"
