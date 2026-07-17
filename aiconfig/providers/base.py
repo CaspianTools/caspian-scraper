@@ -92,8 +92,9 @@ _PRICING: dict[str, dict[str, tuple[float, float]]] = {
     "gemini": {
         "gemini-2.5-pro": (1.25, 10.0),
         "gemini-2.5-flash": (0.30, 2.5),
-        "gemini-1.5-pro": (1.25, 5.0),
-        "gemini-1.5-flash": (0.15, 0.60),
+        "gemini-2.5-flash-lite": (0.10, 0.40),
+        # Newer 3.x models fall through to _default (a conservative estimate for
+        # the soft budget guard only — 1.5-* are retired).
         "_default": (1.0, 5.0),
     },
 }
