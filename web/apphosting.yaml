@@ -21,6 +21,30 @@ runConfig:
   memoryMiB: 512
 
 env:
+  # ---- Access control ----
+  # Who can sign in. Anyone not listed here is refused a session, even with a
+  # valid Google token. Plain values, not Secret Manager refs: these aren't
+  # secret, and keeping them inline means the roster is reviewable in git.
+  #
+  # SUPER_ADMIN_EMAIL owns the workspace. Its Firebase uid is the `owner_uid`
+  # stamped on every project/source/run, and admins are aliased onto it so they
+  # see the same data. Changing this address repoints the whole app at a
+  # different (probably empty) workspace — don't, without migrating owner_uid.
+  #
+  # WARNING: a typo here locks out EVERYONE, including you. The allowlist is
+  # fail-closed by design. Recovery is a fix here plus a redeploy.
+  - variable: SUPER_ADMIN_EMAIL
+    value: fuad.jalilov@gmail.com
+    availability:
+      - RUNTIME
+
+  # Comma-separated. Full access to the workspace, except the AI provider key.
+  # Must be the exact address each person signs in to Google with.
+  - variable: ADMIN_EMAILS
+    value: muhammadtouseefmughal@gmail.com
+    availability:
+      - RUNTIME
+
   # Firebase Admin SDK service-account credentials.
   - variable: FIREBASE_PROJECT_ID
     secret: SCRAPER_FIREBASE_PROJECT_ID
@@ -68,9 +92,11 @@ env:
     availability:
       - RUNTIME
 
-  # Client-side Firestore database id (public, baked into the bundle so the
-  # AI-config wizard's onSnapshot targets the same named DB as the backend).
+  # Client-side Firestore database id (public, baked into the bundle).
   # Non-sensitive — must match FIRESTORE_DATABASE_ID.
+  # NOTE: currently unused. It backed the AI-config wizard's onSnapshot reads,
+  # which were replaced by route polling in 9291b87; the only reader left is
+  # the now-callerless firebaseDb() in lib/firebase/client.ts.
   - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
     value: scraper
     availability:

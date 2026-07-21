@@ -15,11 +15,16 @@ const TABS: [Tab, string][] = [
 
 /**
  * AI-config hub. Client-side tab switcher over the three surfaces — the
- * existing ConfigWizard (unchanged), the user's generic sources, and the
- * write-only Anthropic key settings. The parent page stays a server
- * component doing the auth guard; all interactivity lives here.
+ * existing ConfigWizard (unchanged), the workspace's generic sources, and the
+ * write-only provider key settings. The parent page stays a server component
+ * doing the auth guard; all interactivity lives here.
+ *
+ * `isSuperAdmin` comes from the server session. The API-key tab is still
+ * rendered for admins so the restriction is discoverable rather than a missing
+ * tab, but it shows an explanatory note instead of the form. Enforcement is in
+ * the route (403), not here.
  */
-export function AiConfigDashboard() {
+export function AiConfigDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [tab, setTab] = useState<Tab>("new");
 
   return (
@@ -46,7 +51,7 @@ export function AiConfigDashboard() {
       {tab === "sources" && (
         <GenericSourceList onNewScrape={() => setTab("new")} />
       )}
-      {tab === "key" && <KeySettings />}
+      {tab === "key" && <KeySettings canManage={isSuperAdmin} />}
     </div>
   );
 }

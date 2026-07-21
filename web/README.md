@@ -22,18 +22,63 @@ runs, and lessons — no per-file JSON in the repo, no GitHub API calls.
    └────────────────────────────────────────────────────┘
 ```
 
-- **Auth**: Firebase Authentication, **Google sign-in only**.
+- **Auth**: Firebase Authentication, **Google sign-in only**, restricted to an
+  allowlist — see [Who can sign in](#who-can-sign-in).
 - **Data**: dedicated Firestore database named `scraper` inside the
   `caspian-tools` project. Schema:
   - `/employers/{id}` — one doc per employer (replaces `employers.json`)
   - `/lessons/{auto-id}` — append-only run-level log (replaces
     `state/lessons.jsonl`)
   - `/runs/{auto-id}` — per-run summary (replaces `docs/data.json`)
-  - `/users/{uid}` — profile doc, optional allowlist
+  - `/users/{uid}` — profile doc (email, name, picture, role)
 - **No GitHub API**. The web app neither reads from nor writes to
   GitHub. The scraper still lives in this repo and runs as a GitHub
   Actions cron, but it writes its output directly to Firestore via the
   Firebase Admin SDK.
+
+## Who can sign in
+
+A valid Google account is **not** enough — the address must be on the
+allowlist, or it's refused a session. Two env vars, both set for production in
+[`apphosting.yaml`](./apphosting.yaml):
+
+| Var | Who | Can do |
+| --- | --- | --- |
+| `SUPER_ADMIN_EMAIL` | the workspace owner (one address) | everything |
+| `ADMIN_EMAILS` | comma-separated admins | everything **except** managing the AI provider key |
+
+**One shared workspace.** Every doc carries an `owner_uid`, and ~90 call sites
+filter on `owner_uid == session.uid`. Rather than teach all of them about
+roles, an admin's session `uid` is *aliased* to the super admin's uid
+(`lib/auth/roles.ts`), so the existing ownership queries return the shared data
+untouched. The real identity is kept as `session.actorUid` / `session.email`
+for display; documents are **not** stamped with it, so there is no per-person
+write attribution.
+
+Two consequences worth knowing:
+
+- Admins have the same delete rights as the owner.
+- The allowlist is re-checked on **every** request, not just at sign-in, so
+  removing someone takes effect immediately rather than after their 5-day
+  session cookie expires.
+
+### Adding or removing someone
+
+1. Edit `ADMIN_EMAILS` in `apphosting.yaml`. Use the exact address they sign in
+   to Google with — a Workspace alias or forwarding address won't match.
+2. Merge to `main` and roll out the App Hosting backend. Pushing alone does not
+   deploy (see the root `CLAUDE.md`).
+
+For local dev, set both vars in `.env.local` instead; the deployed site never
+reads that file.
+
+> **Fail-closed.** With `SUPER_ADMIN_EMAIL` unset or misspelled, *nobody* can
+> sign in — including you. That's deliberate: an empty allowlist must lock the
+> app down, not open it. Recovery is a one-line fix plus a redeploy.
+>
+> Don't repoint `SUPER_ADMIN_EMAIL` at a different account casually: its uid is
+> the `owner_uid` on all existing data, so changing it aims the app at a
+> different, probably empty, workspace.
 
 ## One-time setup
 

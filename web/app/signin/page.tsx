@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithGoogle } from "@/lib/firebase/client";
+import { signInWithGoogle, signOut } from "@/lib/firebase/client";
 
 export default function SignInPage() {
   return (
@@ -29,6 +29,16 @@ function SignInContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
+      if (res.status === 403) {
+        // Allowlisted accounts only. Sign back out of Firebase so the user
+        // isn't left authenticated with no session — otherwise the Google
+        // popup silently reuses the account and a retry looks like a no-op.
+        await signOut().catch(() => {});
+        throw new Error(
+          `${user.email ?? "That account"} isn't authorized for this workspace. ` +
+            `Ask the workspace owner to add it.`
+        );
+      }
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         throw new Error(`session-login failed (${res.status}): ${body}`);

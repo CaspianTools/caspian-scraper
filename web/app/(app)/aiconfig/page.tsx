@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
  * AppHeader is rendered above). Three surfaces via a client-side tab switcher:
  * "New scrape" (the ConfigWizard — describe a site, approve the agent's
  * proposed config into a generic source), "My sources" (manage the sources
- * you've created), and "API key" (the write-only Anthropic key the setup agent
- * uses). The page stays a server component doing the auth guard; all
- * interactivity lives in AiConfigDashboard.
+ * you've created), and "API key" (the write-only provider key the setup agent
+ * uses — workspace owner only). The page stays a server component doing the
+ * auth guard; all interactivity lives in AiConfigDashboard.
  */
 export default async function AiConfigPage() {
   const session = await getSessionFromCookie();
@@ -28,7 +28,7 @@ export default async function AiConfigPage() {
         </p>
       </div>
 
-      <AiConfigDashboard />
+      <AiConfigDashboard isSuperAdmin={session.isSuperAdmin} />
     </div>
   );
 }

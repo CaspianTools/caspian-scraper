@@ -1,11 +1,21 @@
 rules_version = '2';
 
-// Caspian Scraper — multi-tenant Firestore rules.
+// Caspian Scraper — ownership-scoped Firestore rules.
 //
 // Model: every doc is owned by a Firebase user (UID). A user can only
 // read/write their own data. The Firebase Admin SDK (used by the web
 // app's API routes and the Python scraper) bypasses all rules — those
 // paths are governed by the backend code instead.
+//
+// NOTE ON ADMINS: the app is one shared workspace with a super admin plus
+// allowlisted admins (see web/README.md → "Who can sign in"). An admin's
+// server-side session uid is aliased to the owner's, so they read the owner's
+// data through the API routes. These rules deliberately have NO matching admin
+// bypass, and don't need one: the browser never reads Firestore directly —
+// every surface goes through an Admin-SDK route, and firebaseDb() in
+// lib/firebase/client.ts has no callers. `request.auth.uid` here would be the
+// admin's *real* uid, which by design matches no owner_uid. If you ever add a
+// client-side Firestore read, it will fail for admins until that is addressed.
 service cloud.firestore {
   match /databases/{database}/documents {
 

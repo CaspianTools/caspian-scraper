@@ -66,11 +66,40 @@ interface KeyState {
 }
 
 /**
- * AI provider + key card. Pick a provider (Anthropic / OpenAI / Gemini / any
- * OpenAI-compatible endpoint) and a model. The key is stored write-only: GET
- * reports only whether one is set + a masked hint, never the raw value.
+ * AI provider + key card.
+ *
+ * Managing the key is restricted to the workspace owner — it's the key that
+ * gets billed. Admins see an explanatory note instead. The form is split into
+ * its own component so its mount-time fetch never fires for someone who would
+ * only get a 403 back. Real enforcement lives in /api/aiconfig/key.
  */
-export function KeySettings() {
+export function KeySettings({ canManage }: { canManage: boolean }) {
+  return canManage ? <KeyForm /> : <KeyLocked />;
+}
+
+function KeyLocked() {
+  return (
+    <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-2">
+      <h3 className="text-sm font-semibold tracking-tight">AI provider &amp; key</h3>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xl">
+        The AI setup agent runs on a provider key managed by the workspace
+        owner. You can use the agent normally — you just can&apos;t view or
+        change the key itself.
+      </p>
+      <p className="text-xs text-zinc-500">
+        Need it pointed at a different provider or model? Ask the workspace
+        owner.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * Pick a provider (Anthropic / OpenAI / Gemini / any OpenAI-compatible
+ * endpoint) and a model. The key is stored write-only: GET reports only
+ * whether one is set + a masked hint, never the raw value.
+ */
+function KeyForm() {
   const [state, setState] = useState<KeyState | null>(null);
   const [loading, setLoading] = useState(true);
   const [provider, setProvider] = useState("anthropic");

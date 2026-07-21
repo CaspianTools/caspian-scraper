@@ -5,14 +5,25 @@ import { AiKeyWriteSchema } from "@/lib/firestore/schema";
 import { aiconfigKeyDoc } from "@/lib/firestore/collections";
 
 /**
- * Per-user Anthropic API key used by the AI scraper-config agent.
+ * The workspace's LLM provider key used by the AI scraper-config agent.
  *
  * Stored write-only in /aiconfig_keys/{uid} (encrypted at rest by GCP), read
  * ONLY by the aiconfig Actions job (service account) at run time. It is never
  * returned to clients — GET reports only whether one is set plus a masked hint.
  * The collection has no client Firestore rules (default deny); all access goes
- * through this admin-SDK route, which enforces owner == session.uid.
+ * through this admin-SDK route.
+ *
+ * SUPER ADMIN ONLY. This is the one thing an admin can't touch: it's the key
+ * that gets billed, so replacing or deleting it stays with the workspace owner.
+ *
+ * The doc is keyed by `session.uid` — the *workspace* uid, not the actor's.
+ * That is load-bearing: aiconfig/cli.py looks the key up by the `owner_uid`
+ * stamped on the job, so a key stored under any other uid would be missed and
+ * the agent would silently fall back to the shared org key.
  */
+
+const NOT_OWNER =
+  "only the workspace owner can manage the AI provider key";
 
 function maskKey(value: string): string {
   // Reveal at most the last 4 chars, and only for a comfortably long key, so a
@@ -27,6 +38,9 @@ export async function GET(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ error: NOT_OWNER }, { status: 403 });
   }
   const snap = await aiconfigKeyDoc(session.uid).get();
   if (!snap.exists || !snap.data()?.value) {
@@ -48,6 +62,9 @@ export async function PUT(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ error: NOT_OWNER }, { status: 403 });
   }
   let body: unknown;
   try {
@@ -98,6 +115,9 @@ export async function DELETE(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+  if (!session.isSuperAdmin) {
+    return NextResponse.json({ error: NOT_OWNER }, { status: 403 });
   }
   await aiconfigKeyDoc(session.uid).delete();
   return NextResponse.json({ ok: true });
