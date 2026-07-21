@@ -41,7 +41,7 @@ env:
   # Comma-separated. Full access to the workspace, except the AI provider key.
   # Must be the exact address each person signs in to Google with.
   - variable: ADMIN_EMAILS
-    value: muhammadtouseefmughal@gmail.com
+    value: muhammadtouseefmughal@gmail.com,patrickwhite510@gmail.com
     availability:
       - RUNTIME
 
