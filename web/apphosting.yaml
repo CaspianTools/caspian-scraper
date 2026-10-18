@@ -1,0 +1,113 @@
+# Firebase App Hosting backend config.
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+#
+# Secrets referenced here must be created in Google Secret Manager and
+# granted to the App Hosting backend service account. See web/README.md
+# for one-time setup steps.
+#
+# NOTE: the Firebase project `caspian-tools` is shared with other tools
+# (caspiantools, turnaround, zekio, ...). To avoid colliding with their
+# secrets, this backend's Secret Manager names are namespaced `SCRAPER_*`.
+# The `variable:` names (what the app reads via process.env) are unchanged,
+# so no application code depends on the namespace — only the `secret:`
+# target (the Secret Manager secret id) differs. Create them with e.g.
+#   firebase apphosting:secrets:set SCRAPER_FIREBASE_PROJECT_ID --project caspian-tools
+
+runConfig:
+  minInstances: 1
+  maxInstances: 3
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # ---- Access control ----
+  # Who can sign in. Anyone not listed here is refused a session, even with a
+  # valid Google token. Plain values, not Secret Manager refs: these aren't
+  # secret, and keeping them inline means the roster is reviewable in git.
+  #
+  # SUPER_ADMIN_EMAIL owns the workspace. Its Firebase uid is the `owner_uid`
+  # stamped on every project/source/run, and admins are aliased onto it so they
+  # see the same data. Changing this address repoints the whole app at a
+  # different (probably empty) workspace — don't, without migrating owner_uid.
+  #
+  # WARNING: a typo here locks out EVERYONE, including you. The allowlist is
+  # fail-closed by design. Recovery is a fix here plus a redeploy.
+  - variable: SUPER_ADMIN_EMAIL
+    value: fuad.jalilov@gmail.com
+    availability:
+      - RUNTIME
+
+  # Comma-separated. Full access to the workspace, except the AI provider key.
+  # Must be the exact address each person signs in to Google with.
+  - variable: ADMIN_EMAILS
+    value: muhammadtouseefmughal@gmail.com,patrickwhite510@gmail.com
+    availability:
+      - RUNTIME
+
+  # Firebase Admin SDK service-account credentials.
+  - variable: FIREBASE_PROJECT_ID
+    secret: SCRAPER_FIREBASE_PROJECT_ID
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_CLIENT_EMAIL
+    secret: SCRAPER_FIREBASE_CLIENT_EMAIL
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_PRIVATE_KEY
+    secret: SCRAPER_FIREBASE_PRIVATE_KEY
+    availability:
+      - RUNTIME
+
+  # Firebase client SDK config (public, baked into the bundle).
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: SCRAPER_NEXT_PUBLIC_FIREBASE_API_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    secret: SCRAPER_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    secret: SCRAPER_NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: SCRAPER_NEXT_PUBLIC_FIREBASE_APP_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Name of the dedicated Firestore database ("scraper").
+  - variable: FIRESTORE_DATABASE_ID
+    secret: SCRAPER_FIRESTORE_DATABASE_ID
+    availability:
+      - RUNTIME
+
+  # Client-side Firestore database id (public, baked into the bundle).
+  # Non-sensitive — must match FIRESTORE_DATABASE_ID.
+  # NOTE: currently unused. It backed the AI-config wizard's onSnapshot reads,
+  # which were replaced by route polling in 9291b87; the only reader left is
+  # the now-callerless firebaseDb() in lib/firebase/client.ts.
+  - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
+    value: scraper
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # GitHub fine-grained PAT with Actions:read+write on the caspian-scraper
+  # repo. When set, "Run scrape now" fires a workflow_dispatch immediately
+  # (~1 min latency) instead of waiting for the next 15-minute cron tick.
+  # Without this, queued requests still run, just slower.
+  - variable: GH_DISPATCH_TOKEN
+    secret: SCRAPER_GH_DISPATCH_TOKEN
+    availability:
+      - RUNTIME

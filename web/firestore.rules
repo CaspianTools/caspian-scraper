@@ -1,0 +1,140 @@
+rules_version = '2';
+
+// Caspian Scraper — ownership-scoped Firestore rules.
+//
+// Model: every doc is owned by a Firebase user (UID). A user can only
+// read/write their own data. The Firebase Admin SDK (used by the web
+// app's API routes and the Python scraper) bypasses all rules — those
+// paths are governed by the backend code instead.
+//
+// NOTE ON ADMINS: the app is one shared workspace with a super admin plus
+// allowlisted admins (see web/README.md → "Who can sign in"). An admin's
+// server-side session uid is aliased to the owner's, so they read the owner's
+// data through the API routes. These rules deliberately have NO matching admin
+// bypass, and don't need one: the browser never reads Firestore directly —
+// every surface goes through an Admin-SDK route, and firebaseDb() in
+// lib/firebase/client.ts has no callers. `request.auth.uid` here would be the
+// admin's *real* uid, which by design matches no owner_uid. If you ever add a
+// client-side Firestore read, it will fail for admins until that is addressed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- /users/{uid} ----
+    // A user reads their own profile doc. Profile data (email, name,
+    // picture, last_signed_in_at, quota) is written by the backend at
+    // /api/auth/session-login. Clients can only mutate the `prefs`
+    // subobject directly.
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['prefs']);
+      allow create, delete: if false;
+    }
+
+    // ---- /projects/{projectId} ----
+    // A project's owner is identified by the `owner_uid` field. The
+    // project's owner has full read/write access to the project doc
+    // AND every subcollection (sources, destinations, runs, lessons,
+    // published). Secrets are NOT readable from the client — see below.
+    match /projects/{projectId} {
+      allow read:   if isProjectOwner();
+      allow update: if isProjectOwner()
+        && request.resource.data.owner_uid == resource.data.owner_uid;
+      allow create: if isSignedIn()
+        && request.resource.data.owner_uid == request.auth.uid;
+      allow delete: if isProjectOwner();
+
+      // Sources / destinations / runs / lessons / published —
+      // ownership inherits from the parent project.
+      match /sources/{sourceId} {
+        allow read, write: if isProjectOwner();
+      }
+      match /destinations/{destId} {
+        allow read, write: if isProjectOwner();
+      }
+      match /runs/{runId} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // runs are written only by the scraper service account
+      }
+      match /lessons/{lessonId} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // lessons are appended only by the scraper
+      }
+      match /published/{slug} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // published is written only by the scraper
+      }
+      match /findings/{slug} {
+        allow read: if isProjectOwner();
+        allow write: if false;   // findings are written only by the scraper
+      }
+
+      // Secrets: write-only from clients, never readable. The value
+      // is read only by the scraper service account (which bypasses
+      // these rules). On update, the owner can overwrite the value —
+      // they never need to read it back.
+      match /secrets/{name} {
+        allow read: if false;
+        allow create, update: if isProjectOwner()
+          && request.resource.data.keys().hasOnly(
+               ['value', 'created_at', 'updated_at'])
+          && request.resource.data.value is string
+          && request.resource.data.value.size() <= 4096;
+        allow delete: if isProjectOwner();
+      }
+
+      // Helper: a project's owner is whoever's UID matches owner_uid.
+      function isProjectOwner() {
+        return isSignedIn()
+          && request.auth.uid == get(
+               /databases/$(database)/documents/projects/$(projectId)
+             ).data.owner_uid;
+      }
+    }
+
+    // ---- /run_requests/{requestId} ----
+    // Top-level ad-hoc trigger queue. A user inserts a request; the
+    // scraper picks it up. Status updates after creation are written
+    // by the scraper (service account, bypasses rules).
+    match /run_requests/{requestId} {
+      allow read: if isSignedIn()
+        && request.auth.uid == resource.data.requested_by_uid;
+      allow create: if isSignedIn()
+        && request.resource.data.requested_by_uid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update, delete: if false;   // service account only
+    }
+
+    // ---- /config_jobs/{jobId} ----
+    // AI scraper-config wizard jobs. NO client rules (default deny): the doc is
+    // created + driven by admin-SDK routes / the agent (service account), and
+    // the wizard reads status by polling the owner-guarded route
+    // GET /api/aiconfig/jobs/[id] — not a client Firestore read. Keeping this
+    // admin-SDK-only matches /generic_* and means clients can never forge agent
+    // turns or an approved proposal.
+    match /config_jobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    // NOTE: /generic_sources, /generic_records, /generic_runs carry no
+    // client rules — like /comparison_* and /car_*, they are written and
+    // read exclusively through the Admin SDK (API routes + the scraper),
+    // which bypasses these rules. Clients get the default deny.
+
+    // ---- /aiconfig_keys/{uid} ----
+    // Per-user Anthropic API key for the AI config agent. NO client rules
+    // (default deny): the value is write-only via the admin-SDK route
+    // /api/aiconfig/key (owner-guarded) and read only by the aiconfig Actions
+    // job (service account). Clients can never read or write it directly, so a
+    // stored key can't leak back to the browser.
+    match /aiconfig_keys/{uid} {
+      allow read, write: if false;
+    }
+
+    // ---- helpers ----
+    function isSignedIn() {
+      return request.auth != null;
+    }
+  }
+}

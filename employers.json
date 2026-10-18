@@ -1,26 +1,3050 @@
 [
   {
-    "name": "Aramco",
-    "url": "https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch=",
-    "ats": "successfactors",
-    "active": true
-  },
-  {
     "name": "Halliburton",
-    "url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
+    "kind": "employer",
+    "type": "Oilfield Services",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Qatar",
+      "Iraq",
+      "Egypt"
+    ],
+    "headquarters": "UAE / Saudi Arabia",
+    "segment": "Drilling, Completions, Production",
+    "website": "https://www.halliburton.com",
+    "careers_url": "https://jobs.halliburton.com/search/?createNewAlert=false&q=hse&locationsearch=",
+    "linkedin": "https://www.linkedin.com/company/halliburton/",
     "ats": "successfactors",
-    "active": true
+    "active": true,
+    "notes": ""
   },
   {
     "name": "QatarEnergy",
-    "url": "https://careerportal.qatarenergy.qa/jobs/categories/Health+Safety+Environment+%26+Security",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "Doha",
+    "segment": "Health Safety Environment & Security category",
+    "website": "https://www.qatarenergy.qa",
+    "careers_url": "https://careerportal.qatarenergy.qa/jobs/categories/Health+Safety+Environment+%26+Security",
+    "linkedin": "https://www.linkedin.com/company/qatarenergy/",
     "ats": "jibe",
-    "active": true
+    "active": true,
+    "notes": "Active scrape target: HSE category"
   },
   {
     "name": "QatarEnergy",
-    "url": "https://careerportal.qatarenergy.qa/jobs/categories/Idd+El-Shargi+-+Health%2C+Safety++%26+Envr",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "Doha",
+    "segment": "Idd El-Shargi Health Safety & Envr category",
+    "website": "https://www.qatarenergy.qa",
+    "careers_url": "https://careerportal.qatarenergy.qa/jobs/categories/Idd+El-Shargi+-+Health%2C+Safety++%26+Envr",
+    "linkedin": "https://www.linkedin.com/company/qatarenergy/",
     "ats": "jibe",
-    "active": true
+    "active": true,
+    "notes": "Active scrape target: Idd El-Shargi HSE category"
+  },
+  {
+    "name": "Saudi Aramco",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "Dhahran",
+    "segment": "Upstream, Downstream, Chemicals, Refining",
+    "website": "https://www.aramco.com",
+    "careers_url": "https://careers.aramco.com/search/?createNewAlert=false&q=hse&locationsearch=",
+    "linkedin": "https://www.linkedin.com/company/saudi-aramco/",
+    "ats": "successfactors",
+    "active": true,
+    "notes": "World's largest oil company; main employer in KSA"
+  },
+  {
+    "name": "Abraj Energy Services",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.abrajenergy.com/careers",
+    "linkedin": "https://www.linkedin.com/company/abraj-energy-services/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Listed on MSX"
+  },
+  {
+    "name": "ADES Holding",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.adesgroup.com/careers",
+    "linkedin": "https://www.linkedin.com/company/adesgroup/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Major regional driller"
+  },
+  {
+    "name": "ADNOC (Abu Dhabi National Oil Co.)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "Abu Dhabi",
+    "segment": "Upstream, Downstream, LNG, Petrochemicals",
+    "website": "https://www.adnoc.ae",
+    "careers_url": "https://www.adnoc.ae/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ADNOC (Group)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "National Oil Company (Integrated)",
+    "website": "",
+    "careers_url": "https://jobs.adnoc.ae/",
+    "linkedin": "https://www.linkedin.com/company/adnocgroup/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Parent; jobs across all subsidiaries"
+  },
+  {
+    "name": "ADNOC Global Trading",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Trading",
+    "website": "",
+    "careers_url": "https://agtcareers.adnoc.ae/",
+    "linkedin": "https://www.linkedin.com/company/adnoc-global-trading/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ADNOC Logistics & Services",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Logistics / Marine",
+    "website": "",
+    "careers_url": "https://adnocls.ae/en/careers",
+    "linkedin": "https://www.linkedin.com/company/adnoc-logistics-services/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Listed"
+  },
+  {
+    "name": "Aker Solutions",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Subsea / EPC",
+    "website": "",
+    "careers_url": "https://www.akersolutions.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/aker-solutions/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Al-Furat Petroleum Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Syria"
+    ],
+    "headquarters": "",
+    "segment": "Upstream JV",
+    "website": "",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV SPC / Shell (suspended)"
+  },
+  {
+    "name": "Apache Egypt",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.apachecorp.com/careers",
+    "linkedin": "https://www.linkedin.com/company/apa-corporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Largest US operator in Egypt"
+  },
+  {
+    "name": "ARA Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.arapetroleum.com/careers",
+    "linkedin": "https://www.linkedin.com/company/ara-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ARO Drilling",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.arodrilling.com/careers",
+    "linkedin": "https://www.linkedin.com/company/aro-drilling/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV Aramco / Valaris"
+  },
+  {
+    "name": "Bahrain LNG",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "",
+    "segment": "LNG terminal",
+    "website": "",
+    "careers_url": "https://www.bahrainlng.com/careers",
+    "linkedin": "https://www.linkedin.com/company/bahrain-lng/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Bahri",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Marine transport / Tankers",
+    "website": "",
+    "careers_url": "https://www.bahri.sa/careers",
+    "linkedin": "https://www.linkedin.com/company/bahri/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "National shipping carrier"
+  },
+  {
+    "name": "Baker Hughes",
+    "kind": "employer",
+    "type": "Oilfield Services",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Qatar",
+      "Iraq",
+      "Egypt"
+    ],
+    "headquarters": "UAE / Saudi Arabia",
+    "segment": "Oilfield Equipment, Digital",
+    "website": "https://www.bakerhughes.com",
+    "careers_url": "https://careers.bakerhughes.com",
+    "linkedin": "https://www.linkedin.com/company/bakerhughes/",
+    "ats": "successfactors",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Banagas",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "",
+    "segment": "Gas processing",
+    "website": "",
+    "careers_url": "https://www.banagas.com.bh/careers",
+    "linkedin": "https://www.linkedin.com/company/banagas/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "BAPCO (Bahrain Petroleum Co.)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "Awali",
+    "segment": "Refining, Upstream",
+    "website": "https://www.bapco.net",
+    "careers_url": "https://www.bapco.net/careers",
+    "linkedin": "https://www.linkedin.com/company/bapco/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Bapco Energies",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "",
+    "segment": "National Oil Company",
+    "website": "",
+    "careers_url": "https://www.bapcoenergies.com/careers",
+    "linkedin": "https://www.linkedin.com/company/bapcoenergies/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Parent holding"
+  },
+  {
+    "name": "Bapco Upstream / Tatweer Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.tatweer.bh/careers",
+    "linkedin": "https://www.linkedin.com/company/tatweer-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operates Bahrain Field"
+  },
+  {
+    "name": "Bapetco",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream JV",
+    "website": "",
+    "careers_url": "https://www.bapetco.com/careers",
+    "linkedin": "https://www.linkedin.com/company/bapetco/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV EGPC / Shell"
+  },
+  {
+    "name": "Basra Oil Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (South)",
+    "website": "",
+    "careers_url": "http://www.boc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/basra-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "State-owned (South Oil Company)"
+  },
+  {
+    "name": "Bechtel",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://jobs.bechtel.com/",
+    "linkedin": "https://www.linkedin.com/company/bechtel/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Borouge",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.borouge.com/careers",
+    "linkedin": "https://www.linkedin.com/company/borouge/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV ADNOC / Borealis"
+  },
+  {
+    "name": "Borr Drilling",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.borrdrilling.com/careers",
+    "linkedin": "https://www.linkedin.com/company/borr-drilling/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "BP",
+    "kind": "employer",
+    "type": "International Oil Company (IOC)",
+    "countries": [],
+    "headquarters": "Oman / UAE",
+    "segment": "Upstream, Gas",
+    "website": "https://www.bp.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Khazzan gas project Oman"
+  },
+  {
+    "name": "BP",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt",
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.bp.com/en/global/corporate/careers.html",
+    "linkedin": "https://www.linkedin.com/company/bp/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operations across Iraq Egypt UAE Oman"
+  },
+  {
+    "name": "CC Energy Development",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.consolidatedcontractors.com/careers",
+    "linkedin": "https://www.linkedin.com/company/cc-energy-development/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Block 3 & 4"
+  },
+  {
+    "name": "Cheiron Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.cheiron-eg.com/careers",
+    "linkedin": "https://www.linkedin.com/company/cheiron-petroleum-corporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Chevron",
+    "kind": "employer",
+    "type": "International Oil Company (IOC)",
+    "countries": [],
+    "headquarters": "Saudi Arabia / Kuwait",
+    "segment": "Upstream",
+    "website": "https://www.chevron.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Saudi Arabia Partitioned Zone"
+  },
+  {
+    "name": "Chevron",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Major IOC",
+    "website": "",
+    "careers_url": "https://careers.chevron.com/",
+    "linkedin": "https://www.linkedin.com/company/chevron/",
+    "ats": "successfactors",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Chiyoda Almana Engineering",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.chiyoda-almana.com/careers",
+    "linkedin": "https://www.linkedin.com/company/chiyoda-almana-engineering/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Chiyoda Corporation",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.chiyodacorp.com/en/career/",
+    "linkedin": "https://www.linkedin.com/company/chiyoda-corporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "CNPC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "IOC / Services",
+    "website": "",
+    "careers_url": "http://www.cnpc.com.cn/en/career/",
+    "linkedin": "https://www.linkedin.com/company/cnpc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Crescent Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.crescent.ae/careers/",
+    "linkedin": "https://www.linkedin.com/company/crescent-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Privately held"
+  },
+  {
+    "name": "Daewoo E&C",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.daewooenc.com/recruit",
+    "linkedin": "https://www.linkedin.com/company/daewoo-engineering-construction/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Daleel Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.daleelpetroleum.com/careers",
+    "linkedin": "https://www.linkedin.com/company/daleel-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV MB Petroleum / CNPC"
+  },
+  {
+    "name": "Dana Gas",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Upstream gas",
+    "website": "",
+    "careers_url": "https://www.danagas.com/en-us/careers",
+    "linkedin": "https://www.linkedin.com/company/dana-gas/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Listed in Abu Dhabi"
+  },
+  {
+    "name": "Dhi Qar Oil Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "http://www.dqoc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/dhi-qar-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "DNO Iraq (Tawke)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (KRI)",
+    "website": "",
+    "careers_url": "https://www.dno.no/en/careers/",
+    "linkedin": "https://www.linkedin.com/company/dno/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Kurdistan operator"
+  },
+  {
+    "name": "Dragon Oil",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.dragonoil.com/careers",
+    "linkedin": "https://www.linkedin.com/company/dragon-oil/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "ENOC subsidiary"
+  },
+  {
+    "name": "Drydocks World",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Ship repair / Fabrication",
+    "website": "",
+    "careers_url": "https://www.drydocks.gov.ae/careers",
+    "linkedin": "https://www.linkedin.com/company/drydocks-world/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "DP World subsidiary"
+  },
+  {
+    "name": "Dubai Petroleum Establishment",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.dubaipetroleum.ae/Pages/Careers.aspx",
+    "linkedin": "https://www.linkedin.com/company/dubai-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operator of offshore Dubai"
+  },
+  {
+    "name": "EGAS",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Gas (state)",
+    "website": "",
+    "careers_url": "http://www.egas.com.eg/",
+    "linkedin": "https://www.linkedin.com/company/egas/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "EGPC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "National Oil Company",
+    "website": "",
+    "careers_url": "http://www.egpc.com.eg/",
+    "linkedin": "https://www.linkedin.com/company/egyptian-general-petroleum-corporation--egpc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Egyptian Drilling Company (EDC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.egyptiandrilling.com/careers",
+    "linkedin": "https://www.linkedin.com/company/egyptian-drilling-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV EGPC / Maridive"
+  },
+  {
+    "name": "Emerson Process",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Automation",
+    "website": "",
+    "careers_url": "https://www.emerson.com/en-us/careers",
+    "linkedin": "https://www.linkedin.com/company/emerson/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ENOC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Downstream / Integrated",
+    "website": "",
+    "careers_url": "https://careers.enoc.com/",
+    "linkedin": "https://www.linkedin.com/company/enoc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Government of Dubai"
+  },
+  {
+    "name": "ENOC (Emirates National Oil Co.)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "Dubai",
+    "segment": "Refining, Trading, Fuel Retail, Aviation",
+    "website": "https://www.enoc.com",
+    "careers_url": "https://www.enoc.com/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Enppi",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Engineering / EPC",
+    "website": "",
+    "careers_url": "https://www.enppi.com/careers",
+    "linkedin": "https://www.linkedin.com/company/enppi/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "State-owned EPC"
+  },
+  {
+    "name": "EQUATE Petrochemical",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.equate.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/equate/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Equinor",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Major IOC",
+    "website": "",
+    "careers_url": "https://www.equinor.com/careers",
+    "linkedin": "https://www.linkedin.com/company/equinor/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ExxonMobil",
+    "kind": "employer",
+    "type": "International Oil Company (IOC)",
+    "countries": [],
+    "headquarters": "Qatar",
+    "segment": "LNG, Upstream",
+    "website": "https://www.exxonmobil.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "RasGas / QatarEnergy LNG partner"
+  },
+  {
+    "name": "ExxonMobil",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt",
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Upstream / Lubes",
+    "website": "",
+    "careers_url": "https://corporate.exxonmobil.com/careers",
+    "linkedin": "https://www.linkedin.com/company/exxonmobil/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Fertiglobe",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Fertilizers / Petchem",
+    "website": "",
+    "careers_url": "https://www.fertiglobe.com/careers",
+    "linkedin": "https://www.linkedin.com/company/fertiglobe/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV ADNOC / OCI"
+  },
+  {
+    "name": "Fluor",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.fluor.com/careers",
+    "linkedin": "https://www.linkedin.com/company/fluor-corporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Galfar Engineering",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE",
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "EPC contractor",
+    "website": "",
+    "careers_url": "https://www.galfar.com/careers",
+    "linkedin": "https://www.linkedin.com/company/galfar-engineering/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "GASCO",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Gas pipelines",
+    "website": "",
+    "careers_url": "http://www.gasco.com.eg/",
+    "linkedin": "https://www.linkedin.com/company/gasco-egypt/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Gazprom Neft Badra",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.gazprom-neft.com/career/",
+    "linkedin": "https://www.linkedin.com/company/gazprom-neft/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Badra field"
+  },
+  {
+    "name": "Genel Energy",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (KRI)",
+    "website": "",
+    "careers_url": "https://www.genelenergy.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/genel-energy/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "GPIC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Bahrain"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals / Fertilizers",
+    "website": "",
+    "careers_url": "https://www.gpic.com/careers",
+    "linkedin": "https://www.linkedin.com/company/gulf-petrochemical-industries-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Gulf Drilling International",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.gdi.com.qa/careers",
+    "linkedin": "https://www.linkedin.com/company/gulf-drilling-international/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Honeywell UOP",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Refining / Petchem tech",
+    "website": "",
+    "careers_url": "https://careers.honeywell.com/",
+    "linkedin": "https://www.linkedin.com/company/honeywell/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Hydrocarbon Finder E&P",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.hydrocarbonfinder.com/careers",
+    "linkedin": "https://www.linkedin.com/company/hydrocarbon-finder/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Hyundai E&C",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.hdec.kr/en/recruit/",
+    "linkedin": "https://www.linkedin.com/company/hyundai-engineering-construction/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Hyundai Engineering",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "Saudi Arabia / Kuwait",
+    "segment": "Refining, Petrochemicals EPC",
+    "website": "https://www.hyundai-eng.co.kr",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Clean Fuels Project Kuwait"
+  },
+  {
+    "name": "Hyundai Engineering",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://career.hec.co.kr/",
+    "linkedin": "https://www.linkedin.com/company/hyundai-engineering/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "ICOFC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.icofc.ir/",
+    "linkedin": "https://www.linkedin.com/company/icofc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "IEOC (Eni Egypt)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt",
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.eni.com/en-IT/careers.html",
+    "linkedin": "https://www.linkedin.com/company/eni/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Zohr operator"
+  },
+  {
+    "name": "Industries",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Holding (Petchem / Steel)",
+    "website": "",
+    "careers_url": "https://www.iq.com.qa/careers",
+    "linkedin": "https://www.linkedin.com/company/industries-qatar/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Inpex",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Major IOC",
+    "website": "",
+    "careers_url": "https://www.inpex.co.jp/english/careers/",
+    "linkedin": "https://www.linkedin.com/company/inpex/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "UAE"
+  },
+  {
+    "name": "IOEC (Iranian Offshore Engineering & Construction)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.ioec.com/",
+    "linkedin": "https://www.linkedin.com/company/ioec/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Iraq Drilling Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "http://www.idc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/iraqi-drilling-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Iraq Petroleum Pipelines Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Midstream",
+    "website": "",
+    "careers_url": "http://www.oil.gov.iq/",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "State-owned"
+  },
+  {
+    "name": "JGC Holdings",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.jgc.com/en/careers/",
+    "linkedin": "https://www.linkedin.com/company/jgc-corporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Jordan Petroleum Refinery Company (JPRC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Jordan"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.jopetrol.com.jo/careers",
+    "linkedin": "https://www.linkedin.com/company/jordan-petroleum-refinery-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "KBR",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia",
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Engineering / EPC",
+    "website": "",
+    "careers_url": "https://careers.kbr.com/",
+    "linkedin": "https://www.linkedin.com/company/kbr-inc/",
+    "ats": "successfactors",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "KGOC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (Neutral Zone)",
+    "website": "",
+    "careers_url": "https://www.kgoc.com.kw/careers",
+    "linkedin": "https://www.linkedin.com/company/kgoc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operations in PNZ"
+  },
+  {
+    "name": "Khalda Petroleum",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream JV",
+    "website": "",
+    "careers_url": "https://www.khalda-eg.com/careers",
+    "linkedin": "https://www.linkedin.com/company/khalda-petroleum/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV EGPC / Apache"
+  },
+  {
+    "name": "KIPIC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Refining / LNG",
+    "website": "",
+    "careers_url": "https://kipic.com.kw/careers/",
+    "linkedin": "https://www.linkedin.com/company/kipic/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operates Al-Zour refinery"
+  },
+  {
+    "name": "KNPC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.knpc.com/en/Careers",
+    "linkedin": "https://www.linkedin.com/company/knpc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Merging with KIPIC"
+  },
+  {
+    "name": "KNPC (Kuwait National Petroleum Co.)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "Kuwait City",
+    "segment": "Refining, LPG, Sulfur",
+    "website": "https://www.knpc.com",
+    "careers_url": "https://www.knpc.com/en/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "KUFPEC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "International upstream",
+    "website": "",
+    "careers_url": "https://www.kufpec.com/careers",
+    "linkedin": "https://www.linkedin.com/company/kufpec/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Kuwait Drilling Company (Burgan)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.burganco.com/careers",
+    "linkedin": "https://www.linkedin.com/company/burgan-drilling/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Kuwait Oil Company (KOC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.kockw.com/sites/EN/Pages/Join%20Us/Join-Us.aspx",
+    "linkedin": "https://www.linkedin.com/company/kuwait-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Kuwait Oil Tanker Company (KOTC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Tankers / Shipping",
+    "website": "",
+    "careers_url": "https://www.kotc.com.kw/careers",
+    "linkedin": "https://www.linkedin.com/company/kotc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Kuwait Petroleum Corporation (KPC)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "Kuwait City",
+    "segment": "Upstream, Downstream, Refining",
+    "website": "https://www.kpc.com.kw",
+    "careers_url": "https://www.kpc.com.kw/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Kuwait Petroleum Corporation (KPC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Holding (National Oil)",
+    "website": "",
+    "careers_url": "https://www.kpc.com.kw/KPCCareers",
+    "linkedin": "https://www.linkedin.com/company/kuwaitpetroleumcorporation/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Umbrella parent"
+  },
+  {
+    "name": "L&T Energy Hydrocarbon (Saudi)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://careers.larsentoubro.com/",
+    "linkedin": "https://www.linkedin.com/company/larsentoubro/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "L&T Hydrocarbon Engineering",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "UAE / Saudi Arabia / Oman",
+    "segment": "Onshore & Offshore EPC",
+    "website": "https://www.lnthydrocarbon.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Growing ME footprint"
+  },
+  {
+    "name": "Lamprell",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Fabrication / Rigs",
+    "website": "",
+    "careers_url": "https://www.lamprell.com/careers",
+    "linkedin": "https://www.linkedin.com/company/lamprell/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Luberef",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Base oils refining",
+    "website": "",
+    "careers_url": "https://www.luberef.com.sa/careers",
+    "linkedin": "https://www.linkedin.com/company/luberef/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Aramco subsidiary"
+  },
+  {
+    "name": "Maersk Drilling / Noble Corp",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.noblecorp.com/careers",
+    "linkedin": "https://www.linkedin.com/company/noblecorp/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Manaseer Oil & Gas",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Jordan"
+    ],
+    "headquarters": "",
+    "segment": "Downstream",
+    "website": "",
+    "careers_url": "https://www.manaseergroup.com/careers",
+    "linkedin": "https://www.linkedin.com/company/manaseer-group/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "McDermott",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "Dubai",
+    "segment": "Offshore EPC, Subsea",
+    "website": "https://www.mcdermott.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Qatar North Field Expansion"
+  },
+  {
+    "name": "McDermott",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Offshore",
+    "website": "",
+    "careers_url": "https://www.mcdermott.com/careers/search-apply",
+    "linkedin": "https://www.linkedin.com/company/mcdermott-international-inc-/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Midland Oil Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "http://www.midoc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/midland-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Missan Oil Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "http://www.missanoc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/missan-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Mubadala Energy",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.mubadalaenergy.com/careers",
+    "linkedin": "https://www.linkedin.com/company/mubadala-energy/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Formerly Mubadala Petroleum"
+  },
+  {
+    "name": "Nakilat",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "LNG shipping",
+    "website": "",
+    "careers_url": "https://www.nakilat.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/nakilat/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "National Petroleum Company (NPC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Jordan"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.npc.com.jo/",
+    "linkedin": "https://www.linkedin.com/company/national-petroleum-company-jordan/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NIDC (National Iranian Drilling)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.nidc.ir/",
+    "linkedin": "https://www.linkedin.com/company/national-iranian-drilling-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NIGC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "National gas",
+    "website": "",
+    "careers_url": "https://www.nigc.ir/",
+    "linkedin": "https://www.linkedin.com/company/national-iranian-gas-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NIOC (National Iranian Oil Company)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "National Oil Company",
+    "website": "",
+    "careers_url": "https://www.nioc.ir/",
+    "linkedin": "https://www.linkedin.com/company/national-iranian-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Subject to international sanctions"
+  },
+  {
+    "name": "NIORDC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "Refining / Distribution",
+    "website": "",
+    "careers_url": "https://www.niordc.ir/",
+    "linkedin": "https://www.linkedin.com/company/niordc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NMDC Energy",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Marine",
+    "website": "",
+    "careers_url": "https://www.nmdc.com/careers",
+    "linkedin": "https://www.linkedin.com/company/nmdc-energy/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Formerly NPCC parent"
+  },
+  {
+    "name": "North Oil Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (North)",
+    "website": "",
+    "careers_url": "http://www.noc.oil.gov.iq/",
+    "linkedin": "https://www.linkedin.com/company/north-oil-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Kirkuk fields"
+  },
+  {
+    "name": "NPC (National Petrochemical Co)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.nipc.net/",
+    "linkedin": "https://www.linkedin.com/company/national-petrochemical-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NPCC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Offshore",
+    "website": "",
+    "careers_url": "https://www.npcc.ae/npccweb/career/default.aspx",
+    "linkedin": "https://www.linkedin.com/company/npcc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Major EPC; HQ Abu Dhabi"
+  },
+  {
+    "name": "NPCC (National Petroleum Construction Co.)",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "Abu Dhabi",
+    "segment": "Offshore Fabrication & EPC",
+    "website": "https://www.npcc.ae",
+    "careers_url": "https://www.npcc.ae/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "NPS (National Petroleum Services)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Oilfield services",
+    "website": "",
+    "careers_url": "https://www.nps-sa.com/careers",
+    "linkedin": "https://www.linkedin.com/company/nationalpetroleumservices/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Oman LNG",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "LNG",
+    "website": "",
+    "careers_url": "https://www.omanlng.com/en/Careers",
+    "linkedin": "https://www.linkedin.com/company/oman-lng-llc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Oman Oil Company (OQ)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "Muscat",
+    "segment": "Upstream, Downstream, Petrochemicals",
+    "website": "https://www.oq.com",
+    "careers_url": "https://www.oq.com/en/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "OMV",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Major IOC",
+    "website": "",
+    "careers_url": "https://www.omv.com/en/careers",
+    "linkedin": "https://www.linkedin.com/company/omv/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "UAE Yemen"
+  },
+  {
+    "name": "OQ",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Integrated energy",
+    "website": "",
+    "careers_url": "https://careers.oq.com/",
+    "linkedin": "https://www.linkedin.com/company/thisisoq/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Formed from Oman Oil + Orpic"
+  },
+  {
+    "name": "OQ8 (Duqm Refinery)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.oq8.om/careers",
+    "linkedin": "https://www.linkedin.com/company/oq8-duqm/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV OQ / Kuwait Petroleum"
+  },
+  {
+    "name": "Pars Oil and Gas Company (POGC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iran"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.pogc.ir/",
+    "linkedin": "https://www.linkedin.com/company/pars-oil-and-gas-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "South Pars operator"
+  },
+  {
+    "name": "PDO (Petroleum Development Oman)",
+    "kind": "employer",
+    "type": "E&P Operator",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "Muscat",
+    "segment": "Upstream Exploration & Production",
+    "website": "https://www.pdo.co.om",
+    "careers_url": "https://www.pdo.co.om/en/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Petro Rabigh",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Refining / Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.petrorabigh.com/en/careers",
+    "linkedin": "https://www.linkedin.com/company/petro-rabigh/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV Saudi Aramco / Sumitomo"
+  },
+  {
+    "name": "Petrobel",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream JV",
+    "website": "",
+    "careers_url": "https://www.petrobel.com.eg/careers",
+    "linkedin": "https://www.linkedin.com/company/petrobel/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV EGPC / Eni"
+  },
+  {
+    "name": "Petrofac",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "Abu Dhabi / Saudi Arabia",
+    "segment": "Onshore EPC, Operations",
+    "website": "https://www.petrofac.com",
+    "careers_url": "https://www.petrofac.com/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Petrofac",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Services",
+    "website": "",
+    "careers_url": "https://petrofac.referrals.selectminds.com/",
+    "linkedin": "https://www.linkedin.com/company/petrofac/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Petrogas E&P",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.petrogas.com.om/careers",
+    "linkedin": "https://www.linkedin.com/company/petrogas-e-p-llc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Petrojet",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Construction",
+    "website": "",
+    "careers_url": "https://www.petrojet.com.eg/careers",
+    "linkedin": "https://www.linkedin.com/company/petrojet/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "State-owned"
+  },
+  {
+    "name": "Petroleum Development Oman (PDO)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.petrojobs.om/",
+    "linkedin": "https://www.linkedin.com/company/petroleum-development-oman/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "~70% of Oman crude output"
+  },
+  {
+    "name": "PetroMasila",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Yemen"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.petromasila.com/careers",
+    "linkedin": "https://www.linkedin.com/company/petromasila/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "PIC (Petrochemical Industries Company)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Kuwait"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.pic.com.kw/careers",
+    "linkedin": "https://www.linkedin.com/company/petrochemical-industries-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "QAFAC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Methanol / MTBE",
+    "website": "",
+    "careers_url": "https://www.qafac.com.qa/careers",
+    "linkedin": "https://www.linkedin.com/company/qafac/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "QAFCO",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Fertilizers",
+    "website": "",
+    "careers_url": "https://www.qafco.com/careers",
+    "linkedin": "https://www.linkedin.com/company/qafco/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "QAPCO",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://www.qapco.com/careers",
+    "linkedin": "https://www.linkedin.com/company/qapco/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Qatar Fuel (WOQOD)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "Fuel retail / distribution",
+    "website": "",
+    "careers_url": "https://www.woqod.com.qa/careers",
+    "linkedin": "https://www.linkedin.com/company/woqod/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Listed on QE"
+  },
+  {
+    "name": "QatarEnergy",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar",
+      "Lebanon"
+    ],
+    "headquarters": "",
+    "segment": "National Oil Company (Integrated)",
+    "website": "",
+    "careers_url": "https://careerportal.qatarenergy.qa/",
+    "linkedin": "https://www.linkedin.com/company/qatarenergy/",
+    "ats": "jibe",
+    "active": false,
+    "notes": "Largest LNG exporter"
+  },
+  {
+    "name": "QatarEnergy (formerly Qatar Petroleum)",
+    "kind": "employer",
+    "type": "National Oil Company (NOC)",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "Doha",
+    "segment": "Upstream, LNG, Petrochemicals",
+    "website": "https://www.qatarenergy.qa",
+    "careers_url": "https://www.qatarenergy.qa/en/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "QatarEnergy LNG",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Qatar"
+    ],
+    "headquarters": "",
+    "segment": "LNG",
+    "website": "",
+    "careers_url": "https://careers.qatarenergylng.qa/",
+    "linkedin": "https://www.linkedin.com/company/qatarenergy-lng/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Combined Qatargas / RasGas"
+  },
+  {
+    "name": "Repsol",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Major IOC",
+    "website": "",
+    "careers_url": "https://www.repsol.com/en/careers/",
+    "linkedin": "https://www.linkedin.com/company/repsol/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "SABIC",
+    "kind": "employer",
+    "type": "Petrochemicals",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "Riyadh",
+    "segment": "Chemicals, Fertilizers, Metals, Plastics",
+    "website": "https://www.sabic.com",
+    "careers_url": "https://www.sabic.com/en/careers",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "SABIC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Petrochemicals",
+    "website": "",
+    "careers_url": "https://jobs.sabic.com/",
+    "linkedin": "https://www.linkedin.com/company/sabic/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Global petrochemical leader; Aramco subsidiary"
+  },
+  {
+    "name": "Saipem",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "UAE / Saudi Arabia",
+    "segment": "Offshore & Onshore EPC",
+    "website": "https://www.saipem.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Marjan, North Field Expansion"
+  },
+  {
+    "name": "Saipem",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia",
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "EPC / Offshore",
+    "website": "",
+    "careers_url": "https://jobs.saipem.com/",
+    "linkedin": "https://www.linkedin.com/company/saipem/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Saipem subsidiary"
+  },
+  {
+    "name": "SAMREF",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.samref.com.sa/careers",
+    "linkedin": "https://www.linkedin.com/company/samref/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV Aramco / ExxonMobil"
+  },
+  {
+    "name": "Samsung Engineering",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "Saudi Arabia / UAE",
+    "segment": "Onshore EPC, Petrochemicals",
+    "website": "https://www.samsungengineering.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Jafurah, SATORP projects"
+  },
+  {
+    "name": "Samsung Engineering",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.samsungengineering.com/recruit/",
+    "linkedin": "https://www.linkedin.com/company/samsung-engineering/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "SATORP",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.satorp.com/en/careers",
+    "linkedin": "https://www.linkedin.com/company/satorp/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV Aramco / TotalEnergies"
+  },
+  {
+    "name": "Seadrill",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.seadrill.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/seadrill/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Shelf Drilling",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.shelfdrilling.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/shelf-drilling/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Shell",
+    "kind": "employer",
+    "type": "International Oil Company (IOC)",
+    "countries": [],
+    "headquarters": "Qatar / Oman",
+    "segment": "LNG, Upstream, Downstream",
+    "website": "https://www.shell.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Pearl GTL Qatar, Oman ops"
+  },
+  {
+    "name": "Shell",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt",
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://www.shell.com/careers.html",
+    "linkedin": "https://www.linkedin.com/company/shell/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operations across Oman Iraq Egypt"
+  },
+  {
+    "name": "Sinopec Engineering",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "http://www.segroup.cn/",
+    "linkedin": "https://www.linkedin.com/company/sinopec-engineering-group/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "SLB (Schlumberger)",
+    "kind": "employer",
+    "type": "Oilfield Services",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Qatar",
+      "Iraq",
+      "Egypt"
+    ],
+    "headquarters": "Abu Dhabi",
+    "segment": "Drilling, Well Services, Digital",
+    "website": "https://www.slb.com",
+    "careers_url": "https://careers.slb.com",
+    "linkedin": "https://www.linkedin.com/company/slb/",
+    "ats": "successfactors",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Stena Drilling",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.stena-drilling.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/stena-drilling/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Subsea7",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Subsea / EPC",
+    "website": "",
+    "careers_url": "https://www.subsea7.com/en/careers.html",
+    "linkedin": "https://www.linkedin.com/company/subsea-7/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Suez Oil Processing Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.sopc.com.eg/",
+    "linkedin": "https://www.linkedin.com/company/suez-oil-processing-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "SUMED (Arab Petroleum Pipelines)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Midstream / Pipelines",
+    "website": "",
+    "careers_url": "https://www.sumed.com.eg/careers",
+    "linkedin": "https://www.linkedin.com/company/sumed/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Syrian Gas Company",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Syria"
+    ],
+    "headquarters": "",
+    "segment": "Gas",
+    "website": "",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "State-owned"
+  },
+  {
+    "name": "Syrian Petroleum Company (SPC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Syria"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (state)",
+    "website": "",
+    "careers_url": "http://www.spc.com.sy/",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Subject to sanctions"
+  },
+  {
+    "name": "TAQA",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Power / Utilities & Oil",
+    "website": "",
+    "careers_url": "https://www.taqa.com/careers/",
+    "linkedin": "https://www.linkedin.com/company/taqa/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Listed; integrated energy"
+  },
+  {
+    "name": "TechnipFMC",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "UAE"
+    ],
+    "headquarters": "",
+    "segment": "Subsea / EPC",
+    "website": "",
+    "careers_url": "https://www.technipfmc.com/en/careers/",
+    "linkedin": "https://www.linkedin.com/company/technipfmc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Tecnicas Reunidas",
+    "kind": "employer",
+    "type": "EPC Contractor",
+    "countries": [],
+    "headquarters": "Saudi Arabia / UAE",
+    "segment": "Refining, Petrochemicals EPC",
+    "website": "https://www.tecnicasreunidas.es",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Jubail, Jafurah projects"
+  },
+  {
+    "name": "Tecnicas Reunidas",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.tecnicasreunidas.es/en/careers/",
+    "linkedin": "https://www.linkedin.com/company/tecnicas-reunidas/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Tecnimont (Maire Tecnimont)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "EPC",
+    "website": "",
+    "careers_url": "https://www.mairetecnimont.com/en/careers",
+    "linkedin": "https://www.linkedin.com/company/maire-tecnimont-group/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "TotalEnergies",
+    "kind": "employer",
+    "type": "International Oil Company (IOC)",
+    "countries": [],
+    "headquarters": "Abu Dhabi / Doha",
+    "segment": "Upstream, LNG, Renewables",
+    "website": "https://www.totalenergies.com",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Major presence in UAE & Qatar"
+  },
+  {
+    "name": "TotalEnergies",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt",
+      "Lebanon",
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Upstream / Marketing",
+    "website": "",
+    "careers_url": "https://careers.totalenergies.com/",
+    "linkedin": "https://www.linkedin.com/company/totalenergies/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operator Block 9"
+  },
+  {
+    "name": "Valaris",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Drilling",
+    "website": "",
+    "careers_url": "https://www.valaris.com/careers",
+    "linkedin": "https://www.linkedin.com/company/valaris/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Weatherford",
+    "kind": "employer",
+    "type": "Oilfield Services",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Iraq",
+      "Egypt"
+    ],
+    "headquarters": "UAE / Oman / KSA",
+    "segment": "Well Construction, Completions",
+    "website": "https://www.weatherford.com",
+    "careers_url": "https://www.weatherford.com/careers",
+    "linkedin": "https://www.linkedin.com/company/weatherford/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "WEPCO",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream JV",
+    "website": "",
+    "careers_url": "https://www.wepco.com.eg/",
+    "linkedin": "https://www.linkedin.com/company/wepco/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV EGPC / IEOC"
+  },
+  {
+    "name": "WesternZagros Resources",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Upstream (KRI)",
+    "website": "",
+    "careers_url": "https://www.westernzagros.com/careers",
+    "linkedin": "https://www.linkedin.com/company/westernzagros-resources/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Wintershall Dea",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Egypt"
+    ],
+    "headquarters": "",
+    "segment": "Upstream",
+    "website": "",
+    "careers_url": "https://wintershalldea.com/en/careers",
+    "linkedin": "https://www.linkedin.com/company/wintershalldea/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Wood (formerly Wood Group)",
+    "kind": "employer",
+    "type": "Engineering / EPC",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Regional"
+    ],
+    "headquarters": "UAE / Oman / KSA",
+    "segment": "Engineering, Consulting, Operations",
+    "website": "https://www.woodplc.com",
+    "careers_url": "https://www.woodplc.com/careers",
+    "linkedin": "https://www.linkedin.com/company/woodplc/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Worley",
+    "kind": "employer",
+    "type": "Engineering / EPC",
+    "countries": [
+      "Saudi Arabia",
+      "UAE",
+      "Regional"
+    ],
+    "headquarters": "UAE / Saudi Arabia",
+    "segment": "Engineering, Consulting, Procurement",
+    "website": "https://www.worley.com",
+    "careers_url": "https://www.worley.com/careers",
+    "linkedin": "https://www.linkedin.com/company/worley/",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "YASREF",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Refining",
+    "website": "",
+    "careers_url": "https://www.yasref.com/careers",
+    "linkedin": "https://www.linkedin.com/company/yasref/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "JV Aramco / Sinopec"
+  },
+  {
+    "name": "Yemen LNG",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Yemen"
+    ],
+    "headquarters": "",
+    "segment": "LNG",
+    "website": "",
+    "careers_url": "",
+    "linkedin": "https://www.linkedin.com/company/yemen-lng-company/",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Operations suspended"
+  },
+  {
+    "name": "Yemen Oil & Gas Corporation (YOGC)",
+    "kind": "employer",
+    "type": "",
+    "countries": [
+      "Yemen"
+    ],
+    "headquarters": "",
+    "segment": "National",
+    "website": "",
+    "careers_url": "",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": ""
+  },
+  {
+    "name": "Adecco",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [
+      "UAE",
+      "Saudi Arabia"
+    ],
+    "headquarters": "",
+    "segment": "Oil & Gas, Energy, Petrochemicals",
+    "website": "https://www.adecco.com/en-ae",
+    "careers_url": "https://www.adecco.com/en-ae",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "50+ years HR expertise; dedicated ME energy consultants"
+  },
+  {
+    "name": "Airswift",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Energy, Infrastructure",
+    "website": "https://www.airswift.com",
+    "careers_url": "https://www.airswift.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Global energy workforce solutions; UAE-focused"
+  },
+  {
+    "name": "Bayt.com",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Job Board all sectors incl. O&G, HSE",
+    "website": "https://www.bayt.com",
+    "careers_url": "https://www.bayt.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Largest ME job board; active HSE listings"
+  },
+  {
+    "name": "Brunel",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [
+      "UAE",
+      "Qatar",
+      "Kuwait",
+      "Iraq"
+    ],
+    "headquarters": "",
+    "segment": "Oil & Gas, Energy, Mining, Infrastructure",
+    "website": "https://www.brunel.net/en/middle-east",
+    "careers_url": "https://www.brunel.net/en/middle-east",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "45 years expertise; offices in Abu Dhabi, Doha, Baghdad"
+  },
+  {
+    "name": "Capstone Solutions",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering",
+    "website": "https://capstone-solutions.com",
+    "careers_url": "https://capstone-solutions.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Specialist UAE O&G recruitment"
+  },
+  {
+    "name": "GulfTalent",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Job Board all sectors incl. O&G, HSE",
+    "website": "https://www.gulftalent.com",
+    "careers_url": "https://www.gulftalent.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "2,143+ HSE Manager vacancies listed"
+  },
+  {
+    "name": "Hays",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [
+      "UAE",
+      "Saudi Arabia",
+      "Qatar",
+      "Bahrain",
+      "Kuwait",
+      "Oman"
+    ],
+    "headquarters": "",
+    "segment": "Oil & Gas, HSE, Engineering",
+    "website": "https://www.hays.ae",
+    "careers_url": "https://www.hays.ae",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Active HSE Manager listings; 10+ years in GCC"
+  },
+  {
+    "name": "Indeed Middle East",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Job Board all sectors",
+    "website": "https://ae.indeed.com",
+    "careers_url": "https://ae.indeed.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Major global job board with ME coverage"
+  },
+  {
+    "name": "LinkedIn Jobs",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [
+      "Regional"
+    ],
+    "headquarters": "",
+    "segment": "Professional Network & Job Board",
+    "website": "https://www.linkedin.com/jobs",
+    "careers_url": "https://www.linkedin.com/jobs",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Essential for networking and direct applications"
+  },
+  {
+    "name": "Michael Page",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering, HSE",
+    "website": "https://www.michaelpage.ae",
+    "careers_url": "https://www.michaelpage.ae",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Senior and executive-level O&G placements"
+  },
+  {
+    "name": "NES Fircroft",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Power, Petrochemicals",
+    "website": "https://www.nesfircroft.com",
+    "careers_url": "https://www.nesfircroft.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "First ME office 1999; strong HSE recruitment track record"
+  },
+  {
+    "name": "Progressive Recruitment",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering",
+    "website": "https://www.progressiverecruitment.com",
+    "careers_url": "https://www.progressiverecruitment.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Engineering jobs incl. upstream O&G"
+  },
+  {
+    "name": "Robert Half",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Finance, Engineering",
+    "website": "https://www.roberthalf.ae",
+    "careers_url": "https://www.roberthalf.ae",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Specialist professional recruitment"
+  },
+  {
+    "name": "Sawaeed Employment",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering",
+    "website": "https://sawaeed.ae",
+    "careers_url": "https://sawaeed.ae",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Leading Abu Dhabi O&G recruitment agency"
+  },
+  {
+    "name": "Sundus",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering, HSE",
+    "website": "https://www.sundusglobal.com",
+    "careers_url": "https://www.sundusglobal.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "UAE-based; customised staffing solutions"
+  },
+  {
+    "name": "Talascend",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Engineering",
+    "website": "https://www.talascend.com",
+    "careers_url": "https://www.talascend.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Technical & engineering recruitment"
+  },
+  {
+    "name": "TRS Staffing Solutions",
+    "kind": "agency",
+    "type": "Recruitment Agency",
+    "countries": [],
+    "headquarters": "",
+    "segment": "Oil & Gas, Energy",
+    "website": "https://www.trsstaffing.com",
+    "careers_url": "https://www.trsstaffing.com",
+    "linkedin": "",
+    "ats": "unknown",
+    "active": false,
+    "notes": "Specialist oil & gas staffing in ME"
   }
 ]

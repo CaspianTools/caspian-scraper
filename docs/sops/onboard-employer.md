@@ -103,22 +103,32 @@ isolation.
    `tests/test_parsers.py` so future selector drift gets caught on PR.
 6. Use the new key (e.g. `"workday"`) as the `ats` value in Step 6.
 
-## Step 6 — Add the entry to `employers.json`
+## Step 6 — Add or update the entry in `employers.json`
 
-Append a new object to the array:
+`employers.json` carries every known ME oil-and-gas employer plus recruitment agencies — most are staged as `"active": false` with `"ats": "unknown"` until they're classified. To onboard a new scrape target, either flip an existing entry's `active`/`ats`/`careers_url` or append a fresh object.
+
+Full schema:
 
 ```json
 {
   "name": "Schlumberger",
-  "url": "https://careers.slb.com/search/?q=hse&locationsearch=",
+  "kind": "employer",
+  "type": "Oilfield Services",
+  "countries": ["UAE", "Saudi Arabia"],
+  "headquarters": "Abu Dhabi",
+  "segment": "Drilling, Well Services, Digital",
+  "website": "https://www.slb.com",
+  "careers_url": "https://careers.slb.com/search/?q=hse&locationsearch=",
+  "linkedin": "https://www.linkedin.com/company/slb/",
   "ats": "successfactors",
-  "active": true
+  "active": true,
+  "notes": ""
 }
 ```
 
-All four fields are required — the loader at `scrape.py` lines 517–525 rejects entries that are missing any of them.
+Required for the scraper: `name`, `careers_url`, `ats`, `active`. The other fields are metadata. The loader rejects entries missing any of the four required keys.
 
-Set `"active": false` to onboard but pause; flip to `true` when ready.
+Set `"active": false` to keep staged; flip to `true` when ready. The `careers_url` should be the HSE-filtered search URL, not the careers landing page.
 
 ## Step 7 — Test locally
 

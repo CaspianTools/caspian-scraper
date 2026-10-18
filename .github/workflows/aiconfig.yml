@@ -1,0 +1,71 @@
+name: AI scraper-config wizard
+
+# Runs the AI scraper-config agent for a single /config_jobs/{id}. The web
+# wizard writes the job doc, then fires this workflow via workflow_dispatch
+# (fire-and-forget). The agent (`python -m aiconfig --job <id>`) inspects the
+# site, proposes a generic-source config (or escalates to a generated
+# adapter), and writes its progress back to the same Firestore doc, which the
+# wizard UI subscribes to live.
+#
+# Required repo secrets:
+#   FIREBASE_ADMIN_SA_JSON  Service-account JSON with Firestore User on the
+#                           `scraper` database.
+#   CLASSIFIEDS_AI_KEY      Anthropic API key (preferred). Falls back to
+#                           ANTHROPIC_API_KEY when unset.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "Config job to run (Firestore /config_jobs doc ID)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  aiconfig:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run aiconfig agent
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_ADMIN_SA_JSON }}
+          FIRESTORE_DATABASE_ID: scraper
+          ANTHROPIC_API_KEY: ${{ secrets.CLASSIFIEDS_AI_KEY || secrets.ANTHROPIC_API_KEY }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: python -m aiconfig --job "$JOB_ID"
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          gh issue create \
+            --title "aiconfig failed: run #${RUN_NUMBER}" \
+            --body "The aiconfig workflow failed.
+
+          - Run: ${RUN_URL}
+          - Config job: \`${JOB_ID}\`
+
+          Inspect the logs and the Firestore /config_jobs/${JOB_ID} doc (its \`error\` field)." \
+            || echo "::warning::failed to open issue; check workflow permissions"

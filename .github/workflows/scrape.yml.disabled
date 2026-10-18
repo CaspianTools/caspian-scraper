@@ -37,9 +37,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/data.json
+          git add docs/data.json state/lessons.jsonl
           if git diff --cached --quiet; then
-            echo "no dashboard changes to commit"
+            echo "no dashboard or lesson changes to commit"
           else
             git commit -m "scraper: update dashboard data [skip ci]"
             git push
