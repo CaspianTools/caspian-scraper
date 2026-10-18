@@ -1782,12 +1782,56 @@ def load_project(db, project_id: str) -> dict | None:
     return _doc_with_id(snap)
 
 
-def load_sources(db, project_id: str, *, active_only: bool = True) -> list[dict]:
+def load_sources(
+    db,
+    project_id: str,
+    *,
+    active_only: bool = True,
+    project: dict | None = None,
+) -> list[dict]:
+    """
+    A project's sources = its own /projects/{id}/sources subcollection plus
+    the shared /resources/{rid} docs listed in the project's `resource_ids`.
+    Shared resources are tagged `__resource=True` so per-source writes
+    (last_run_summary) land on the shared doc, and are only honoured when
+    their owner_uid matches the project's. A careers_url that appears in
+    both is scraped once (the project's own copy wins).
+    """
     col = db.collection("projects").document(project_id).collection("sources")
     q = col
     if active_only:
         q = q.where(filter=FieldFilter("active", "==", True))
-    return [_doc_with_id(d) for d in q.stream()]
+    sources = [_doc_with_id(d) for d in q.stream()]
+
+    if project is None:
+        project = load_project(db, project_id) or {}
+    resource_ids = [
+        str(r) for r in (project.get("resource_ids") or []) if str(r).strip()
+    ]
+    if not resource_ids:
+        return sources
+
+    owner = project.get("owner_uid")
+    seen_urls = {
+        str(s.get("careers_url") or "").strip().rstrip("/").lower()
+        for s in sources
+    }
+    refs = [db.collection("resources").document(rid) for rid in resource_ids]
+    for snap in db.get_all(refs):
+        if not snap.exists:
+            continue
+        res = _doc_with_id(snap)
+        if owner and res.get("owner_uid") != owner:
+            continue
+        if active_only and res.get("active") is not True:
+            continue
+        url_key = str(res.get("careers_url") or "").strip().rstrip("/").lower()
+        if url_key and url_key in seen_urls:
+            continue
+        seen_urls.add(url_key)
+        res["__resource"] = True
+        sources.append(res)
+    return sources
 
 
 def load_destinations(db, project_id: str) -> list[dict]:
@@ -2095,7 +2139,9 @@ def run_project(
     overrun = False
 
     try:
-        sources = load_sources(db, project_id, active_only=True)
+        sources = load_sources(
+            db, project_id, active_only=True, project=project
+        )
         destinations = load_destinations(db, project_id)
         secrets = load_secrets(db, project_id)
 
@@ -2515,10 +2561,16 @@ def _write_lesson(
 
     # Best-effort update of the source's last_run_summary mirror — gives
     # the Sources table a quick "last X / Y" badge without a runs join.
+    # Shared resources keep one summary: the latest run by any job.
     try:
-        (
-            db.collection("projects").document(project_id)
+        source_ref = (
+            db.collection("resources").document(source["__id"])
+            if source.get("__resource")
+            else db.collection("projects").document(project_id)
             .collection("sources").document(source["__id"])
+        )
+        (
+            source_ref
             .update({
                 "last_run_summary": {
                     "ts": SERVER_TIMESTAMP,

@@ -84,17 +84,35 @@ def _num(v: Any) -> int:
         return 0
 
 
-def load_employers(proj) -> list[dict]:
-    """docs/data.json employers[] from /sources. url == careers_url so it
-    matches the by_employer[] join key (name|url) the dashboard builds."""
+def load_employers(proj, db=None) -> list[dict]:
+    """docs/data.json employers[] from /sources plus the shared /resources the
+    project lists in `resource_ids`. url == careers_url so it matches the
+    by_employer[] join key (name|url) the dashboard builds."""
+    snaps = list(proj.collection("sources").stream())
+    if db is not None:
+        project = proj.get().to_dict() or {}
+        ids = [str(r) for r in (project.get("resource_ids") or []) if r]
+        if ids:
+            refs = [db.collection("resources").document(r) for r in ids]
+            snaps += [
+                s for s in db.get_all(refs)
+                if s.exists
+                and (s.to_dict() or {}).get("owner_uid") == project.get("owner_uid")
+            ]
     out: list[dict] = []
-    for d in proj.collection("sources").stream():
+    seen: set[str] = set()
+    for d in snaps:
         s = d.to_dict() or {}
+        url = s.get("careers_url") or ""
+        key = url.strip().rstrip("/").lower()
+        if key and key in seen:
+            continue
+        seen.add(key)
         out.append({
             "name": s.get("name") or d.id,
             "ats": s.get("ats") or "",
             "active": bool(s.get("active", True)),
-            "url": s.get("careers_url") or "",
+            "url": url,
         })
     out.sort(key=lambda e: (not e["active"], (e["name"] or "").lower()))
     return out
@@ -222,8 +240,8 @@ def load_totals(proj) -> dict:
         }
 
 
-def build(proj) -> dict:
-    employers = load_employers(proj)
+def build(proj, db=None) -> dict:
+    employers = load_employers(proj, db)
     runs, last_run_id = load_runs(proj)
     if last_run_id and runs:
         runs[-1]["by_employer"] = load_by_employer(proj, last_run_id)
@@ -251,7 +269,7 @@ def main() -> int:
     if not proj.get().exists:
         raise SystemExit(f"projects/{project_id} does not exist in Firestore")
 
-    data = build(proj)
+    data = build(proj, db)
 
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as fh:

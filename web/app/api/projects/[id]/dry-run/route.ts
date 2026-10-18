@@ -6,14 +6,7 @@ import {
   destinationsCol,
   secretsCol,
 } from "@/lib/firestore/collections";
-
-async function checkProjectOwner(
-  projectId: string,
-  uid: string
-): Promise<boolean> {
-  const snap = await projectDoc(projectId).get();
-  return snap.exists && snap.data()?.owner_uid === uid;
-}
+import { attachedResources } from "@/lib/firestore/resources";
 
 interface CheckResult {
   name: string;
@@ -88,12 +81,16 @@ export async function POST(
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
   const { id } = await ctx.params;
-  if (!(await checkProjectOwner(id, session.uid))) {
+  const project = await projectDoc(id).get();
+  if (!project.exists || project.get("owner_uid") !== session.uid) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const [sourcesSnap, destsSnap, secretsSnap] = await Promise.all([
+  const [sourcesSnap, resourceSnaps, destsSnap, secretsSnap] = await Promise.all([
     sourcesCol(id).where("active", "==", true).get(),
+    attachedResources(session.uid, project.get("resource_ids"), {
+      activeOnly: true,
+    }),
     destinationsCol(id).get(),
     secretsCol(id).get(),
   ]);
@@ -107,10 +104,10 @@ export async function POST(
   }
 
   // --- Check sources in parallel (capped at 10 concurrent) ----------------
-  const sourceDocs = sourcesSnap.docs.slice(0, 100);
+  const sourceDocs = [...sourcesSnap.docs, ...resourceSnaps].slice(0, 100);
   const sourceChecks: SourceCheckResult[] = await Promise.all(
     sourceDocs.map(async (d): Promise<SourceCheckResult> => {
-      const data = d.data();
+      const data = d.data() ?? {};
       const name = String(data.name ?? d.id);
       const url = String(data.careers_url ?? "");
       if (!url) {

@@ -7,8 +7,13 @@ import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { SourceFormInitial } from "./sourceFormDefaults";
 
 interface Props {
-  projectId: string;
+  projectId?: string;
   sourceId?: string; // undefined → create mode; defined → edit mode
+  /** Collection endpoint; defaults to the project's /sources. The shared
+   *  library passes "/api/resources". Items live at `${apiPath}/${id}`. */
+  apiPath?: string;
+  /** Where Cancel / save / delete go; defaults to the project's Sources tab. */
+  listHref?: string;
   initial: SourceFormInitial;
   /** When provided, called instead of navigating to the listing page on
    *  successful create/edit. router.refresh() is still called. */
@@ -26,12 +31,16 @@ interface FieldErr {
 export function SourceForm({
   projectId,
   sourceId,
+  apiPath,
+  listHref,
   initial,
   onSuccess,
   onCancel,
 }: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
+  const collectionUrl = apiPath ?? `/api/projects/${projectId}/sources`;
+  const backHref = listHref ?? `/projects/${projectId}/sources`;
   const [form, setForm] = useState<SourceFormInitial>(initial);
   const [countriesText, setCountriesText] = useState(initial.countries.join(", "));
   const [busy, setBusy] = useState(false);
@@ -56,9 +65,7 @@ export function SourceForm({
         .filter(Boolean);
       const body = JSON.stringify({ ...form, countries });
 
-      const url = isEdit
-        ? `/api/projects/${projectId}/sources/${sourceId}`
-        : `/api/projects/${projectId}/sources`;
+      const url = isEdit ? `${collectionUrl}/${sourceId}` : collectionUrl;
       const res = await authedFetch(url, {
         method: isEdit ? "PATCH" : "POST",
         body,
@@ -92,7 +99,7 @@ export function SourceForm({
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push(`/projects/${projectId}/sources`);
+        router.push(backHref);
       }
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
@@ -106,16 +113,15 @@ export function SourceForm({
     if (!confirm(`Delete "${form.name}"? This cannot be undone.`)) return;
     setDeleting(true);
     try {
-      const res = await authedFetch(
-        `/api/projects/${projectId}/sources/${sourceId}`,
-        { method: "DELETE" }
-      );
+      const res = await authedFetch(`${collectionUrl}/${sourceId}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const b = await res.json().catch(() => ({}));
         setErrors([{ message: b.error || `Delete failed (${res.status})` }]);
         return;
       }
-      router.push(`/projects/${projectId}/sources`);
+      router.push(backHref);
       router.refresh();
     } finally {
       setDeleting(false);
@@ -296,7 +302,7 @@ export function SourceForm({
             </button>
           ) : (
             <Link
-              href={`/projects/${projectId}/sources`}
+              href={backHref}
               className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
             >
               Cancel

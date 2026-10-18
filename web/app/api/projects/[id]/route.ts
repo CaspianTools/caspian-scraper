@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { ProjectPatchSchema } from "@/lib/firestore/schema";
 import { projectDoc } from "@/lib/firestore/collections";
+import { invalidResourceIds } from "@/lib/firestore/resources";
 
 /**
  * GET /api/projects/[id]
@@ -62,8 +63,31 @@ export async function PATCH(
     );
   }
 
+  // Zod 4's .partial() still fills .default() values for absent keys, so a
+  // settings save of {name, ...} would otherwise reset hse_keywords and
+  // resource_ids to []. Apply only the keys the client actually sent.
+  const sent = new Set(Object.keys(body as object));
+  const patch = Object.fromEntries(
+    Object.entries(parsed.data).filter(([k]) => sent.has(k))
+  ) as typeof parsed.data;
+  if (patch.resource_ids) {
+    patch.resource_ids = Array.from(new Set(patch.resource_ids));
+    const bad = await invalidResourceIds(session.uid, patch.resource_ids);
+    if (bad.length > 0) {
+      return NextResponse.json(
+        {
+          error: "unknown resources",
+          details: [
+            { path: ["resource_ids"], message: `not found: ${bad.join(", ")}` },
+          ],
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   await projectDoc(id).update({
-    ...parsed.data,
+    ...patch,
     updated_at: FieldValue.serverTimestamp(),
   });
 

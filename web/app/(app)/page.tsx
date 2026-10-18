@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
-import { OpenQuickAddButton } from "@/components/quick-add/OpenQuickAddButton";
 
 export const dynamic = "force-dynamic";
+
+const newJobCls =
+  "inline-flex items-center rounded-lg text-sm font-medium transition-colors bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
 
 interface ProjectListItem {
   id: string;
@@ -44,14 +46,16 @@ export default async function Home() {
     <main className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Projects</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Jobs</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             {projects.length === 0
-              ? "Create your first project to get started."
-              : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
+              ? "Create your first job to get started."
+              : `${projects.length} job${projects.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <OpenQuickAddButton kind="project">+ New project</OpenQuickAddButton>
+        <Link href="/projects/new" className={newJobCls + " h-10 px-4"}>
+          + New job
+        </Link>
       </div>
 
       {projects.length === 0 ? (
@@ -117,13 +121,13 @@ function EmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
       <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-        No projects yet. A project is one scraping pipeline — a list of
-        sources to scrape, one or more destinations to POST findings to,
-        and a schedule.
+        No jobs yet. A job is one scraping pipeline — websites to scrape
+        (picked from the shared resource library), one or more destinations
+        to POST findings to, and a schedule.
       </p>
-      <OpenQuickAddButton kind="project" size="sm">
-        Create your first project
-      </OpenQuickAddButton>
+      <Link href="/projects/new" className={newJobCls + " h-9 px-4"}>
+        Create your first job
+      </Link>
     </div>
   );
 }

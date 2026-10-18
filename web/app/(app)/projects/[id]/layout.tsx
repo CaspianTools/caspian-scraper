@@ -40,7 +40,7 @@ export default async function ProjectLayout({
             href="/"
             className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline shrink-0"
           >
-            ← Projects
+            ← Jobs
           </Link>
           <span className="text-zinc-400 shrink-0">/</span>
           <h1 className="text-sm font-semibold tracking-tight truncate">

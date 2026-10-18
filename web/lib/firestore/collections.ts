@@ -38,6 +38,15 @@ export function sourcesCol(projectId: string): CollectionReference {
   return projectDoc(projectId).collection("sources");
 }
 
+/** Shared resource library — see ResourceDocSchema. */
+export function resourcesCol(): CollectionReference {
+  return db().collection("resources");
+}
+
+export function resourceDoc(resourceId: string) {
+  return resourcesCol().doc(resourceId);
+}
+
 export function destinationsCol(projectId: string): CollectionReference {
   return projectDoc(projectId).collection("destinations");
 }

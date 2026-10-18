@@ -85,8 +85,20 @@ export const ProjectCreateSchema = z.object({
   schedule_cron: CronExpressionSchema,
   enabled: z.boolean().default(true),
   hse_keywords: z.array(z.string()).max(50).default([]),
+  /** Shared /resources/{rid} this job scrapes, on top of its own /sources. */
+  resource_ids: z.array(z.string().min(1).max(128)).max(1000).default([]),
 });
 export type ProjectCreate = z.infer<typeof ProjectCreateSchema>;
+
+/**
+ * POST /api/projects body. Create-only extras on top of the project fields:
+ * `copy_destinations_from` copies another job's destinations AND the secrets
+ * they reference, so a new job can publish without re-entering API keys.
+ */
+export const ProjectCreateRequestSchema = ProjectCreateSchema.extend({
+  copy_destinations_from: z.string().min(1).max(128).optional(),
+});
+export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>;
 
 export const ProjectDocSchema = ProjectCreateSchema.extend({
   owner_uid: z.string().min(1),
@@ -135,6 +147,24 @@ export type SourceDoc = z.infer<typeof SourceDocSchema>;
 
 export const SourcePatchSchema = SourceCreateSchema.partial();
 export type SourcePatch = z.infer<typeof SourcePatchSchema>;
+
+// /resources/{rid} ----------------------------------------------------------
+//
+// Shared resource library: the same shape as a project source, but owned by
+// the workspace and attached to any number of jobs via
+// projects/{id}.resource_ids. The scraper merges them into each job's own
+// /sources at run time (load_sources in scrape.py).
+
+export const ResourceCreateSchema = SourceCreateSchema;
+export type ResourceCreate = SourceCreate;
+
+export const ResourceDocSchema = SourceDocSchema.extend({
+  owner_uid: z.string().min(1),
+});
+export type ResourceDoc = z.infer<typeof ResourceDocSchema>;
+
+export const ResourcePatchSchema = SourcePatchSchema;
+export type ResourcePatch = SourcePatch;
 
 // /projects/{projectId}/destinations/{destId} -------------------------------
 

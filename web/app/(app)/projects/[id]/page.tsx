@@ -10,6 +10,7 @@ import {
   lessonsCol,
   publishedCol,
 } from "@/lib/firestore/collections";
+import { attachedResources } from "@/lib/firestore/resources";
 import { humanizeCron } from "@/lib/cron/humanize";
 import { TrendBars, type TrendBarRun } from "@/components/TrendBars";
 
@@ -107,6 +108,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     runsSnap,
     lessonsSnap,
     publishedSnap,
+    sharedResources,
   ] = await Promise.all([
     sourcesCol(id).count().get(),
     destinationsCol(id).count().get(),
@@ -114,9 +116,11 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     runsCol(id).orderBy("started_at", "desc").limit(14).get(),
     lessonsCol(id).orderBy("ts", "desc").limit(200).get(),
     publishedCol(id).orderBy("published_at", "desc").limit(5).get(),
+    attachedResources(session.uid, data.resource_ids),
   ]);
 
-  const sourcesCount = sourcesCountSnap.data().count;
+  // Own /sources plus attached shared resources — what the scraper runs.
+  const sourcesCount = sourcesCountSnap.data().count + sharedResources.length;
   const destsCount = destinationsCountSnap.data().count;
   const secretsCount = secretsCountSnap.data().count;
 
