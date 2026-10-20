@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
@@ -13,6 +15,20 @@ function adminApp(): App {
   const existing = getApps()[0];
   if (existing) {
     _app = existing;
+    return _app;
+  }
+  // Local runs can point at a service-account JSON file instead (the same
+  // one Start.bat hands the scraper); it wins over the three vars below.
+  const saFile = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
+  if (saFile) {
+    const sa = JSON.parse(readFileSync(path.resolve(saFile), "utf8"));
+    _app = initializeApp({
+      credential: cert({
+        projectId: sa.project_id,
+        clientEmail: sa.client_email,
+        privateKey: sa.private_key,
+      }),
+    });
     return _app;
   }
   const projectId = process.env.FIREBASE_PROJECT_ID;

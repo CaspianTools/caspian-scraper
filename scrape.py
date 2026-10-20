@@ -1747,9 +1747,20 @@ def get_db() -> Any:
         return _FIRESTORE_CLIENT
 
     sa_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip()
+    # Local runs (Start.bat) point at a key file instead of inlining the JSON.
+    sa_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if not sa_json and sa_path:
+        try:
+            with open(sa_path, encoding="utf-8") as fh:
+                sa_json = fh.read().strip()
+        except OSError as e:
+            raise RuntimeError(
+                f"GOOGLE_APPLICATION_CREDENTIALS file unreadable: {e}"
+            ) from e
     if not sa_json:
         raise RuntimeError(
-            "GOOGLE_APPLICATION_CREDENTIALS_JSON env var is not set"
+            "GOOGLE_APPLICATION_CREDENTIALS_JSON (or GOOGLE_APPLICATION_CREDENTIALS "
+            "file path) env var is not set"
         )
     try:
         sa_dict = json.loads(sa_json)

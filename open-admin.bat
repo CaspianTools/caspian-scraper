@@ -2,11 +2,16 @@
 setlocal
 rem Starts the Caspian Scraper admin app (web/) on this computer and opens it.
 rem Double-click to run. Close the minimized "admin server" window to stop it.
-rem Needs web\.env.local (Firebase credentials + sign-in allowlist).
+rem Needs web\.env.local (Firebase web config + sign-in allowlist).
+rem Optional argument: a page to open, e.g.  open-admin.bat projects/hse/runs
+
+rem The repo-root service-account.json (shared with Start.bat) overrides the
+rem key in .env.local. Takes effect when the server starts.
+if exist "%~dp0service-account.json" set "FIREBASE_SERVICE_ACCOUNT_FILE=%~dp0service-account.json"
 
 cd /d "%~dp0web"
 set "PORT=4444"
-set "URL=http://localhost:%PORT%/"
+set "URL=http://localhost:%PORT%/%~1"
 
 rem Already running from an earlier launch? Just open the browser.
 curl.exe -s -o nul "http://127.0.0.1:%PORT%/signin" && goto open
