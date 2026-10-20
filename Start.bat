@@ -1,11 +1,10 @@
 @echo off
 setlocal
 title Caspian Scraper - Start
-rem Runs the scraper on this computer, then opens the admin app on the
-rem results so you can review them. Double-click to run.
-rem
-rem Needs service-account.json in this folder (Firebase service-account key,
-rem gitignored) and the Python venv (.venv).
+rem Runs the scraper on this computer, then opens the admin app on what it
+rem found so you can review it. Double-click to run. No accounts or keys
+rem needed: jobs and resources live in data\ (committed), run results in
+rem local-data\ (this computer only).
 
 cd /d "%~dp0"
 
@@ -28,7 +27,7 @@ if exist "%REVIEW_FILE%" del "%REVIEW_FILE%"
 set "RC=%ERRORLEVEL%"
 
 if not exist "%REVIEW_FILE%" (
-  rem Nothing ran (cancelled or a setup problem) - leave the message on screen.
+  rem Nothing ran (a bad choice or a setup problem) - leave the message up.
   echo.
   pause
   exit /b %RC%
@@ -39,9 +38,7 @@ set /p REVIEW_PATH=<"%REVIEW_FILE%"
 del "%REVIEW_FILE%"
 
 echo.
-if not "%RC%"=="0" echo The scraper reported errors - they are listed in the run on the Runs page.
-echo Opening the admin app to review the run...
+if not "%RC%"=="0" echo The scraper reported errors - they are listed on the job's Runs page.
+echo Opening the admin app...
 call "%~dp0open-admin.bat" %REVIEW_PATH%
-echo.
-pause
 endlocal

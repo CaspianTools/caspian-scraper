@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { carListingsCol } from "@/lib/firestore/collections";
+import type { Query } from "@/lib/localdb";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
   const limitRaw = parseInt(url.searchParams.get("limit") || "200", 10);
   const limit = Math.min(Math.max(1, Number.isNaN(limitRaw) ? 200 : limitRaw), 1000);
 
-  let q: FirebaseFirestore.Query = carListingsCol().where(
+  let q: Query = carListingsCol().where(
     "owner_uid",
     "==",
     session.uid

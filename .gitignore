@@ -14,5 +14,6 @@ seen.json
 # Only this subfolder is ignored — a committed .claude/settings.json stays tracked.
 .claude/worktrees/
 
-# Local service-account key used by Start.bat (scraper + admin app). Never commit.
-service-account.json
+# Run results (runs, findings, lessons, listings, logs) - this computer only.
+# Jobs/resources config lives in data/ and IS committed. See data/README.md.
+local-data/

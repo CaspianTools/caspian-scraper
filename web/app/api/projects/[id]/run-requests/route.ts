@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { projectDoc, runRequestsCol } from "@/lib/firestore/collections";
-import { dispatchScrapeWorkflow } from "@/lib/github/dispatch";
+import { startScrape } from "@/lib/localRunner";
 
 async function checkProjectOwner(
   projectId: string,
@@ -62,11 +62,9 @@ export async function POST(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  // Soft anti-abuse: if there's already a pending request for this
-  // project from this user, return it instead of creating a duplicate.
-  // We still try to dispatch — gives the user a "kick" path when an
-  // earlier dispatch didn't claim that request (e.g. a stale queue
-  // entry the cron hasn't picked up yet).
+  // If there's already a pending request for this project, return it
+  // instead of creating a duplicate — and start a run for it, which kicks
+  // a request whose earlier run never picked it up.
   const existing = await runRequestsCol()
     .where("project_id", "==", id)
     .where("requested_by_uid", "==", session.uid)
@@ -75,10 +73,7 @@ export async function POST(
     .get();
   if (!existing.empty) {
     const doc = existing.docs[0];
-    const dispatch = await dispatchScrapeWorkflow({
-      projectId: id,
-      requestId: doc.id,
-    });
+    const dispatch = startScrape({ projectId: id, requestId: doc.id });
     return NextResponse.json({
       id: doc.id,
       ...doc.data(),
@@ -99,16 +94,9 @@ export async function POST(
     run_id: "",
   });
 
-  // Fire workflow_dispatch immediately (if GH_DISPATCH_TOKEN is set).
-  // This is best-effort: the cron will still pick up the request within
-  // 15 min even if dispatch fails. Awaiting here is fine — the GitHub
-  // API typically responds in under a second. requestId is passed so
-  // the runner can mark THIS specific /run_requests doc done at finish
-  // instead of leaving it as "pending" for the cron to redo.
-  const dispatch = await dispatchScrapeWorkflow({
-    projectId: id,
-    requestId: ref.id,
-  });
+  // Start the scraper on this computer right away. requestId is passed so
+  // the run marks THIS /run_requests doc running → done at finish.
+  const dispatch = startScrape({ projectId: id, requestId: ref.id });
 
   return NextResponse.json(
     {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { projectDoc, lessonsCol } from "@/lib/firestore/collections";
+import type { Query } from "@/lib/localdb";
 
 async function checkProjectOwner(
   projectId: string,
@@ -37,7 +38,7 @@ export async function GET(
   const limitRaw = parseInt(url.searchParams.get("limit") || "50", 10);
   const limit = Math.min(Math.max(1, isNaN(limitRaw) ? 50 : limitRaw), 200);
 
-  let q: FirebaseFirestore.Query = lessonsCol(id);
+  let q: Query = lessonsCol(id);
   if (verdict) q = q.where("verdict", "==", verdict);
   if (sourceId) q = q.where("source_id", "==", sourceId);
   q = q.orderBy("ts", "desc").limit(limit);

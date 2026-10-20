@@ -1,4 +1,4 @@
-import type { DocumentSnapshot } from "firebase-admin/firestore";
+import type { DocumentSnapshot } from "@/lib/localdb";
 import { adminDb } from "@/lib/firebase/admin";
 import { projectsCol, resourceDoc, resourcesCol } from "./collections";
 

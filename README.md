@@ -1,5 +1,15 @@
 # HSE scraper
 
+> **Current setup — runs locally, no accounts.** Double-click **`Start.bat`**
+> to run a scrape and review what it found, or **`open-admin.bat`** to open the
+> admin app (http://localhost:4444) and manage jobs and the shared resource
+> library. There is no sign-in, Firestore, or publishing: jobs/resources are
+> JSON files in [`data/`](data/README.md) (committed, so every computer that
+> pulls the repo gets them) and results stay in `local-data/` on the computer
+> that ran them. Needs Python 3 and Node.js; the launchers set up the rest on
+> first run. The sections below describe the older GitHub Actions →
+> entirelysafe.com pipeline, which is currently switched off.
+
 Daily scraper that finds Health, Safety, Environment (HSE) job postings on a
 configurable list of employer career sites and publishes each new one to the
 `entirelysafe.com` REST API. The API is the single source of truth — there

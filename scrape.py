@@ -1733,7 +1733,12 @@ _FIRESTORE_CLIENT: Any = None
 
 def get_db() -> Any:
     """
-    Build a Firestore client from the service-account JSON in the
+    Local mode (the default): no Firestore credentials in the environment →
+    a file-backed LocalDB (localdb.py) over data/ + local-data/, shared with
+    the web app. Firestore is used only when GOOGLE_APPLICATION_CREDENTIALS
+    [_JSON] is set, e.g. a re-enabled GitHub Actions run.
+
+    Firestore mode builds a client from the service-account JSON in the
     GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Bound to
     FIRESTORE_DATABASE_ID (e.g. "scraper") when set, otherwise the
     project's default database.
@@ -1747,8 +1752,12 @@ def get_db() -> Any:
         return _FIRESTORE_CLIENT
 
     sa_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip()
-    # Local runs (Start.bat) point at a key file instead of inlining the JSON.
     sa_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if not sa_json and not sa_path:
+        from localdb import LocalDB
+
+        _FIRESTORE_CLIENT = LocalDB()
+        return _FIRESTORE_CLIENT
     if not sa_json and sa_path:
         try:
             with open(sa_path, encoding="utf-8") as fh:
@@ -2077,11 +2086,12 @@ def _is_cron_due(cron_expr: str, last_run_at: datetime | None, now: datetime) ->
 # ---------------------------------------------------------------------------
 
 def _verdict(
-    *, errors_count: int, published: int, found: int
+    *, errors_count: int, published: int, found: int, collect_only: bool = False
 ) -> str:
     if errors_count > 0:
         return "errors"
-    if published > 0:
+    # Scrape-only jobs never publish; finding roles is the success case.
+    if published > 0 or (collect_only and found > 0):
         return "ok"
     if found == 0:
         return "zero_found"
@@ -2156,13 +2166,9 @@ def run_project(
         destinations = load_destinations(db, project_id)
         secrets = load_secrets(db, project_id)
 
-        if not destinations:
-            summary["errors"].append("no destinations configured")
-            return _finalize_project_run(
-                db, project_id, run_ref, run_id, project, summary,
-                started_at, started_mono, trigger, dry_run,
-                auth_halt=False, overrun=False,
-            )
+        # No destinations = scrape-only: every role is recorded in /findings
+        # (status "found") for review, and nothing is published anywhere.
+        collect_only = not destinations
 
         # Build clients keyed by destination doc id (used for posting).
         clients: dict[str, DestinationClient] = {}
@@ -2185,7 +2191,7 @@ def run_project(
                 field_map=dest.get("field_map") or {},
             )
 
-        if not clients:
+        if not clients and not collect_only:
             summary["errors"].append("no usable destinations (all secrets missing)")
             return _finalize_project_run(
                 db, project_id, run_ref, run_id, project, summary,
@@ -2259,6 +2265,7 @@ def run_project(
                         "published": 0,
                         "skipped_duplicate": 0,
                         "errors": [],
+                        "collect_only": collect_only,
                     }
 
                     if not src_url or not src_ats:
@@ -2295,6 +2302,13 @@ def run_project(
 
                     for role in roles:
                         slug = make_slug(role.title, role.employer)
+                        if collect_only:
+                            if slug:
+                                _upsert_finding(
+                                    db, project_id, run_id, slug,
+                                    role, source, "found",
+                                )
+                            continue
                         title_company = (
                             role.title.strip().lower(),
                             role.employer.strip().lower(),
@@ -2544,6 +2558,7 @@ def _write_lesson(
         errors_count=len(src_record.get("errors", [])),
         published=src_record.get("published", 0),
         found=src_record.get("found", 0),
+        collect_only=bool(src_record.get("collect_only")),
     )
     try:
         (
@@ -2649,7 +2664,9 @@ def _upsert_finding(
     one exception: a previously "published" finding never downgrades to
     "duplicate" (we DID publish it; the destination just remembers).
 
-    status: "duplicate" | "published" | "failed"
+    status: "duplicate" | "published" | "failed" | "found" (scrape-only job:
+    recorded for review, never sent anywhere; later sightings only refresh
+    last_seen_at / attempts)
     """
     ref = (
         db.collection("projects").document(project_id)

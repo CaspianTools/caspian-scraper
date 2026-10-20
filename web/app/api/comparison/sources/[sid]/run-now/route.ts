@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import {
   comparisonSourcesCol,
   runRequestsCol,
 } from "@/lib/firestore/collections";
+import { startScrape } from "@/lib/localRunner";
 
 /**
  * POST /api/comparison/sources/[sid]/run-now
  *
- * Queue an ad-hoc run-request for this comparison source. The Python
- * scraper's cron tick picks it up and dispatches via
- * run_comparison_source. Mirrors /api/projects/[id]/run-requests.
+ * Record a run-request for this comparison source and start the scraper
+ * on this computer for it (lib/localRunner.ts → run_comparison_source). Mirrors /api/projects/[id]/run-requests.
  */
 export async function POST(
   req: NextRequest,
@@ -38,5 +38,9 @@ export async function POST(
     finished_at: null,
     run_id: "",
   });
-  return NextResponse.json({ id: ref.id, status: "pending" }, { status: 201 });
+  const run = startScrape({ comparisonSourceId: sid, requestId: ref.id });
+  return NextResponse.json(
+    { id: ref.id, status: "pending", started: run.ok === true, error: run.error },
+    { status: 201 }
+  );
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import {
   ConfigJobCreateSchema,
@@ -7,7 +7,7 @@ import {
   type ConfigJobDoc,
 } from "@/lib/firestore/schema";
 import { configJobsCol } from "@/lib/firestore/collections";
-import { dispatchAiconfigWorkflow } from "@/lib/github/dispatch";
+import { startAiconfig } from "@/lib/localRunner";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -101,10 +101,10 @@ export async function POST(req: NextRequest) {
     updated_at: FieldValue.serverTimestamp(),
   });
 
-  // Start the runner. Unlike scrape-due, aiconfig.yml has NO cron fallback — it
-  // only runs via this dispatch — so if we can't dispatch, the job would sit at
-  // "queued" forever. Fail it with an actionable message instead.
-  const dispatch = await dispatchAiconfigWorkflow({ jobId: ref.id });
+  // Start the runner on this computer. Nothing else would ever pick the job
+  // up, so if it can't start the job would sit at "queued" forever — fail it
+  // with an actionable message instead.
+  const dispatch = startAiconfig(ref.id);
   let status = writeParsed.data.status;
   if (dispatch.attempted && dispatch.ok) {
     await ref.update({
@@ -113,11 +113,9 @@ export async function POST(req: NextRequest) {
     });
   } else {
     status = "failed";
-    const error = !dispatch.attempted
-      ? "The AI agent couldn't be started: automatic dispatch isn't configured " +
-        "(GH_DISPATCH_TOKEN is unset). An admin can set that token, or run the " +
-        "'aiconfig' GitHub Actions workflow manually with this job id."
-      : `The AI agent couldn't be started (GitHub dispatch failed: ${dispatch.status ?? ""} ${dispatch.error ?? ""}).`;
+    const error =
+      `The AI agent couldn't be started on this computer (${dispatch.error ?? "unknown error"}). ` +
+      "Check that the Python environment exists (.venv — Start.bat creates it).";
     await ref.update({
       status,
       error,

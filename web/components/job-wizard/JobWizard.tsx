@@ -4,45 +4,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/firebase/clientFetch";
-import { humanizeCron } from "@/lib/cron/humanize";
 import type { ResourceRow } from "@/lib/firestore/resources";
-import { SchedulePicker } from "@/components/SchedulePicker";
 import { ResourcePicker } from "@/components/resources/ResourcePicker";
-
-export interface DestinationSourceJob {
-  id: string;
-  name: string;
-  destinations: string[];
-}
 
 interface Props {
   resources: ResourceRow[];
-  /** Existing jobs that have at least one destination to copy. */
-  jobsWithDestinations: DestinationSourceJob[];
 }
 
-const STEPS = ["Basics", "Resources", "Destination", "Schedule", "Review"] as const;
-type Step = 0 | 1 | 2 | 3 | 4;
+const STEPS = ["Basics", "Resources", "Review"] as const;
+type Step = 0 | 1 | 2;
+const LAST: Step = 2;
 
 // Which step owns each server-side field, so a 400 jumps to the right place.
 const FIELD_STEP: Record<string, Step> = {
   name: 0,
   description: 0,
   resource_ids: 1,
-  copy_destinations_from: 2,
-  schedule_cron: 3,
 };
 
-// Mirrors CronExpressionSchema in lib/firestore/schema.ts: 5 fields and a
-// fixed minute (≥1h granularity).
-function cronError(cron: string): string | null {
-  const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5) return "A schedule needs 5 cron fields.";
-  if (!/^\d{1,2}$/.test(parts[0]) || parseInt(parts[0], 10) > 59) {
-    return "Runs at most once an hour — the minute must be a fixed number.";
-  }
-  return null;
-}
+// Jobs run from Start.bat / "Run now" on this computer; there is no cron
+// while the app runs locally. A schedule is still stored (the schema needs
+// one) so the job is ready if a scheduled runner comes back — it can be
+// changed under the job's Settings.
+const DEFAULT_SCHEDULE = "0 */6 * * *";
 
 const inputCls =
   "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400";
@@ -51,7 +35,7 @@ const primaryBtn =
 const secondaryBtn =
   "inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50";
 
-export function JobWizard({ resources: initialResources, jobsWithDestinations }: Props) {
+export function JobWizard({ resources: initialResources }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
 
@@ -59,31 +43,22 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
   const [description, setDescription] = useState("");
   const [library, setLibrary] = useState<ResourceRow[]>(initialResources);
   const [resourceIds, setResourceIds] = useState<string[]>([]);
-  const [destMode, setDestMode] = useState<"copy" | "later">(
-    jobsWithDestinations.length > 0 ? "copy" : "later"
-  );
-  const [copyFrom, setCopyFrom] = useState(jobsWithDestinations[0]?.id ?? "");
-  const [scheduleCron, setScheduleCron] = useState("0 */6 * * *");
-  const [enabled, setEnabled] = useState(true);
 
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Step, string>>>({});
 
-  const copyJob = jobsWithDestinations.find((j) => j.id === copyFrom);
   const chosen = library.filter((r) => resourceIds.includes(r.id));
 
   /** Blocking problem on a step, or null when it's OK to continue. */
   function problem(s: Step): string | null {
     if (s === 0 && !name.trim()) return "Give the job a name.";
-    if (s === 2 && destMode === "copy" && !copyJob) return "Pick a job to copy from.";
-    if (s === 3) return cronError(scheduleCron);
     return null;
   }
 
   function goNext() {
     const p = problem(step);
     setErrors((e) => ({ ...e, [step]: p ?? undefined }));
-    if (!p && step < 4) setStep((step + 1) as Step);
+    if (!p && step < LAST) setStep((step + 1) as Step);
   }
 
   /** Steps are clickable once everything before them is valid. */
@@ -101,33 +76,30 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
-          schedule_cron: scheduleCron.trim(),
-          enabled,
+          schedule_cron: DEFAULT_SCHEDULE,
+          enabled: true,
           hse_keywords: [],
           resource_ids: resourceIds,
-          ...(destMode === "copy" && copyJob
-            ? { copy_destinations_from: copyJob.id }
-            : {}),
         }),
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (Array.isArray(b.details) && b.details.length > 0) {
           const first = b.details[0] as { path?: string[]; message: string };
-          const target = FIELD_STEP[first.path?.[0] ?? ""] ?? 4;
+          const target = FIELD_STEP[first.path?.[0] ?? ""] ?? LAST;
           setErrors({ [target]: first.message });
           setStep(target);
         } else if (res.status === 429) {
-          setErrors({ 4: `Job quota reached (${b.used}/${b.max}).` });
+          setErrors({ [LAST]: `Job quota reached (${b.used}/${b.max}).` });
         } else {
-          setErrors({ 4: b.error || `Request failed (${res.status})` });
+          setErrors({ [LAST]: b.error || `Request failed (${res.status})` });
         }
         return;
       }
       router.push(`/projects/${b.id}`);
       router.refresh();
     } catch (e) {
-      setErrors({ 4: e instanceof Error ? e.message : String(e) });
+      setErrors({ [LAST]: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(false);
     }
@@ -135,7 +107,7 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
 
   return (
     <div className="space-y-6">
-      <ol className="grid grid-cols-5 gap-2">
+      <ol className="grid grid-cols-3 gap-2">
         {STEPS.map((label, i) => {
           const s = i as Step;
           const state = s === step ? "current" : s < step ? "done" : "todo";
@@ -177,7 +149,7 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
           <>
             <StepHeading
               title="What is this job?"
-              hint="A job is one scraping pipeline: a set of websites, where to publish what it finds, and a schedule."
+              hint="A job is one scraping pipeline: a set of websites to scrape. Everything it finds is listed under the job's Findings for you to review."
             />
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
@@ -201,7 +173,7 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
                 maxLength={500}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What does this job publish, and where?"
+                placeholder="What is this job looking for?"
                 className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
               />
             </div>
@@ -218,7 +190,9 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
               resources={library}
               selected={resourceIds}
               onChange={setResourceIds}
-              onCreated={(row) => setLibrary((l) => [...l, row].sort((a, b) => a.name.localeCompare(b.name)))}
+              onCreated={(row) =>
+                setLibrary((l) => [...l, row].sort((a, b) => a.name.localeCompare(b.name)))
+              }
             />
             {resourceIds.length === 0 && (
               <p className="text-xs text-zinc-500">
@@ -232,74 +206,9 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
         {step === 2 && (
           <>
             <StepHeading
-              title="Where should it publish?"
-              hint="A destination is the API each new finding is POSTed to."
+              title="Review and create"
+              hint="After creating it, start a run from the job's Runs tab (or Start.bat) and review the results under Findings."
             />
-            <div className="space-y-3">
-              <Choice
-                checked={destMode === "copy"}
-                disabled={jobsWithDestinations.length === 0}
-                onSelect={() => setDestMode("copy")}
-                title="Copy from an existing job"
-                hint={
-                  jobsWithDestinations.length === 0
-                    ? "No job has a destination yet."
-                    : "Copies its destinations and the API keys they use, so this job can publish straight away."
-                }
-              >
-                {destMode === "copy" && jobsWithDestinations.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    <select
-                      value={copyFrom}
-                      onChange={(e) => setCopyFrom(e.target.value)}
-                      className={inputCls}
-                    >
-                      {jobsWithDestinations.map((j) => (
-                        <option key={j.id} value={j.id}>
-                          {j.name}
-                        </option>
-                      ))}
-                    </select>
-                    {copyJob && (
-                      <p className="text-xs text-zinc-500">
-                        Will copy: {copyJob.destinations.join(", ")}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </Choice>
-              <Choice
-                checked={destMode === "later"}
-                onSelect={() => setDestMode("later")}
-                title="Set up later"
-                hint="Add a destination from the job's Destinations tab. Runs report “no destinations configured” until you do."
-              />
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <StepHeading
-              title="When should it run?"
-              hint="Times are UTC. Jobs run at most once an hour."
-            />
-            <SchedulePicker value={scheduleCron} onChange={setScheduleCron} />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="w-4 h-4"
-              />
-              Start running on this schedule right away
-            </label>
-          </>
-        )}
-
-        {step === 4 && (
-          <>
-            <StepHeading title="Review and create" />
             <dl className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
               <ReviewRow label="Name" onEdit={() => setStep(0)}>
                 {name.trim()}
@@ -319,24 +228,6 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
                     </span>
                   </>
                 )}
-              </ReviewRow>
-              <ReviewRow label="Destination" onEdit={() => setStep(2)}>
-                {destMode === "copy" && copyJob ? (
-                  <>
-                    Copied from {copyJob.name}
-                    <span className="block text-zinc-500">
-                      {copyJob.destinations.join(", ")}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-zinc-500">Set up later</span>
-                )}
-              </ReviewRow>
-              <ReviewRow label="Schedule" onEdit={() => setStep(3)}>
-                {humanizeCron(scheduleCron)}{" "}
-                <span className="text-zinc-500">
-                  ({enabled ? "enabled" : "paused"})
-                </span>
               </ReviewRow>
             </dl>
           </>
@@ -360,7 +251,7 @@ export function JobWizard({ resources: initialResources, jobsWithDestinations }:
             ← Back
           </button>
         )}
-        {step < 4 ? (
+        {step < LAST ? (
           <button type="button" onClick={goNext} className={primaryBtn}>
             Next →
           </button>
@@ -379,49 +270,6 @@ function StepHeading({ title, hint }: { title: string; hint?: string }) {
     <div>
       <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
       {hint && <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{hint}</p>}
-    </div>
-  );
-}
-
-function Choice({
-  checked,
-  disabled,
-  onSelect,
-  title,
-  hint,
-  children,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onSelect: () => void;
-  title: string;
-  hint: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={
-        "rounded-xl border p-4 " +
-        (checked
-          ? "border-zinc-900 dark:border-zinc-100"
-          : "border-zinc-200 dark:border-zinc-800") +
-        (disabled ? " opacity-60" : "")
-      }
-    >
-      <label className={"flex items-start gap-3 " + (disabled ? "cursor-not-allowed" : "cursor-pointer")}>
-        <input
-          type="radio"
-          checked={checked}
-          disabled={disabled}
-          onChange={onSelect}
-          className="w-4 h-4 mt-0.5"
-        />
-        <span>
-          <span className="block text-sm font-medium">{title}</span>
-          <span className="block text-xs text-zinc-500 mt-0.5">{hint}</span>
-        </span>
-      </label>
-      {children}
     </div>
   );
 }

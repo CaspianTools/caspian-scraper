@@ -1,17 +1,10 @@
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { QuickAddHeaderButton } from "./quick-add/QuickAddHeaderButton";
-import type { UserSession } from "@/lib/auth/session";
-
-interface Props {
-  session: UserSession;
-}
-
 /**
- * Shared top bar shown on every authenticated page. Server component:
- * data flows in via the session prop from the route-group layout.
+ * Shared top bar shown on every page of the app (server component).
  */
-export function AppHeader({ session }: Props) {
+export function AppHeader() {
   return (
     <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -61,13 +54,7 @@ export function AppHeader({ session }: Props) {
 
         <div className="flex items-center gap-3">
           <QuickAddHeaderButton />
-          <UserMenu
-            session={{
-              email: session.email,
-              name: session.name,
-              picture: session.picture,
-            }}
-          />
+          <UserMenu />
         </div>
       </div>
     </header>

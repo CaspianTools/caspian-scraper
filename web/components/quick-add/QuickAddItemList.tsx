@@ -12,23 +12,13 @@ interface Item {
 const ITEMS: ReadonlyArray<Item> = [
   {
     kind: "project",
-    title: "Project",
-    hint: "A scraping pipeline: sources, destinations, and a schedule.",
+    title: "Job",
+    hint: "A scraping pipeline: the websites to scrape and what it finds.",
   },
   {
     kind: "source",
     title: "Source",
     hint: "A website or feed to scrape for new findings.",
-  },
-  {
-    kind: "destination",
-    title: "Destination",
-    hint: "An API to POST findings to. Configures URL, auth, and secret.",
-  },
-  {
-    kind: "secret",
-    title: "Secret",
-    hint: "An API key or token. Destinations reference these by name.",
   },
 ];
 

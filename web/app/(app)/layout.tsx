@@ -24,7 +24,7 @@ export default async function AuthedLayout({
   return (
     <QuickAddProvider>
       <div className="min-h-screen bg-zinc-50 dark:bg-black">
-        <AppHeader session={session} />
+        <AppHeader />
         {children}
       </div>
     </QuickAddProvider>

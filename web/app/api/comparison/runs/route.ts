@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { comparisonRunsCol } from "@/lib/firestore/collections";
+import type { Query } from "@/lib/localdb";
 
 /**
  * GET /api/comparison/runs
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   const limitRaw = parseInt(url.searchParams.get("limit") || "50", 10);
   const limit = Math.min(Math.max(1, isNaN(limitRaw) ? 50 : limitRaw), 200);
 
-  let q: FirebaseFirestore.Query = comparisonRunsCol().where(
+  let q: Query = comparisonRunsCol().where(
     "owner_uid",
     "==",
     session.uid

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { carListingDoc } from "@/lib/firestore/collections";
 import { CarGallery } from "@/components/CarGallery";
+import type { DocumentData } from "@/lib/localdb";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ export default async function CarListingDetailPage({ params }: PageProps) {
   // The doc id is "<site>:<listing_id>" (e.g. "opensooq:284135018"); the colon
   // is percent-encoded in the URL and may or may not be decoded back into the
   // route param, so try the decoded form first, then the raw one.
-  let data: FirebaseFirestore.DocumentData | undefined;
+  let data: DocumentData | undefined;
   for (const cand of Array.from(new Set([safeDecode(id), id]))) {
     const snap = await carListingDoc(cand).get();
     if (snap.exists) {

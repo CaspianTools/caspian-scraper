@@ -8,9 +8,12 @@ name: Run due scrapes
 #                           project, with Cloud Datastore / Firestore
 #                           User permissions on the `scraper` database.
 
+# SCHEDULE DISABLED: the scraper now runs locally (Start.bat) against the
+# repo's data/ files, not Firestore. Restore the two lines below to bring the
+# Firestore cron back.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       project_id:

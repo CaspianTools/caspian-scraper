@@ -15,8 +15,6 @@ export function ProjectNav({ projectId }: { projectId: string }) {
   const tabs: Tab[] = [
     { href: base, label: "Overview" },
     { href: `${base}/sources`, label: "Sources" },
-    { href: `${base}/destinations`, label: "Destinations" },
-    { href: `${base}/secrets`, label: "Secrets" },
     { href: `${base}/runs`, label: "Runs" },
     { href: `${base}/findings`, label: "Findings" },
     { href: `${base}/lessons`, label: "Lessons" },

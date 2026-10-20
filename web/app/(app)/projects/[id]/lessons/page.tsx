@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { lessonsCol } from "@/lib/firestore/collections";
+import type { QueryDocumentSnapshot } from "@/lib/localdb";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +126,7 @@ export default async function LessonsPage({
   ]);
 
   const toLesson = (
-    d: FirebaseFirestore.QueryDocumentSnapshot
+    d: QueryDocumentSnapshot
   ): Lesson => {
     const data = d.data();
     return {

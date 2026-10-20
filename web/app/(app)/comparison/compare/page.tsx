@@ -6,6 +6,7 @@ import {
   comparisonListingsCol,
   comparisonSourcesCol,
 } from "@/lib/firestore/collections";
+import type { DocumentData } from "@/lib/localdb";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function ComparisonComparePage() {
     for (const lid of ids) allListingIds.add(lid);
   }
   const ids = Array.from(allListingIds);
-  const listingsById = new Map<string, FirebaseFirestore.DocumentData>();
+  const listingsById = new Map<string, DocumentData>();
   for (let i = 0; i < ids.length; i += 10) {
     const chunk = ids.slice(i, i + 10);
     if (chunk.length === 0) continue;

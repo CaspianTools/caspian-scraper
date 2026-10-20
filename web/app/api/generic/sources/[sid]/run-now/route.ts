@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import {
   genericSourcesCol,
   runRequestsCol,
 } from "@/lib/firestore/collections";
+import { startScrape } from "@/lib/localRunner";
 
 /**
  * POST /api/generic/sources/[sid]/run-now
  *
- * Queue an ad-hoc run-request for this generic source. The Python
- * scraper's cron tick picks it up (find_due_work) and dispatches
- * run_generic_source. Mirrors /api/comparison/sources/[sid]/run-now.
+ * Record a run-request for this generic source and start the scraper on
+ * this computer for it (lib/localRunner.ts → run_generic_source). Mirrors /api/comparison/sources/[sid]/run-now.
  */
 export async function POST(
   req: NextRequest,
@@ -53,5 +53,9 @@ export async function POST(
     finished_at: null,
     run_id: "",
   });
-  return NextResponse.json({ id: ref.id, status: "pending" }, { status: 201 });
+  const run = startScrape({ genericSourceId: sid, requestId: ref.id });
+  return NextResponse.json(
+    { id: ref.id, status: "pending", started: run.ok === true, error: run.error },
+    { status: 201 }
+  );
 }

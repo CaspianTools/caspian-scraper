@@ -2,7 +2,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import type {
   Firestore,
   CollectionReference,
-} from "firebase-admin/firestore";
+} from "@/lib/localdb";
 
 /**
  * Typed collection references. Use these in API routes / server

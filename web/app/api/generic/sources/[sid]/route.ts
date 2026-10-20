@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type DocumentData } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { GenericSourcePatchSchema } from "@/lib/firestore/schema";
 import { genericSourcesCol } from "@/lib/firestore/collections";
@@ -7,7 +7,7 @@ import { genericSourcesCol } from "@/lib/firestore/collections";
 async function loadOwned(
   sid: string,
   uid: string
-): Promise<FirebaseFirestore.DocumentData | null> {
+): Promise<DocumentData | null> {
   const snap = await genericSourcesCol().doc(sid).get();
   if (!snap.exists) return null;
   const data = snap.data();

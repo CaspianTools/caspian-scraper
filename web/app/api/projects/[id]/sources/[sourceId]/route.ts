@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { SourcePatchSchema } from "@/lib/firestore/schema";
 import { projectDoc, sourcesCol } from "@/lib/firestore/collections";

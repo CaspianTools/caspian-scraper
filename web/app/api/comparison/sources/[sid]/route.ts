@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type DocumentData } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { ComparisonSourcePatchSchema } from "@/lib/firestore/schema";
 import { comparisonSourcesCol } from "@/lib/firestore/collections";
@@ -7,7 +7,7 @@ import { comparisonSourcesCol } from "@/lib/firestore/collections";
 async function loadOwned(
   sid: string,
   uid: string
-): Promise<FirebaseFirestore.DocumentData | null> {
+): Promise<DocumentData | null> {
   const snap = await comparisonSourcesCol().doc(sid).get();
   if (!snap.exists) return null;
   const data = snap.data();

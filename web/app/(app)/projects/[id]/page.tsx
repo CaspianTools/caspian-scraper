@@ -4,8 +4,6 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import {
   projectDoc,
   sourcesCol,
-  destinationsCol,
-  secretsCol,
   runsCol,
   lessonsCol,
   publishedCol,
@@ -103,16 +101,12 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
 
   const [
     sourcesCountSnap,
-    destinationsCountSnap,
-    secretsCountSnap,
     runsSnap,
     lessonsSnap,
     publishedSnap,
     sharedResources,
   ] = await Promise.all([
     sourcesCol(id).count().get(),
-    destinationsCol(id).count().get(),
-    secretsCol(id).count().get(),
     runsCol(id).orderBy("started_at", "desc").limit(14).get(),
     lessonsCol(id).orderBy("ts", "desc").limit(200).get(),
     publishedCol(id).orderBy("published_at", "desc").limit(5).get(),
@@ -121,8 +115,6 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
 
   // Own /sources plus attached shared resources — what the scraper runs.
   const sourcesCount = sourcesCountSnap.data().count + sharedResources.length;
-  const destsCount = destinationsCountSnap.data().count;
-  const secretsCount = secretsCountSnap.data().count;
 
   // Trend chart wants oldest → newest; the query was newest first.
   const recentRuns = runsSnap.docs.map((d) => d.data());
@@ -163,9 +155,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     (latestRun ? tsToIso(latestRun.started_at) : "");
 
   const needsSources = sourcesCount === 0;
-  const needsDestinations = destsCount === 0;
-  const needsSecrets = secretsCount === 0;
-  const stillSettingUp = needsSources || needsDestinations || needsSecrets;
+  const stillSettingUp = needsSources;
 
   return (
     <>
@@ -378,34 +368,14 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                 — the URLs to scrape (each tagged with an ATS type).
               </li>
             )}
-            {needsDestinations && (
-              <li>
-                Configure a{" "}
-                <Link
-                  href={`/projects/${id}/destinations`}
-                  className="underline"
-                >
-                  destination
-                </Link>{" "}
-                — the API to POST findings to.
-              </li>
-            )}
-            {needsSecrets && (
-              <li>
-                Store the API key for that destination as a{" "}
-                <Link
-                  href={`/projects/${id}/secrets`}
-                  className="underline"
-                >
-                  secret
-                </Link>
-                .
-              </li>
-            )}
             <li>
-              Wait for the schedule, or trigger an ad-hoc run from{" "}
+              Start a run from{" "}
               <Link href={`/projects/${id}/runs`} className="underline">
                 Runs
+              </Link>{" "}
+              (or Start.bat), then review what it found under{" "}
+              <Link href={`/projects/${id}/findings`} className="underline">
+                Findings
               </Link>
               .
             </li>

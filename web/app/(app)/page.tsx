@@ -121,9 +121,9 @@ function EmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
       <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-        No jobs yet. A job is one scraping pipeline — websites to scrape
-        (picked from the shared resource library), one or more destinations
-        to POST findings to, and a schedule.
+        No jobs yet. A job is one scraping pipeline — websites to scrape,
+        picked from the shared resource library. Everything a run finds is
+        listed under the job&apos;s Findings for review.
       </p>
       <Link href="/projects/new" className={newJobCls + " h-9 px-4"}>
         Create your first job

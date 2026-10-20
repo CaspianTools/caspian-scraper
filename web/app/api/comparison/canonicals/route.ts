@@ -4,6 +4,7 @@ import {
   comparisonCanonicalsCol,
   comparisonListingsCol,
 } from "@/lib/firestore/collections";
+import type { DocumentData } from "@/lib/localdb";
 
 /**
  * GET /api/comparison/canonicals
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     for (const lid of ids) listingIds.add(lid);
   }
   const ids = Array.from(listingIds);
-  const listingsById = new Map<string, FirebaseFirestore.DocumentData>();
+  const listingsById = new Map<string, DocumentData>();
   for (let i = 0; i < ids.length; i += 10) {
     const chunk = ids.slice(i, i + 10);
     if (chunk.length === 0) continue;
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     const linkedIds = (data.listing_ids ?? []) as string[];
     const listings = linkedIds
       .map((lid) => listingsById.get(lid))
-      .filter((v): v is FirebaseFirestore.DocumentData => !!v);
+      .filter((v): v is DocumentData => !!v);
     return { id: d.id, ...data, listings };
   });
 

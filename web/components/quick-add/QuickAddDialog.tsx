@@ -16,8 +16,8 @@ import { useRouter } from "next/navigation";
 
 const TITLES: Record<string, string> = {
   list: "Create new",
-  picker: "Pick a project",
-  "form:project": "New project",
+  picker: "Pick a job",
+  "form:project": "New job",
   "form:source": "Add source",
   "form:destination": "Add destination",
   "form:secret": "Add secret",
