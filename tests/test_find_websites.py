@@ -19,6 +19,7 @@ import findings_db as fdb  # noqa: E402
 @pytest.fixture(autouse=True)
 def tmp_db(tmp_path, monkeypatch):
     monkeypatch.setattr(fdb, "DB_DIR", tmp_path / "db")
+    monkeypatch.setattr(fw, "CACHE_DIR", tmp_path / "cache")
 
 
 class _Resp:
@@ -181,3 +182,44 @@ def test_careers_url_is_strict_about_what_counts():
 def test_maps_category_never_repeats_the_name():
     lines = ["Al Mashreq Training", "4.8(52) · Training centre · Manama"]
     assert fw._maps_category(lines, "Al Mashreq Training") == "Training centre"
+
+
+def test_repeat_search_is_served_from_cache_with_fresh_records(monkeypatch):
+    calls = []
+
+    def fake_browser(i, c, e):
+        calls.append(1)
+        return [{"name": "Beta Academy", "website": "https://beta.example/", "countries": ["Qatar"],
+                 "sources": ["google_maps"], "_score": 4}]
+
+    monkeypatch.setattr(fw, "wikidata_matches", lambda i, c, e: [])
+    monkeypatch.setattr(fw, "osm_matches", lambda i, c, e: [])
+    monkeypatch.setattr(fw, "browser_matches", fake_browser)
+    first = fw.discover("training", ["Qatar"])
+    assert first["cached"] is False and len(calls) == 1
+
+    # A careers page found after the search shows up in the replay.
+    fdb.upsert([{"id": "beta.example", "careers_url": "https://beta.example/careers",
+                 "ats": "jibe", "reachable": True, "checked_at": fdb.now_iso()}])
+    again = fw.discover("Trainign", ["Qatar"])           # same words once the typo is fixed
+    assert again["cached"] is True and len(calls) == 1
+    assert again["findings"][0]["scrapable"] is True
+
+    fresh = fw.discover("training", ["Qatar"], refresh=True)
+    assert fresh["cached"] is False and len(calls) == 2
+
+
+def test_browse_lists_the_whole_database():
+    fdb.upsert([{"id": "b.example", "name": "Beta", "sources": ["osm"]},
+                {"id": "a.example", "name": "Acme", "sources": ["wikidata", "osm"]}])
+    out = fw.browse()
+    assert [f["name"] for f in out["findings"]] == ["Acme", "Beta"]
+    assert out["by_source"] == {"wikidata": 1, "osm": 2} and out["browse"] is True
+
+
+def test_mark_hides_and_unhides_known_companies_only(monkeypatch, capsys):
+    fdb.upsert([{"id": "a.example", "name": "Acme"}])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"ids": ["a.example", "nope.example"], "hidden": True})))
+    assert fw.main(["--mark"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"updated": 1}
+    assert fw.browse()["findings"][0]["hidden"] is True and "nope.example" not in fdb.load()

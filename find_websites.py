@@ -5,6 +5,13 @@ websites". Free: no AI, no API keys, no billing.
     python find_websites.py "training centres" --country Oman --no-web
     echo '{"query": "...", "countries": [...]}' | python find_websites.py --json
     echo '{"ids": ["adnoc.ae"]}' | python find_websites.py --enrich      # careers pages
+    echo '{"browse": true}' | python find_websites.py --json             # whole database
+    echo '{"ids": ["x.com"], "hidden": true}' | python find_websites.py --mark   # hide / unhide
+
+Searches are cached (local-data/search-cache/, this computer only): the same
+words + countries within CACHE_DAYS return instantly instead of searching
+again — with each company re-read from the database, so careers pages found
+since show up. {"refresh": true} searches afresh.
 
 Every search reads and grows the findings database (db/companies.jsonl, see
 findings_db.py): everything it finds is saved there, and earlier finds that
@@ -48,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import random
@@ -75,6 +83,8 @@ PROBE_TIMEOUT_S = 6
 SEARCH_WAIT_MS = 12_000
 SEARCH_PAUSE_S = (1.5, 3.0)
 HEADLESS_ENV = "FIND_WEBSITES_HEADLESS"
+CACHE_DAYS = 7
+CACHE_DIR = fdb.REPO_ROOT / "local-data" / "search-cache"
 
 WIKIDATA_URL = "https://query.wikidata.org/sparql"
 OVERPASS_URLS = ("https://overpass-api.de/api/interpreter",
@@ -781,6 +791,7 @@ def to_finding(rec: dict, *, known: bool) -> dict:
         "checked": checked,
         "reachable": reachable,
         "scrapable": bool(reachable) and ats in SUPPORTED_ATS and bool(rec.get("careers_url")),
+        "hidden": bool(rec.get("hidden")),
     }
 
 
@@ -791,8 +802,61 @@ def _iso_ts(s: str | None) -> float:
         return 0.0
 
 
+def _cache_path(intent: dict, countries: list[str], use_web: bool) -> "os.PathLike":
+    key = json.dumps([intent["corrected"].strip(), sorted(countries), use_web])
+    return CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest()[:16] + ".json")
+
+
 def discover(query: str, countries: list[str], *, use_web: bool = True,
-             exclude_urls: list[str] = ()) -> dict:
+             exclude_urls: list[str] = (), refresh: bool = False) -> dict:
+    """Search, or — for the same words + countries within CACHE_DAYS — replay
+    the cached search with every company re-read from the database."""
+    intent = understand(query)
+    resolved = resolve_countries(query, countries)
+    path = _cache_path(intent, resolved, use_web)
+    if not refresh and path.exists():
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            cached = None
+        if cached and time.time() - _iso_ts(cached.get("searched_at")) < CACHE_DAYS * 86400:
+            records = fdb.load()
+            exclude = {fdb.company_id(u) for u in exclude_urls}
+            known = set(cached.get("known", []))
+            findings = [to_finding(records[c], known=c in known)
+                        for c in cached["ids"] if c in records and c not in exclude]
+            return {**{k: v for k, v in cached.items() if k not in ("ids", "known")},
+                    "findings": findings, "cached": True, "database_size": len(records)}
+
+    result = _search(query, countries, use_web=use_web, exclude_urls=exclude_urls)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            **{k: v for k, v in result.items() if k not in ("findings", "database_size")},
+            "ids": [f["id"] for f in result["findings"]],
+            "known": [f["id"] for f in result["findings"] if f["known"]],
+        }), encoding="utf-8")
+    except OSError:
+        pass  # a cache that can't be written just means no cache
+    return result
+
+
+def browse() -> dict:
+    """Everything in the findings database, as findings (no searching)."""
+    records = fdb.load()
+    findings = sorted((to_finding(r, known=True) for r in records.values()),
+                      key=lambda f: f["name"].lower())
+    by_source: dict[str, int] = {}
+    for f in findings:
+        for src in f["sources"]:
+            by_source[src] = by_source.get(src, 0) + 1
+    return {"findings": findings, "by_source": by_source, "errors": [], "query_used": "",
+            "countries_used": [], "database_size": len(records), "browse": True,
+            "searched_at": fdb.now_iso()}
+
+
+def _search(query: str, countries: list[str], *, use_web: bool = True,
+            exclude_urls: list[str] = ()) -> dict:
     intent = understand(query)
     countries = resolve_countries(query, countries)
     errors: list[tuple[str, str]] = []
@@ -856,6 +920,8 @@ def discover(query: str, countries: list[str], *, use_web: bool = True,
         "query_used": intent["corrected"],
         "countries_used": countries,
         "database_size": len(fdb.load()),
+        "searched_at": fdb.now_iso(),
+        "cached": False,
     }
 
 
@@ -863,6 +929,9 @@ def discover(query: str, countries: list[str], *, use_web: bool = True,
 
 def _print_table(result: dict) -> None:
     rows = result["findings"]
+    if result.get("cached"):
+        print(f"\n(from the search cache, searched {result.get('searched_at', '?')} - "
+              "use --refresh to search again)")
     print(f"\n{len(rows)} found for {result['query_used']!r} in "
           f"{', '.join(result['countries_used']) or 'any country'}  (by source: {result['by_source']}; "
           f"database now {result['database_size']} companies)")
@@ -882,23 +951,37 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("query", nargs="?", default="", help='e.g. "HSE jobs oil and gas"')
     ap.add_argument("--country", action="append", default=[], help="repeatable")
     ap.add_argument("--no-web", action="store_true", help="skip the browser searches")
+    ap.add_argument("--refresh", action="store_true", help="ignore the search cache")
     ap.add_argument("--json", action="store_true",
                     help="machine output; with no query, read the request as JSON on stdin")
+    ap.add_argument("--mark", action="store_true",
+                    help='hide / unhide: read {"ids": [...], "hidden": true|false} on stdin')
     ap.add_argument("--enrich", action="store_true",
                     help='find careers pages: read {"ids": [...]} on stdin, print the updated companies')
     args = ap.parse_args(argv)
 
+    if args.mark:
+        req = json.loads(sys.stdin.read() or "{}")
+        records = fdb.load()
+        ids = [str(i) for i in req.get("ids") or [] if str(i) in records]
+        fdb.upsert([{"id": i, "hidden": bool(req.get("hidden", True))} for i in ids])
+        print(json.dumps({"updated": len(ids)}))
+        return 0
     if args.enrich:
         req = json.loads(sys.stdin.read() or "{}")
         print(json.dumps({"findings": enrich([str(i) for i in req.get("ids") or []])}))
         return 0
     if args.json and not args.query:
         req = json.loads(sys.stdin.read() or "{}")
-        result = discover(str(req.get("query") or ""), [str(c) for c in req.get("countries") or []],
-                          use_web=bool(req.get("use_web", True)),
-                          exclude_urls=[str(u) for u in req.get("exclude_urls") or []])
+        if req.get("browse"):
+            result = browse()
+        else:
+            result = discover(str(req.get("query") or ""), [str(c) for c in req.get("countries") or []],
+                              use_web=bool(req.get("use_web", True)),
+                              exclude_urls=[str(u) for u in req.get("exclude_urls") or []],
+                              refresh=bool(req.get("refresh")))
     else:
-        result = discover(args.query, args.country, use_web=not args.no_web)
+        result = discover(args.query, args.country, use_web=not args.no_web, refresh=args.refresh)
 
     if args.json:
         # ASCII-only JSON: Windows pipes use the console code page, not UTF-8.

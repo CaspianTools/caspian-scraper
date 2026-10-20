@@ -8,6 +8,10 @@ const DiscoverSchema = z.object({
   query: z.string().max(500).default(""),
   countries: z.array(z.string().max(80)).max(20).default([]),
   use_web: z.boolean().default(true),
+  /** Ignore the search cache and search afresh. */
+  refresh: z.boolean().default(false),
+  /** List the whole findings database instead of searching. */
+  browse: z.boolean().default(false),
 });
 
 /**
@@ -18,7 +22,9 @@ const DiscoverSchema = z.object({
  * `find_websites.py --json` — free, no AI, no keys. Everything found is saved
  * to the findings database; nothing is added to the resource library until
  * the user picks (POST /api/resources/enrich, then POST /api/resources).
- * Usually takes one to two and a half minutes.
+ * Usually takes one to two and a half minutes; a repeat of a recent search
+ * comes from the search cache instantly (refresh: true searches again), and
+ * browse: true lists the whole database.
  */
 export async function POST(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));

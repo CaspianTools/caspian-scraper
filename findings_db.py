@@ -22,9 +22,11 @@ A company record (missing fields are simply absent):
     wikidata_id, osm_id
     found_by      search phrases that turned it up (latest 20)
     first_seen, last_seen               ISO times
+    hidden        true when someone marked it "not relevant" in the app
 
 Merging only ever adds: lists are unioned, empty fields filled, and the
-careers check fields replaced by a newer check.
+careers check fields replaced by a newer check. The one exception is
+`hidden`, a person's decision, which the latest value always replaces.
 """
 
 from __future__ import annotations
@@ -43,6 +45,8 @@ COMPANIES_FILE = "companies.jsonl"
 
 LIST_FIELDS = ("countries", "industries", "types", "sources")
 CHECK_FIELDS = ("careers_url", "ats", "reachable", "checked_at")
+# Decisions people make in the app: the newest value wins, even false.
+OVERRIDE_FIELDS = ("hidden",)
 FOUND_BY_KEEP = 20
 
 # Careers sub-sites belong to the company's own domain: careers.adnoc.ae → adnoc.ae.
@@ -91,7 +95,8 @@ def save(records: dict[str, dict], name: str = COMPANIES_FILE) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(f".{p.name}.{secrets.token_hex(4)}.tmp")
     lines = [json.dumps(records[k], ensure_ascii=False, sort_keys=True) for k in sorted(records)]
-    tmp.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    # newline="\n": LF on every OS, matching .gitattributes (no CRLF churn).
+    tmp.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8", newline="\n")
     os.replace(tmp, p)
 
 
@@ -106,7 +111,9 @@ def merge(old: dict | None, new: dict) -> dict:
     for k, v in new.items():
         if v in (None, "", []):
             continue
-        if k in LIST_FIELDS:
+        if k in OVERRIDE_FIELDS:
+            rec[k] = v
+        elif k in LIST_FIELDS:
             rec[k] = list(dict.fromkeys([*(rec.get(k) or []), *v]))
         elif k == "found_by":
             rec[k] = list(dict.fromkeys([*v, *(rec.get(k) or [])]))[:FOUND_BY_KEEP]

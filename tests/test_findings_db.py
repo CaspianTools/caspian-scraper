@@ -63,3 +63,15 @@ def test_a_broken_line_doesnt_sink_the_file(tmp_db):
     (tmp_db / "companies.jsonl").write_text('{"id": "a.com"}\n<<<<<<< HEAD\n{"id": "b.com"}\n',
                                             encoding="utf-8")
     assert sorted(fdb.load()) == ["a.com", "b.com"]
+
+
+def test_hidden_is_a_decision_the_latest_value_wins():
+    rec = fdb.merge({"id": "a.com", "hidden": True}, {"id": "a.com", "hidden": False})
+    assert rec["hidden"] is False
+    assert fdb.merge(rec, {"id": "a.com", "name": "A"})["hidden"] is False  # untouched by other saves
+
+
+def test_saved_with_lf_line_endings_on_every_os(tmp_db):
+    fdb.upsert([{"id": "a.com"}, {"id": "b.com"}])
+    raw = (tmp_db / "companies.jsonl").read_bytes()
+    assert b"\r\n" not in raw and raw.count(b"\n") == 2

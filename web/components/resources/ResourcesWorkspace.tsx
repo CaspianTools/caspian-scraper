@@ -62,6 +62,7 @@ export function ResourcesWorkspace({ resources }: { resources: ResourceRow[] }) 
         <FinderResults
           finder={finder}
           onAdded={() => router.refresh()}
+          allowAddToJob
           emptyHint="Describe what you're looking for in the sidebar and press Search. Results appear here as cards or a list."
         />
       )}
