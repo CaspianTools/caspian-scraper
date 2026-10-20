@@ -1,4 +1,4 @@
-"""find_websites.py — "Find websites" suggestions, offline (no network)."""
+"""find_websites.py — "Find websites", offline (no network, no browser)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,18 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 import find_websites as fw  # noqa: E402
+import findings_db as fdb  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def tmp_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(fdb, "DB_DIR", tmp_path / "db")
 
 
 class _Resp:
@@ -30,89 +38,51 @@ class _Resp:
             raise RuntimeError(self.status_code)
 
 
+# ---- understanding the query -------------------------------------------------
+
+def test_typos_are_fixed_and_generic_words_ignored():
+    i = fw.understand("Trainign Agencies")
+    assert i["corrected"] == "training agencies"
+    assert [g[0] for g in i["terms"]] == ["training"] and i["hse"] is False
+
+
+def test_hse_jobs_means_hse_hiring_industries():
+    i = fw.understand("HSE jobs")
+    assert i["terms"] == [] and i["hse"] is True and i["topic"] == "hse"
+
+
+def test_relevance_needs_every_specific_word_and_ranks_name_first():
+    i = fw.understand("safety training")
+    assert fw.relevance(i, name="Gulf Safety Training Centre") > \
+        fw.relevance(i, name="Acme", types=["safety"], description="training courses")
+    assert fw.relevance(i, name="Acme Safety") == 0                 # no "training"
+    hse = fw.understand("HSE jobs")
+    assert fw.relevance(hse, name="PetroCo", industries=["petroleum industry"]) > 0
+    assert fw.relevance(hse, name="Club", industries=["sporting activities"]) == 0
+
+
+def test_regions_expand_to_countries():
+    assert "Qatar" in fw.resolve_countries("HSE jobs Middle East", [])
+    assert fw.resolve_countries("x", ["UAE", "ksa"]) == ["United Arab Emirates", "Saudi Arabia"]
+
+
+# ---- careers pages -----------------------------------------------------------
+
 def test_detect_ats():
     assert fw.detect_ats('<script src="https://cms.jibecdn.com/x.js">') == "jibe"
     assert fw.detect_ats('<a data-careersite-propertyid="title">') == "successfactors"
     assert fw.detect_ats("<html>plain careers page</html>") == "unknown"
 
 
-def test_catalog_country_aliases_and_regions(tmp_path, monkeypatch):
-    cat = tmp_path / "employers.json"
-    cat.write_text(json.dumps([
-        {"name": "Emirates Co", "careers_url": "https://a.example/jobs", "countries": ["UAE"], "ats": "jibe"},
-        {"name": "Far Co", "careers_url": "https://b.example/jobs", "countries": ["Brazil"]},
-        {"name": "Have Co", "careers_url": "https://www.c.example/jobs/", "countries": ["Qatar"]},
-    ]), encoding="utf-8")
-    monkeypatch.setattr(fw, "CATALOG_FILE", cat)
-    # The picker sends full names; the catalog says "UAE".
-    assert [g["name"] for g in fw.catalog_matches("HSE jobs", ["United Arab Emirates"], set())] == ["Emirates Co"]
-    # Region words expand to countries; already-saved URLs are skipped.
-    got = fw.catalog_matches("HSE jobs Middle East", [], {"c.example/jobs"})
-    assert [g["name"] for g in got] == ["Emirates Co"]
-
-
-def test_search_result_links_are_unwrapped():
-    assert fw._ddg_href("//duckduckgo.com/l/?uddg=https%3A%2F%2Facme.example%2Fcareers&rut=x") \
-        == "https://acme.example/careers"
-    assert fw._google_href("/url?q=https://acme.example/jobs&sa=U") == "https://acme.example/jobs"
-    assert fw._google_href("https://acme.example/jobs") == "https://acme.example/jobs"
-
-
-def test_queries_spell_out_hse_and_spend_budget_on_countries():
-    qs = fw.build_queries("HSE jobs", ["Qatar", "Oman"])
-    assert len(qs) == 4 and all("health safety environment" in q for q in qs)
-    assert any("Qatar" in q for q in qs) and any("Oman" in q for q in qs)
-    assert all("jobs jobs" not in q for q in qs)
-
-
-def test_pick_sites_keeps_employers_one_per_site():
-    results = [
-        ("400+ HSE Jobs, Employment in Qatar", "https://qa.indeed.com/hse"),  # board domain
-        ("HSE Jobs in Qatar (Oct 2026) - Bayt.com", "https://www.bayt.com/x"),
-        ("HSE jobs - The HSE Leader", "https://jobs.thehseleader.com/"),      # 'hse' site name
-        ("Hse jobs in Qatar (October-2026)", "https://aimgulf.com/x"),          # aggregator title
-        ("Careers | Acme Energy", "https://acme.example/careers"),
-        ("Acme Energy - Search jobs", "https://acme.example/careers/search"),  # same site
-        ("Acme annual report", "https://news.example/acme"),                   # not careers
-        ("Join us - Beta Drilling", "https://beta.example/join-us"),
-    ]
-    got = fw.pick_sites(results, set())
-    assert [(g["name"], g["careers_url"]) for g in got] == [
-        ("Acme Energy", "https://acme.example/careers"),
-        ("Beta Drilling", "https://beta.example/join-us"),
-    ]
-
-
-def test_wikidata_filters_by_hse_industries_or_typed_words(monkeypatch):
-    rows = [
-        {"coLabel": {"value": "PetroCo"}, "site": {"value": "https://petro.example"},
-         "links": {"value": "30"}, "inds": {"value": "petroleum industry"}},
-        {"coLabel": {"value": "Club"}, "site": {"value": "https://club.example"},
-         "links": {"value": "40"}, "inds": {"value": "sporting activities"}},
-        {"coLabel": {"value": "BuildCo"}, "site": {"value": "https://build.example"},
-         "links": {"value": "5"}, "inds": {"value": "construction"}},
-        {"coLabel": {"value": "Hotel"}, "site": {"value": "https://hotel.example"},
-         "links": {"value": "9"}, "inds": {"value": "hospitality industry"}},
-    ]
-    monkeypatch.setattr(fw.requests, "get",
-                        lambda *a, **k: _Resp("x", payload={"results": {"bindings": rows}}))
-    names = [c["name"] for c in fw.wikidata_companies(["Qatar"], "HSE jobs")]
-    assert names == ["PetroCo", "BuildCo"]          # HSE industries, notable first
-    names = [c["name"] for c in fw.wikidata_companies(["Qatar"], "HSE construction jobs")]
-    assert names == ["BuildCo"]                     # typed industry narrows it
-
-
 def test_careers_page_found_from_homepage_link(monkeypatch):
     pages = {
-        "https://acme.example": _Resp(
-            "https://www.acme.example/",
-            '<a href="/about">About</a><a href="/en/careers">Careers</a>'),
-        "https://www.acme.example/en/careers": _Resp(
-            "https://www.acme.example/en/careers", "<title>Careers at Acme</title>"),
+        "https://acme.example": _Resp("https://www.acme.example/",
+                                      '<a href="/about">About</a><a href="/en/careers">Careers</a>'),
+        "https://www.acme.example/en/careers": _Resp("https://www.acme.example/en/careers",
+                                                     "<title>Careers at Acme</title>"),
     }
-    monkeypatch.setattr(fw, "_get", lambda url: pages.get(url))
-    r = fw.find_careers_page("https://acme.example")
-    assert r is not None and r.url == "https://www.acme.example/en/careers"
+    monkeypatch.setattr(fw, "_get", lambda url, timeout=0: pages.get(url))
+    assert fw.find_careers_page("https://acme.example").url == "https://www.acme.example/en/careers"
 
 
 def test_careers_page_falls_back_to_usual_address(monkeypatch):
@@ -120,31 +90,94 @@ def test_careers_page_falls_back_to_usual_address(monkeypatch):
         "https://acme.example": _Resp("https://acme.example/", "<p>no links</p>"),
         "https://careers.acme.example": _Resp("https://careers.acme.example/", "<title>Jobs</title>"),
     }
-    monkeypatch.setattr(fw, "_get", lambda url: pages.get(url))
+    monkeypatch.setattr(fw, "_get", lambda url, timeout=0: pages.get(url))
     assert fw.find_careers_page("https://acme.example").url == "https://careers.acme.example/"
 
 
-def test_default_ports_dont_break_duplicate_matching():
-    assert fw._clean_url("https://careerportal.qatarenergy.qa:443/") == "https://careerportal.qatarenergy.qa/"
-    assert fw._host("https://careerportal.qatarenergy.qa:443/") == "careerportal.qatarenergy.qa"
+def test_enrich_saves_the_careers_page(monkeypatch):
+    fdb.upsert([{"id": "acme.example", "name": "Acme", "website": "https://acme.example"}])
+    monkeypatch.setattr(fw, "find_careers_page", lambda site: _Resp(
+        "https://careers.acme.example:443/", '<script src="//cms.jibecdn.com/a.js">'))
+    (f,) = fw.enrich(["acme.example", "missing.example"])
+    assert f["careers_url"] == "https://careers.acme.example/" and f["scrapable"] is True
+    assert fdb.load()["acme.example"]["ats"] == "jibe"
 
 
-def test_discover_offline_returns_catalog_only(monkeypatch):
-    monkeypatch.setattr(fw, "catalog_matches", lambda q, c, e: [
-        {"name": "A", "careers_url": "https://a.example", "countries": [],
-         "catalog_ats": "successfactors", "why": "", "source": "catalog"}])
-    monkeypatch.setattr(fw, "verify", lambda url: {
-        "reachable": True, "status": 200, "detected_ats": "unknown", "note": ""})
-    out = fw.discover("hse", [], use_web=False)
-    assert out["web_status"] == "off" and out["directory_status"] == "off"
-    (a,) = out["catalog"]
-    # Platform falls back to the catalog's when the page check can't tell.
-    assert a["ats"] == "successfactors" and a["scrapable"] is True
+# ---- sources -----------------------------------------------------------------
+
+def test_search_result_links_are_unwrapped():
+    assert fw._ddg_href("//duckduckgo.com/l/?uddg=https%3A%2F%2Facme.example%2Fcareers&rut=x") \
+        == "https://acme.example/careers"
+    assert fw._google_href("/url?q=https://acme.example/jobs&sa=U") == "https://acme.example/jobs"
+
+
+def test_maps_category_and_tracking_params():
+    assert fw._maps_category(["4.6(120) · Training centre · Al Quoz", "Open · Closes 6 pm"]) == "Training centre"
+    assert fw._strip_tracking("http://www.rei.ae/?utm_source=gmb&utm_medium=organic") == "http://www.rei.ae/"
+
+
+def test_web_candidates_drop_boards_and_aggregators():
+    assert not fw.is_candidate("400+ HSE Jobs, Employment in Qatar", "https://qa.indeed.com/hse")
+    assert not fw.is_candidate("HSE jobs - The HSE Leader", "https://jobs.thehseleader.com/")
+    assert not fw.is_candidate("Top 10 Training Agencies in Bahrain", "https://acme.example/blog")
+    assert fw.is_candidate("Careers | Acme Energy", "https://acme.example/careers")
+
+
+def test_wikidata_keeps_organisations_ranked_by_query(monkeypatch):
+    rows = [
+        {"co": {"value": "x/Q1"}, "coLabel": {"value": "Gulf Training Institute"}, "site": {"value": "https://gti.example"},
+         "links": {"value": "3"}, "types": {"value": "educational institution"}, "coDescription": {"value": ""}},
+        {"co": {"value": "x/Q2"}, "coLabel": {"value": "Training Tower"}, "site": {"value": "https://tower.example"},
+         "links": {"value": "9"}, "types": {"value": "skyscraper"}},                       # not an organisation
+        {"co": {"value": "x/Q3"}, "coLabel": {"value": "PetroCo"}, "site": {"value": "https://petro.example"},
+         "links": {"value": "30"}, "inds": {"value": "petroleum industry"}},              # off-topic
+    ]
+    monkeypatch.setattr(fw.requests, "get", lambda *a, **k: _Resp("x", payload={"results": {"bindings": rows}}))
+    got = fw.wikidata_matches(fw.understand("training"), ["Qatar"], [])
+    assert [g["name"] for g in got] == ["Gulf Training Institute"]
+
+
+# ---- discover: merge, save, rank ---------------------------------------------
+
+def test_discover_merges_sources_by_domain_and_saves_everything(monkeypatch):
+    monkeypatch.setattr(fw, "wikidata_matches", lambda i, c, e: [
+        {"name": "Acme Training", "website": "https://www.acme.example/", "countries": ["Qatar"],
+         "types": ["company"], "sources": ["wikidata"], "_score": 3, "_links": 5}])
+    monkeypatch.setattr(fw, "osm_matches", lambda i, c, e: [
+        {"name": "Acme Training Centre", "website": "https://acme.example/en", "countries": ["Qatar"],
+         "sources": ["osm"], "_score": 3}])
+    monkeypatch.setattr(fw, "browser_matches", lambda i, c, e: [
+        {"name": "Beta Academy", "website": "https://beta.example/", "countries": ["Qatar"],
+         "types": ["Training centre"], "sources": ["google_maps"], "_score": 4}])
+    out = fw.discover("training", ["Qatar"])
+    by_id = {f["id"]: f for f in out["findings"]}
+    assert set(by_id) == {"acme.example", "beta.example"}
+    assert by_id["acme.example"]["sources"] == ["wikidata", "osm"]   # one finding, two chips
+    assert out["database_size"] == 2 and set(fdb.load()) == {"acme.example", "beta.example"}
+    assert fdb.load()["beta.example"]["found_by"] == ["training"]
+
+    # A second search finds them in the database too.
+    out2 = fw.discover("training", ["Qatar"], use_web=False)
+    assert all(f["known"] for f in out2["findings"] if f["id"] == "beta.example")
 
 
 def test_json_mode_reads_stdin(monkeypatch, capsys):
-    monkeypatch.setattr(fw, "catalog_matches", lambda q, c, e: [])
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"query": "hse", "use_web": False})))
     assert fw.main(["--json"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["catalog"] == [] and out["directory"] == [] and out["web_status"] == "off"
+    assert out["findings"] == [] and out["countries_used"] == []
+
+
+def test_careers_url_is_strict_about_what_counts():
+    assert fw.is_careers_url("https://www.adnoc.ae/en/careers")
+    assert fw.is_careers_url("https://careers.slb.com/")
+    assert fw.is_careers_url("https://x.example/jobs.html")
+    # Pages that only mention jobs aren't the careers page.
+    assert not fw.is_careers_url("https://almashreqbh.com/customer-type/job-seekers/")
+    assert not fw.is_careers_url("https://aztechtraining.com/about-us/equal-opportunity-ip-policies")
+    assert fw.CAREERS_LINK_TEXT.match("Join Our Team") and not fw.CAREERS_LINK_TEXT.match("Job Seekers")
+
+
+def test_maps_category_never_repeats_the_name():
+    lines = ["Al Mashreq Training", "4.8(52) · Training centre · Manama"]
+    assert fw._maps_category(lines, "Al Mashreq Training") == "Training centre"

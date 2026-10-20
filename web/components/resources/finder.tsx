@@ -6,46 +6,55 @@ import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { ResourceRow } from "@/lib/firestore/resources";
 
 /**
- * "Find websites" building blocks: the app proposes careers sites — from the
- * built-in employer list, companies in the chosen countries (Wikidata) and
- * DuckDuckGo/Google searches run in a browser (find_websites.py: free, no AI,
- * no keys) — after opening each one to check it works and which platform it
- * runs on. Ticked ones are saved to the shared library.
+ * "Find websites" building blocks. find_websites.py searches Google Maps,
+ * Google / DuckDuckGo, Wikidata, OpenStreetMap and the findings database
+ * (db/) — free, no AI, no keys — saves everything to the database, and
+ * returns one list of companies. Picked ones get their careers page found
+ * (/api/resources/enrich) and are added to the resource library.
  *
  *   useFinder()      search state + actions, shared by the two parts below
  *   <FinderForm>     the search controls (fits a sidebar)
- *   <FinderResults>  results as a list or cards, with select + "Add to library"
+ *   <FinderResults>  one list of findings — cards or rows, with chips
  */
 
-/** One suggestion from POST /api/resources/discover (find_websites.py). */
-export interface Suggestion {
+/** One company from find_websites.py (to_finding). */
+export interface Finding {
+  id: string;
   name: string;
+  website: string;
   careers_url: string;
+  description: string;
   countries: string[];
+  industries: string[];
+  types: string[];
+  sources: string[];
+  known: boolean;
   ats: "successfactors" | "jibe" | "unknown";
-  reachable: boolean;
+  checked: boolean;
+  reachable: boolean | null;
   scrapable: boolean;
-  note: string;
-  why: string;
-  source: "catalog" | "directory" | "web";
 }
 
 export interface DiscoverResult {
-  catalog: Suggestion[];
-  directory: Suggestion[];
-  web: Suggestion[];
-  directory_status: "ok" | "error" | "off";
-  directory_error: string;
-  web_status: "ok" | "blocked" | "error" | "off";
-  web_error: string;
+  findings: Finding[];
+  by_source: Record<string, number>;
+  errors: { source: string; message: string }[];
+  query_used: string;
+  countries_used: string[];
+  database_size: number;
 }
 
-const SOURCE_NOTE: Record<Suggestion["source"], string> = {
-  catalog: "From the built-in employer list.",
-  directory: "Found in the Wikidata company directory.",
-  web: "Found by web search.",
+const SOURCE_LABEL: Record<string, string> = {
+  google_maps: "Google Maps",
+  google: "Google",
+  duckduckgo: "DuckDuckGo",
+  wikidata: "Wikidata",
+  osm: "OpenStreetMap",
+  web: "Web",
+  db: "In database",
 };
 const ATS_LABEL: Record<string, string> = { successfactors: "SuccessFactors", jibe: "Jibe / iCIMS" };
+const PAGE = 60;
 
 const inputCls =
   "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400";
@@ -63,14 +72,12 @@ export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {})
   const [countries, setCountries] = useState<string[]>([]);
   const [useWeb, setUseWeb] = useState(true);
   const [busy, setBusy] = useState<"search" | "add" | null>(null);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DiscoverResult | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  const all = useMemo(
-    () => (result ? [...result.directory, ...result.web, ...result.catalog] : []),
-    [result]
-  );
+  const all = useMemo(() => result?.findings ?? [], [result]);
 
   async function search() {
     setBusy("search");
@@ -88,8 +95,7 @@ export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {})
       }
       const r = b as DiscoverResult;
       setResult(r);
-      // Pre-tick only what will actually be scraped today.
-      setPicked(new Set([...r.directory, ...r.web, ...r.catalog].filter((s) => s.scrapable).map((s) => s.careers_url)));
+      setPicked(new Set(r.findings.filter((f) => f.scrapable).map((f) => f.id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -97,73 +103,98 @@ export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {})
     }
   }
 
-  /** Save the ticked suggestions to the library; returns the saved rows. */
+  /** Find careers pages for the picked companies, then save them to the
+   *  resource library; returns the saved rows. */
   async function addPicked(): Promise<ResourceRow[]> {
     setBusy("add");
     setError(null);
+    const chosen = all.filter((f) => picked.has(f.id));
     const added: ResourceRow[] = [];
+    const addedIds = new Set<string>();
     try {
-      for (const s of all.filter((x) => picked.has(x.careers_url))) {
-        const res = await authedFetch("/api/resources", {
+      setProgress(`Finding careers pages for ${chosen.length} compan${chosen.length === 1 ? "y" : "ies"}…`);
+      const res = await authedFetch("/api/resources/enrich", {
+        method: "POST",
+        body: JSON.stringify({ ids: chosen.map((f) => f.id).slice(0, 200) }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(b.error || `Careers-page lookup failed (${res.status})`);
+        return [];
+      }
+      const enriched = new Map<string, Finding>((b.findings as Finding[]).map((f) => [f.id, f]));
+
+      for (const [i, f0] of chosen.entries()) {
+        const f = enriched.get(f0.id) ?? f0;
+        setProgress(`Adding ${i + 1} of ${chosen.length}…`);
+        const r = await authedFetch("/api/resources", {
           method: "POST",
           body: JSON.stringify({
-            name: s.name,
+            name: f.name.slice(0, 120),
             kind: "employer",
-            ats: s.ats,
-            careers_url: s.careers_url,
-            countries: s.countries,
-            notes: [s.why, SOURCE_NOTE[s.source]].filter(Boolean).join(" "),
+            ats: f.scrapable ? f.ats : "unknown",
+            careers_url: f.careers_url || f.website,
+            countries: f.countries.slice(0, 20),
+            website: f.website.slice(0, 300),
+            notes: [
+              f.careers_url ? "" : "No careers page found yet - this is the company website.",
+              `Found via ${f.sources.map((s) => SOURCE_LABEL[s] ?? s).join(", ")}.`,
+            ]
+              .filter(Boolean)
+              .join(" "),
           }),
         });
-        const b = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(`Couldn't add ${s.name}: ${b.details?.[0]?.message || b.error || res.status}`);
+        const rb = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setError(`Couldn't add ${f.name}: ${rb.details?.[0]?.message || rb.error || r.status}`);
           continue;
         }
+        addedIds.add(f0.id);
         added.push({
-          id: b.id,
-          name: b.name,
-          kind: b.kind,
-          ats: b.ats,
-          careers_url: b.careers_url,
-          active: b.active !== false,
-          countries: b.countries ?? [],
+          id: rb.id,
+          name: rb.name,
+          kind: rb.kind,
+          ats: rb.ats,
+          careers_url: rb.careers_url,
+          active: rb.active !== false,
+          countries: rb.countries ?? [],
           used_by: [],
         });
       }
-      // Saved ones leave the results so they can't be added twice.
-      const savedUrls = new Set(added.map((a) => a.careers_url));
+      // Added ones leave the results so they can't be added twice; the rest
+      // pick up any careers pages found.
       setResult((r) =>
         r && {
           ...r,
-          catalog: r.catalog.filter((s) => !savedUrls.has(s.careers_url)),
-          directory: r.directory.filter((s) => !savedUrls.has(s.careers_url)),
-          web: r.web.filter((s) => !savedUrls.has(s.careers_url)),
+          findings: r.findings
+            .filter((f) => !addedIds.has(f.id))
+            .map((f) => enriched.get(f.id) ?? f),
         }
       );
       setPicked(new Set());
       return added;
     } finally {
       setBusy(null);
+      setProgress("");
     }
   }
 
-  function toggle(url: string) {
+  function toggle(id: string) {
     setPicked((p) => {
       const n = new Set(p);
-      if (n.has(url)) n.delete(url);
-      else n.add(url);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   }
 
-  function selectWhere(pred: (s: Suggestion) => boolean) {
-    setPicked(new Set(all.filter(pred).map((s) => s.careers_url)));
+  function selectIds(ids: string[]) {
+    setPicked(new Set(ids));
   }
 
   return {
     query, setQuery, countries, setCountries, useWeb, setUseWeb,
-    busy, error, result, all, picked, toggle, selectWhere, search, addPicked,
+    busy, progress, error, result, all, picked, toggle, selectIds, search, addPicked,
   };
 }
 
@@ -180,8 +211,8 @@ export function FinderForm({ finder, onSearch }: { finder: Finder; onSearch?: ()
       <div>
         <p className="text-sm font-semibold tracking-tight">Find websites</p>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Careers sites from the built-in employer list, companies in the chosen countries and a
-          web search — each opened to check it works. Free: no AI, no keys.
+          Searches Google Maps, Google, Wikidata and OpenStreetMap, and your findings database.
+          Everything found is saved to the database. Free: no AI, no keys.
         </p>
       </div>
       <label className="block text-sm">
@@ -196,15 +227,16 @@ export function FinderForm({ finder, onSearch }: { finder: Finder; onSearch?: ()
               if (!f.busy) run();
             }
           }}
-          placeholder="HSE jobs in oil & gas"
+          placeholder="Training centres, oil & gas companies…"
           className={inputCls}
         />
       </label>
       <div className="text-sm">
-        <span className="block font-medium mb-1">
-          Countries <span className="text-zinc-500 font-normal">(optional)</span>
-        </span>
+        <span className="block font-medium mb-1">Countries</span>
         <CountrySelect value={f.countries} onChange={f.setCountries} />
+        <p className="text-xs text-zinc-500 mt-1">
+          The directories and maps need countries. The first 4 are searched on Google.
+        </p>
       </div>
       <label className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         <input
@@ -213,41 +245,17 @@ export function FinderForm({ finder, onSearch }: { finder: Finder; onSearch?: ()
           onChange={(e) => f.setUseWeb(e.target.checked)}
           className="w-4 h-4 mt-0.5"
         />
-        Also look online (company directory + web search)
+        Search Google Maps and the web too (slower, finds the most)
       </label>
       <button type="button" onClick={run} disabled={f.busy !== null} className={primaryBtn + " w-full"}>
         {f.busy === "search" ? "Searching…" : "Search"}
       </button>
       {f.busy === "search" && (
         <p className="text-xs text-zinc-500">
-          Checking every suggestion{f.useWeb ? " and looking online" : ""} — usually about a minute.
+          Looking in every source{f.useWeb ? " — Google Maps and the web take 1–3 minutes" : ""}.
         </p>
       )}
-      {f.result && <SearchNotes result={f.result} countriesChosen={f.countries.length > 0} />}
       {f.error && <p className="text-sm text-red-600">{f.error}</p>}
-    </div>
-  );
-}
-
-function SearchNotes({ result, countriesChosen }: { result: DiscoverResult; countriesChosen: boolean }) {
-  const notes: string[] = [];
-  if (result.web_status !== "off" && result.directory_status === "off" && !countriesChosen) {
-    notes.push("Pick countries (or name a region like “Middle East”) to also get companies from the directory.");
-  }
-  if (result.directory_status === "error") {
-    notes.push(`The company directory didn't answer (${result.directory_error}). Try again in a moment.`);
-  }
-  if (result.web_status === "blocked") {
-    notes.push("The search engines are limiting automated searches right now — try again in a few minutes.");
-  } else if (result.web_status === "error") {
-    notes.push(`Web search failed: ${result.web_error}`);
-  }
-  if (notes.length === 0) return null;
-  return (
-    <div className="text-xs rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2 space-y-1">
-      {notes.map((n) => (
-        <p key={n}>{n}</p>
-      ))}
     </div>
   );
 }
@@ -292,6 +300,24 @@ export function FinderResults({
 }) {
   const f = finder;
   const [view, setView] = useView();
+  const [text, setText] = useState("");
+  const [sources, setSources] = useState<Set<string>>(new Set());
+  const [shown, setShown] = useState(PAGE);
+
+  const filtered = useMemo(() => {
+    const needle = text.trim().toLowerCase();
+    return f.all.filter((x) => {
+      if (sources.size > 0) {
+        const own = new Set([...x.sources, ...(x.known ? ["db"] : [])]);
+        if (![...sources].some((s) => own.has(s))) return false;
+      }
+      if (!needle) return true;
+      return [x.name, x.website, x.description, ...x.countries, ...x.types, ...x.industries]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [f.all, text, sources]);
 
   if (f.busy === "search") return <LoadingGrid view={view} />;
   if (!f.result) {
@@ -302,33 +328,79 @@ export function FinderResults({
     );
   }
 
-  const groups: { title: string; items: Suggestion[] }[] = [
-    { title: "Companies in the chosen countries", items: f.result.directory },
-    { title: "Found on the web", items: f.result.web },
-    { title: "From the built-in employer list", items: f.result.catalog },
-  ].filter((g) => g.items.length > 0);
-  const total = f.all.length;
-  const scrapable = f.all.filter((s) => s.scrapable).length;
+  const r = f.result;
+  const counts = Object.entries(r.by_source).filter(([, n]) => n > 0);
+  const scrapable = f.all.filter((x) => x.scrapable).length;
 
   return (
-    <div className="space-y-5">
-      <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-50/90 dark:bg-black/80 backdrop-blur flex flex-wrap items-center gap-2">
-        <p className="text-sm mr-auto">
-          <span className="font-medium">{total}</span> found ·{" "}
-          <span className="text-emerald-700 dark:text-emerald-400">{scrapable} scrapable now</span> ·{" "}
-          {f.picked.size} selected
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <p className="text-sm">
+          <span className="font-medium">{f.all.length}</span> found for{" "}
+          <span className="font-medium">“{r.query_used || "anything"}”</span>
+          {r.countries_used.length > 0 && <> in {r.countries_used.join(", ")}</>}
+          {scrapable > 0 && <span className="text-emerald-700 dark:text-emerald-400"> · {scrapable} scrapable now</span>}
+          <span className="text-zinc-500"> · findings database: {r.database_size} companies</span>
         </p>
-        <div className="flex items-center gap-1">
-          <button type="button" className={chipBtn} onClick={() => f.selectWhere((s) => s.scrapable)}>
-            Scrapable
-          </button>
-          <button type="button" className={chipBtn} onClick={() => f.selectWhere(() => true)}>
-            All
-          </button>
-          <button type="button" className={chipBtn} onClick={() => f.selectWhere(() => false)}>
-            None
-          </button>
+        {r.errors.length > 0 && (
+          <div className="text-xs rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2 space-y-0.5">
+            {r.errors.map((e, i) => (
+              <p key={i}>
+                <span className="font-medium">{SOURCE_LABEL[e.source] ?? e.source}:</span> {e.message}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-50/90 dark:bg-black/80 backdrop-blur flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setShown(PAGE);
+          }}
+          placeholder="Filter results…"
+          className="h-8 w-48 px-2.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+        />
+        <div className="flex flex-wrap items-center gap-1">
+          {counts.map(([s, n]) => {
+            const on = sources.has(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setSources((cur) => {
+                    const next = new Set(cur);
+                    if (next.has(s)) next.delete(s);
+                    else next.add(s);
+                    return next;
+                  });
+                  setShown(PAGE);
+                }}
+                className={
+                  "h-7 px-2.5 rounded-full text-xs border " +
+                  (on
+                    ? "bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900")
+                }
+              >
+                {SOURCE_LABEL[s] ?? s} {n}
+              </button>
+            );
+          })}
         </div>
+        <span className="mx-auto" />
+        <span className="text-xs text-zinc-500">{f.picked.size} selected</span>
+        <button type="button" className={chipBtn} onClick={() => f.selectIds(filtered.map((x) => x.id))}>
+          All shown
+        </button>
+        <button type="button" className={chipBtn} onClick={() => f.selectIds([])}>
+          None
+        </button>
         <ViewToggle view={view} onChange={setView} />
         <button
           type="button"
@@ -342,30 +414,31 @@ export function FinderResults({
           {f.busy === "add" ? "Adding…" : `Add ${f.picked.size} to library`}
         </button>
       </div>
+      {f.progress && <p className="text-xs text-zinc-500">{f.progress}</p>}
 
-      {total === 0 ? (
-        <p className="text-sm text-zinc-500">Nothing new matched — try other words or countries.</p>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-zinc-500">
+          {f.all.length === 0 ? "Nothing matched — try other words or countries." : "No results match the filter."}
+        </p>
+      ) : view === "cards" ? (
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {filtered.slice(0, shown).map((x) => (
+            <ResultCard key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} />
+          ))}
+        </div>
       ) : (
-        groups.map((g) => (
-          <section key={g.title}>
-            <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500 mb-2">
-              {g.title} <span className="normal-case tracking-normal">({g.items.length})</span>
-            </h3>
-            {view === "cards" ? (
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {g.items.map((s) => (
-                  <ResultCard key={s.careers_url} s={s} picked={f.picked.has(s.careers_url)} onToggle={f.toggle} />
-                ))}
-              </div>
-            ) : (
-              <ul className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 divide-y divide-zinc-100 dark:divide-zinc-800">
-                {g.items.map((s) => (
-                  <ResultRow key={s.careers_url} s={s} picked={f.picked.has(s.careers_url)} onToggle={f.toggle} />
-                ))}
-              </ul>
-            )}
-          </section>
-        ))
+        <ul className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 divide-y divide-zinc-100 dark:divide-zinc-800">
+          {filtered.slice(0, shown).map((x) => (
+            <ResultRow key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} />
+          ))}
+        </ul>
+      )}
+      {filtered.length > shown && (
+        <div className="text-center">
+          <button type="button" className={chipBtn + " h-9 px-4"} onClick={() => setShown((n) => n + PAGE)}>
+            Show more ({filtered.length - shown} left)
+          </button>
+        </div>
       )}
       {f.error && <p className="text-sm text-red-600">{f.error}</p>}
     </div>
@@ -413,16 +486,57 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
   );
 }
 
-function StatusBadge({ s }: { s: Suggestion }) {
-  const [cls, text] = !s.reachable
-    ? ["bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", "couldn't check"]
-    : s.scrapable
-      ? ["bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300", `${ATS_LABEL[s.ats]} — will be scraped`]
-      : ["bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300", "saved, not scraped yet"];
-  return <span className={"text-xs px-1.5 py-0.5 rounded whitespace-nowrap " + cls}>{text}</span>;
+function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: string; title?: string }) {
+  const cls: Record<string, string> = {
+    plain: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+    source: "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+    known: "bg-violet-50 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+    good: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+    warn: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+    bad: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  };
+  return (
+    <span title={title} className={"text-[11px] leading-4 px-1.5 py-0.5 rounded whitespace-nowrap " + cls[tone]}>
+      {children}
+    </span>
+  );
+}
+
+/** Status, sources, place and kind — the chips every finding shows. */
+function Chips({ f }: { f: Finding }) {
+  const status = f.scrapable ? (
+    <Chip tone="good">{ATS_LABEL[f.ats]} — will be scraped</Chip>
+  ) : !f.checked ? (
+    <Chip tone="plain" title="The careers page is looked up when you add it">careers page not checked yet</Chip>
+  ) : f.reachable === false ? (
+    <Chip tone="bad">careers page didn&apos;t open</Chip>
+  ) : f.careers_url ? (
+    <Chip tone="warn">other platform — saved, not scraped yet</Chip>
+  ) : (
+    <Chip tone="warn">no careers page found</Chip>
+  );
+  const kinds = [...f.types, ...f.industries].filter(Boolean);
+  return (
+    <span className="flex flex-wrap gap-1">
+      {status}
+      {f.known && <Chip tone="known">In database</Chip>}
+      {f.sources.map((s) => (
+        <Chip key={s} tone="source">
+          {SOURCE_LABEL[s] ?? s}
+        </Chip>
+      ))}
+      {f.countries.slice(0, 3).map((c) => (
+        <Chip key={c}>{c}</Chip>
+      ))}
+      {kinds.slice(0, 2).map((k) => (
+        <Chip key={k}>{k}</Chip>
+      ))}
+    </span>
+  );
 }
 
 function UrlLink({ url }: { url: string }) {
+  if (!url) return null;
   return (
     <a
       href={url}
@@ -432,33 +546,30 @@ function UrlLink({ url }: { url: string }) {
       className="block text-xs text-zinc-500 font-mono truncate hover:underline"
       title={url}
     >
-      {url.replace(/^https?:\/\/(www\.)?/, "")}
+      {url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
     </a>
   );
 }
 
-function ResultRow({ s, picked, onToggle }: { s: Suggestion; picked: boolean; onToggle: (url: string) => void }) {
+function ResultRow({ f, picked, onToggle }: { f: Finding; picked: boolean; onToggle: (id: string) => void }) {
   return (
     <li>
       <label className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
-        <input type="checkbox" checked={picked} onChange={() => onToggle(s.careers_url)} className="w-4 h-4 mt-0.5 shrink-0" />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">{s.name}</span>
-            <StatusBadge s={s} />
-            {s.countries.length > 0 && <span className="text-xs text-zinc-500">{s.countries.slice(0, 4).join(", ")}</span>}
+        <input type="checkbox" checked={picked} onChange={() => onToggle(f.id)} className="w-4 h-4 mt-0.5 shrink-0" />
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-sm font-medium">{f.name}</span>
+            <Chips f={f} />
           </span>
-          <UrlLink url={s.careers_url} />
-          {(s.why || s.note) && (
-            <span className="block text-xs text-zinc-500 mt-0.5">{[s.why, s.note].filter(Boolean).join(" — ")}</span>
-          )}
+          <UrlLink url={f.careers_url || f.website} />
+          {f.description && <span className="block text-xs text-zinc-500 line-clamp-1">{f.description}</span>}
         </span>
       </label>
     </li>
   );
 }
 
-function ResultCard({ s, picked, onToggle }: { s: Suggestion; picked: boolean; onToggle: (url: string) => void }) {
+function ResultCard({ f, picked, onToggle }: { f: Finding; picked: boolean; onToggle: (id: string) => void }) {
   return (
     <label
       className={
@@ -471,24 +582,19 @@ function ResultCard({ s, picked, onToggle }: { s: Suggestion; picked: boolean; o
       <input
         type="checkbox"
         checked={picked}
-        onChange={() => onToggle(s.careers_url)}
+        onChange={() => onToggle(f.id)}
         className="absolute top-3 right-3 w-4 h-4"
-        aria-label={`Select ${s.name}`}
+        aria-label={`Select ${f.name}`}
       />
       <span className="flex items-center gap-2 pr-6">
         <span className="w-8 h-8 shrink-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-sm font-semibold text-zinc-600 dark:text-zinc-300">
-          {s.name.trim().charAt(0).toUpperCase()}
+          {f.name.trim().charAt(0).toUpperCase()}
         </span>
-        <span className="text-sm font-medium leading-tight line-clamp-2">{s.name}</span>
+        <span className="text-sm font-medium leading-tight line-clamp-2">{f.name}</span>
       </span>
-      <span>
-        <StatusBadge s={s} />
-      </span>
-      <UrlLink url={s.careers_url} />
-      {s.countries.length > 0 && <span className="text-xs text-zinc-500">{s.countries.slice(0, 4).join(", ")}</span>}
-      {(s.why || s.note) && (
-        <span className="text-xs text-zinc-500 line-clamp-2">{[s.why, s.note].filter(Boolean).join(" — ")}</span>
-      )}
+      <UrlLink url={f.careers_url || f.website} />
+      <Chips f={f} />
+      {f.description && <span className="text-xs text-zinc-500 line-clamp-2">{f.description}</span>}
     </label>
   );
 }

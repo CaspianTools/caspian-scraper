@@ -1,0 +1,3 @@
+# The findings database is rewritten by find_websites.py on every computer;
+# keep its line endings fixed so a save never shows as every line changed.
+db/*.jsonl text eol=lf

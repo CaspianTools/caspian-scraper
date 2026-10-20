@@ -13,12 +13,12 @@ const DiscoverSchema = z.object({
 /**
  * POST /api/resources/discover
  *
- * "Find websites": careers-site suggestions from the built-in employer list,
- * companies in the chosen countries (Wikidata) and DuckDuckGo/Google searches
- * in a browser — free, no AI, no keys — each opened to check it works and to
- * detect its careers platform. Runs `find_websites.py --json`; nothing is
- * saved — the client adds the ones the
- * user picks via POST /api/resources. Usually takes about a minute.
+ * "Find websites": companies from Google Maps, Google Search / DuckDuckGo,
+ * Wikidata, OpenStreetMap and the findings database (db/), via
+ * `find_websites.py --json` — free, no AI, no keys. Everything found is saved
+ * to the findings database; nothing is added to the resource library until
+ * the user picks (POST /api/resources/enrich, then POST /api/resources).
+ * Usually takes one to two and a half minutes.
  */
 export async function POST(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       ...parsed.data,
       owner_uid: session.uid,
       exclude_urls: library.map((r) => r.careers_url),
-    });
+    }, 420_000);
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json(
