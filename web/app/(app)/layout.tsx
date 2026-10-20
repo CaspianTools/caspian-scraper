@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
-import { AppHeader } from "@/components/AppHeader";
+import { SideRail } from "@/components/shell/SideRail";
 import { QuickAddProvider } from "@/components/quick-add/QuickAddProvider";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Authed route-group layout. Every page under app/(app)/ inherits this:
- * a single auth check + the shared header. Nested layouts (e.g. the
- * project layout) can assume the user is signed in.
+ * App route-group layout. Every page under app/(app)/ inherits this: the
+ * session (always the local one — see lib/auth/session.ts) and the
+ * full-height SideRail on the left. Pages fill the rest of the width, usually
+ * via <SidebarLayout> (page sidebar + main area) or <FullWidth>.
  *
  * The parentheses in "(app)" make this a Next.js route group — the
  * folder doesn't appear in URLs.
@@ -23,9 +24,9 @@ export default async function AuthedLayout({
 
   return (
     <QuickAddProvider>
-      <div className="min-h-screen bg-zinc-50 dark:bg-black">
-        <AppHeader />
-        {children}
+      <div className="min-h-screen flex bg-zinc-50 dark:bg-black">
+        <SideRail />
+        <div className="flex-1 min-w-0">{children}</div>
       </div>
     </QuickAddProvider>
   );

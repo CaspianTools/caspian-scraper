@@ -159,12 +159,6 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
 
   return (
     <>
-      {data.description && (
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          {data.description}
-        </p>
-      )}
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           label="Schedule"

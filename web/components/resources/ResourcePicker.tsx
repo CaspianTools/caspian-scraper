@@ -14,13 +14,15 @@ interface Props {
   onCreated: (row: ResourceRow) => void;
   /** Prefill for Find websites, e.g. the job's name and description. */
   suggestQuery?: string;
+  /** Hide the inline Find websites button (when a sidebar has the search). */
+  hideFind?: boolean;
 }
 
 /**
  * Searchable checklist over the shared resource library, with an inline
  * "add new" form. Pure selection UI — the caller decides what to save.
  */
-export function ResourcePicker({ resources, selected, onChange, onCreated, suggestQuery }: Props) {
+export function ResourcePicker({ resources, selected, onChange, onCreated, suggestQuery, hideFind = false }: Props) {
   const [q, setQ] = useState("");
   const [ats, setAts] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
@@ -94,7 +96,7 @@ export function ResourcePicker({ resources, selected, onChange, onCreated, sugge
           />
           Selected only
         </label>
-        {!finding && (
+        {!finding && !hideFind && (
           <button
             type="button"
             onClick={() => {

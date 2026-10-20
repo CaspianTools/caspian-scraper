@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
+import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 
 export const dynamic = "force-dynamic";
 
@@ -43,31 +44,53 @@ export default async function Home() {
   });
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Jobs</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-            {projects.length === 0
-              ? "Create your first job to get started."
-              : `${projects.length} job${projects.length === 1 ? "" : "s"}`}
-          </p>
-        </div>
-        <Link href="/projects/new" className={newJobCls + " h-10 px-4"}>
-          + New job
-        </Link>
-      </div>
-
+    <SidebarLayout
+      sidebar={
+        <>
+          <SidebarHeader
+            title="Jobs"
+            subtitle={
+              projects.length === 0
+                ? "Create your first job to get started."
+                : `${projects.length} job${projects.length === 1 ? "" : "s"}`
+            }
+          />
+          <Link href="/projects/new" className={newJobCls + " h-10 px-4 w-full justify-center"}>
+            + New job
+          </Link>
+          {projects.length > 0 && (
+            <nav aria-label="Jobs" className="flex flex-col gap-0.5">
+              {projects.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/projects/${p.id}`}
+                  className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                >
+                  <span
+                    aria-hidden
+                    className={
+                      "w-1.5 h-1.5 rounded-full shrink-0 " +
+                      (p.enabled ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600")
+                    }
+                  />
+                  <span className="truncate">{p.name}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
+        </>
+      }
+    >
       {projects.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {projects.map((p) => (
             <ProjectCard key={p.id} project={p} />
           ))}
         </div>
       )}
-    </main>
+    </SidebarLayout>
   );
 }
 

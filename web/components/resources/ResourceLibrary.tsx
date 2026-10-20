@@ -8,7 +8,14 @@ import { NewResourceForm } from "./NewResourceForm";
 import { FindWebsites } from "./FindWebsites";
 
 /** Searchable list of the shared library with per-resource job usage. */
-export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
+export function ResourceLibrary({
+  resources,
+  hideFind = false,
+}: {
+  resources: ResourceRow[];
+  /** Hide the inline Find websites button (when a sidebar has the search). */
+  hideFind?: boolean;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [unused, setUnused] = useState(false);
@@ -45,7 +52,7 @@ export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
           />
           Unused only
         </label>
-        {!finding && (
+        {!finding && !hideFind && (
           <button
             type="button"
             onClick={() => {

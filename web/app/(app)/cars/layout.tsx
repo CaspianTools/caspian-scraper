@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
-import { CarsNav } from "@/components/CarsNav";
+import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
+import { SidebarNav } from "@/components/shell/SidebarNav";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Top-level Cars layout. Sits inside the authed (app)/layout.tsx, so the
- * global AppHeader is already rendered above. Adds a breadcrumb sub-bar
- * and the Cars tab nav (Listings / Sources / Runs).
+ * Cars section layout: the sidebar holds the section title and its nav
+ * (Listings / Sources / Runs); pages render in the main area.
  *
  * Car sources reuse the standalone `classifieds/` scraper as their engine
  * (scrape.py:run_car_source) — top-level, per-user, not nested under a project.
@@ -21,22 +21,25 @@ export default async function CarsLayout({
   if (!session) redirect("/signin");
 
   return (
-    <>
-      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <div className="max-w-6xl mx-auto px-6 h-12 flex items-center gap-3 min-w-0">
-          <h1 className="text-sm font-semibold tracking-tight truncate">
-            Cars
-          </h1>
-          <span className="text-xs text-zinc-500 truncate">
-            Car classifieds (OpenSooq / Dubizzle / YallaMotor — Oman)
-          </span>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        <CarsNav />
-        {children}
-      </div>
-    </>
+    <SidebarLayout
+      sidebar={
+        <>
+          <SidebarHeader
+            title="Cars"
+            subtitle="Car classifieds (OpenSooq / Dubizzle / YallaMotor — Oman)"
+          />
+          <SidebarNav
+            label="Cars"
+            items={[
+              { href: "/cars", label: "Listings", exact: true },
+              { href: "/cars/sources", label: "Sources" },
+              { href: "/cars/runs", label: "Runs" },
+            ]}
+          />
+        </>
+      }
+    >
+      {children}
+    </SidebarLayout>
   );
 }

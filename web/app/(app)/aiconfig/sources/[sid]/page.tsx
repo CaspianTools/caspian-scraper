@@ -20,7 +20,7 @@ export default async function GenericSourcePage({ params }: PageProps) {
   const { sid } = await params;
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
+    <div className="px-6 lg:px-8 py-6">
       <GenericSourceDetail sid={sid} />
     </div>
   );

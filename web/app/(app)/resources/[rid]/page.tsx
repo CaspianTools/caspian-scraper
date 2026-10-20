@@ -4,6 +4,7 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import { resourceDoc } from "@/lib/firestore/collections";
 import { resourceUsage } from "@/lib/firestore/resources";
 import { SourceForm } from "@/components/SourceForm";
+import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import type { SourceFormInitial } from "@/components/sourceFormDefaults";
 
 export const dynamic = "force-dynamic";
@@ -40,40 +41,44 @@ export default async function EditResourcePage({ params }: PageProps) {
   };
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-10 space-y-4">
-      <Link
-        href="/resources"
-        className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
-      >
-        ← Resources
-      </Link>
-      <h2 className="text-xl font-semibold tracking-tight">
-        Edit {initial.name || "resource"}
-      </h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {usedBy.length === 0 ? (
-          "Not used by any job yet."
-        ) : (
-          <>
-            Changes apply to every job that uses it:{" "}
-            {usedBy.map((u, i) => (
-              <span key={u.id}>
-                {i > 0 && ", "}
-                <Link href={`/projects/${u.id}/sources`} className="underline">
-                  {u.name}
-                </Link>
-              </span>
-            ))}
-            . Deleting it detaches it from all of them.
-          </>
-        )}
-      </p>
-      <SourceForm
-        sourceId={rid}
-        apiPath="/api/resources"
-        listHref="/resources"
-        initial={initial}
-      />
-    </main>
+    <SidebarLayout
+      sidebar={
+        <>
+          <SidebarHeader
+            back={{ href: "/resources", label: "Resources" }}
+            title={initial.name || "Resource"}
+            subtitle="Shared resource"
+          />
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Used by</p>
+            {usedBy.length === 0 ? (
+              <p className="text-sm text-zinc-500">No job yet.</p>
+            ) : (
+              <nav className="flex flex-col gap-0.5">
+                {usedBy.map((u) => (
+                  <Link
+                    key={u.id}
+                    href={`/projects/${u.id}/sources`}
+                    className="text-sm px-3 py-2 rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 truncate"
+                  >
+                    {u.name}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {usedBy.length > 0 && (
+              <p className="text-xs text-zinc-500">
+                Changes apply to every job above. Deleting it detaches it from all of them.
+              </p>
+            )}
+          </div>
+        </>
+      }
+    >
+      <div className="max-w-3xl space-y-4">
+        <h2 className="text-xl font-semibold tracking-tight">Edit {initial.name || "resource"}</h2>
+        <SourceForm sourceId={rid} apiPath="/api/resources" listHref="/resources" initial={initial} />
+      </div>
+    </SidebarLayout>
   );
 }
