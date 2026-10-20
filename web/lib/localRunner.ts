@@ -91,7 +91,7 @@ export function startAiconfig(jobId: string): RunStartResult {
 
 /**
  * Run a Python module to completion and parse its stdout as JSON — for
- * request/response helpers such as `python -m aiconfig.discover`. `input` is
+ * request/response helpers such as `find_websites.py --json`. `input` is
  * written to stdin as JSON. Rejects on a non-zero exit, bad JSON or timeout.
  */
 export function runPythonJson(

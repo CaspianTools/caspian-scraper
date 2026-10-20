@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { CountrySelect } from "@/components/CountrySelect";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { ResourceRow } from "@/lib/firestore/resources";
 
-/** One suggestion from POST /api/resources/discover (aiconfig/discover.py). */
+/** One suggestion from POST /api/resources/discover (find_websites.py). */
 interface Suggestion {
   name: string;
   careers_url: string;
@@ -21,8 +21,7 @@ interface Suggestion {
 interface DiscoverResult {
   catalog: Suggestion[];
   web: Suggestion[];
-  web_status: "ok" | "no_key" | "error" | "off";
-  web_mode: "live_search" | "model_knowledge" | "";
+  web_status: "ok" | "no_key" | "bad_key" | "limited" | "error" | "off";
   web_error: string;
 }
 
@@ -48,13 +47,13 @@ const ATS_LABEL: Record<string, string> = {
 
 /**
  * "Find websites": the app proposes careers sites for a job — from the
- * built-in employer list and, with an AI Setup key, a web search — after
- * opening each one to check it works and which platform it runs on. Ticked
- * ones are saved to the shared library.
+ * built-in employer list and a Brave Search web search (find_websites.py,
+ * no AI) — after opening each one to check it works and which platform it
+ * runs on. Ticked ones are saved to the shared library.
  */
 export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
   const [query, setQuery] = useState(defaultQuery);
-  const [countriesText, setCountriesText] = useState("");
+  const [countries, setCountries] = useState<string[]>([]);
   const [useWeb, setUseWeb] = useState(true);
   const [busy, setBusy] = useState<"search" | "add" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +71,7 @@ export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
         method: "POST",
         body: JSON.stringify({
           query: query.trim(),
-          countries: countriesText.split(",").map((s) => s.trim()).filter(Boolean),
+          countries,
           use_web: useWeb,
         }),
       });
@@ -148,8 +147,8 @@ export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
         <div>
           <p className="text-sm font-medium">Find websites</p>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Suggests careers sites from the built-in employer list and a web search,
-            and opens each one to check it works.
+            Suggests careers sites from the built-in employer list and a web search
+            (Brave Search), and opens each one to check it works.
           </p>
         </div>
         <button type="button" onClick={onClose} className="text-xs text-zinc-500 hover:underline">
@@ -174,24 +173,18 @@ export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
             className={inputCls}
           />
         </label>
-        <label className="block text-sm">
+        <div className="block text-sm">
           <span className="block font-medium mb-1">
             Countries <span className="text-zinc-500 font-normal">(optional)</span>
           </span>
-          <input
-            type="text"
-            value={countriesText}
-            onChange={(e) => setCountriesText(e.target.value)}
-            placeholder="UAE, Qatar"
-            className={inputCls}
-          />
-        </label>
+          <CountrySelect value={countries} onChange={setCountries} />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
           <input type="checkbox" checked={useWeb} onChange={(e) => setUseWeb(e.target.checked)} className="w-4 h-4" />
-          Also search the web (uses the AI Setup key)
+          Also search the web (Brave Search)
         </label>
         <button type="button" onClick={search} disabled={busy !== null} className={primaryBtn}>
           {busy === "search" ? "Searching…" : "Search"}
@@ -206,10 +199,10 @@ export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
 
       {result && (
         <div className="space-y-4">
-          <WebStatus result={result} />
+          <WebStatus result={result} onKeySaved={search} />
           {result.web.length > 0 && (
             <Group
-              title={result.web_mode === "live_search" ? "Found on the web" : "Suggested by the AI"}
+              title="Found on the web"
               items={result.web}
               picked={picked}
               onToggle={toggle}
@@ -243,37 +236,93 @@ export function FindWebsites({ defaultQuery = "", onAdded, onClose }: Props) {
   );
 }
 
-function WebStatus({ result }: { result: DiscoverResult }) {
-  if (result.web_status === "no_key") {
-    return (
-      <p className="text-xs rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
-        Web search is off: no AI key yet. Add one under{" "}
-        <Link href="/aiconfig" className="underline">
-          AI Setup
-        </Link>{" "}
-        to also get suggestions from the web.
-      </p>
-    );
+function WebStatus({
+  result,
+  onKeySaved,
+}: {
+  result: DiscoverResult;
+  onKeySaved: () => void;
+}) {
+  if (result.web_status === "no_key" || result.web_status === "bad_key") {
+    return <SearchKeyForm rejected={result.web_status === "bad_key"} onSaved={onKeySaved} />;
   }
-  if (result.web_status === "error") {
+  if (result.web_status === "limited" || result.web_status === "error") {
     return (
       <p className="text-xs rounded-lg bg-red-50 dark:bg-red-950/30 px-3 py-2">
         Web search failed: {result.web_error}
       </p>
     );
   }
-  if (result.web_status === "ok" && result.web_mode === "model_knowledge") {
-    return (
-      <p className="text-xs text-zinc-500">
-        Your AI provider has no live web search here, so its suggestions come from what the model
-        knows — each link was still opened and checked.
-      </p>
-    );
-  }
   if (result.web_status === "ok" && result.web.length === 0) {
-    return <p className="text-xs text-zinc-500">The web search found nothing new.</p>;
+    return <p className="text-xs text-zinc-500">The web search found no new careers sites.</p>;
   }
   return null;
+}
+
+/** Paste the Brave Search API key (stored in local-data/, never committed). */
+function SearchKeyForm({ rejected, onSaved }: { rejected: boolean; onSaved: () => void }) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await authedFetch("/api/search-key", {
+        method: "PUT",
+        body: JSON.stringify({ value: value.trim() }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(b.error || `Save failed (${res.status})`);
+        return;
+      }
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-3 space-y-2">
+      <p className="text-xs">
+        {rejected
+          ? "Brave Search rejected the saved key - paste a valid one."
+          : "Web search needs a Brave Search API key (a normal search API, no AI; billed per search by Brave)."}{" "}
+        Get one at{" "}
+        <a
+          href="https://api-dashboard.search.brave.com"
+          target="_blank"
+          rel="noreferrer"
+          className="underline"
+        >
+          api-dashboard.search.brave.com
+        </a>
+        . It&apos;s stored on this computer only.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (value.trim() && !busy) save();
+            }
+          }}
+          placeholder="Brave Search API key"
+          autoComplete="off"
+          className={inputCls + " font-mono"}
+        />
+        <button type="button" onClick={save} disabled={busy || !value.trim()} className={primaryBtn}>
+          {busy ? "Saving…" : "Save & search"}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
 }
 
 function Group({

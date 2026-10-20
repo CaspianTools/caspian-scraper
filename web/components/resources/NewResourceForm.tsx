@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CountrySelect } from "@/components/CountrySelect";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { emptySourceFormInitial } from "@/components/sourceFormDefaults";
@@ -21,7 +22,7 @@ const inputCls =
  */
 export function NewResourceForm({ onCreated, onCancel }: Props) {
   const [form, setForm] = useState(emptySourceFormInitial());
-  const [countriesText, setCountriesText] = useState("");
+  const [countries, setCountries] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +30,6 @@ export function NewResourceForm({ onCreated, onCancel }: Props) {
     setError(null);
     setBusy(true);
     try {
-      const countries = countriesText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
       const res = await authedFetch("/api/resources", {
         method: "POST",
         body: JSON.stringify({ ...form, name: form.name.trim(), countries }),
@@ -118,18 +115,12 @@ export function NewResourceForm({ onCreated, onCancel }: Props) {
             <option value="unknown">Unknown (won&apos;t be scraped yet)</option>
           </select>
         </label>
-        <label className="block text-sm">
+        <div className="block text-sm">
           <span className="block font-medium mb-1">
             Countries <span className="text-zinc-500 font-normal">(optional)</span>
           </span>
-          <input
-            type="text"
-            value={countriesText}
-            onChange={(e) => setCountriesText(e.target.value)}
-            placeholder="Saudi Arabia, UAE"
-            className={inputCls}
-          />
-        </label>
+          <CountrySelect value={countries} onChange={setCountries} />
+        </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-2">

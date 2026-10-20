@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CountrySelect } from "@/components/CountrySelect";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { SourceFormInitial } from "./sourceFormDefaults";
 
@@ -42,7 +43,7 @@ export function SourceForm({
   const collectionUrl = apiPath ?? `/api/projects/${projectId}/sources`;
   const backHref = listHref ?? `/projects/${projectId}/sources`;
   const [form, setForm] = useState<SourceFormInitial>(initial);
-  const [countriesText, setCountriesText] = useState(initial.countries.join(", "));
+  const [countries, setCountries] = useState<string[]>(initial.countries);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<FieldErr[]>([]);
@@ -59,10 +60,6 @@ export function SourceForm({
     setErrors([]);
     setBusy(true);
     try {
-      const countries = countriesText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
       const body = JSON.stringify({ ...form, countries });
 
       const url = isEdit ? `${collectionUrl}/${sourceId}` : collectionUrl;
@@ -189,14 +186,8 @@ export function SourceForm({
         </Row>
       </div>
 
-      <Row label="Countries" hint="Comma-separated, optional. E.g. Saudi Arabia, UAE">
-        <input
-          type="text"
-          value={countriesText}
-          onChange={(e) => setCountriesText(e.target.value)}
-          placeholder="Saudi Arabia, UAE"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-        />
+      <Row label="Countries" hint="Type to search; pick as many as apply.">
+        <CountrySelect value={countries} onChange={setCountries} />
       </Row>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
