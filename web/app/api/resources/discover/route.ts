@@ -13,11 +13,12 @@ const DiscoverSchema = z.object({
 /**
  * POST /api/resources/discover
  *
- * "Find websites": careers-site suggestions from the built-in employer list
- * and (with a Brave Search API key, see /api/search-key) the web, each fetched
- * to check it opens and to detect its careers platform. Runs
- * `find_websites.py --json`; nothing is saved — the client adds the ones the
- * user picks via POST /api/resources. Usually takes 15-60 seconds.
+ * "Find websites": careers-site suggestions from the built-in employer list,
+ * companies in the chosen countries (Wikidata) and DuckDuckGo/Google searches
+ * in a browser — free, no AI, no keys — each opened to check it works and to
+ * detect its careers platform. Runs `find_websites.py --json`; nothing is
+ * saved — the client adds the ones the
+ * user picks via POST /api/resources. Usually takes about a minute.
  */
 export async function POST(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
