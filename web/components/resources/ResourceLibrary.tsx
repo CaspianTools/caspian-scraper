@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { NewResourceForm } from "./NewResourceForm";
+import { FindWebsites } from "./FindWebsites";
 
 /** Searchable list of the shared library with per-resource job usage. */
 export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
@@ -12,6 +13,7 @@ export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
   const [q, setQ] = useState("");
   const [unused, setUnused] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [finding, setFinding] = useState(false);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -43,16 +45,41 @@ export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
           />
           Unused only
         </label>
+        {!finding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setFinding(true);
+            }}
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          >
+            Find websites
+          </button>
+        )}
         {!adding && (
           <button
             type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            onClick={() => {
+              setFinding(false);
+              setAdding(true);
+            }}
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
           >
             + New resource
           </button>
         )}
       </div>
+
+      {finding && (
+        <FindWebsites
+          onClose={() => setFinding(false)}
+          onAdded={() => {
+            setFinding(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {adding && (
         <NewResourceForm
@@ -79,7 +106,7 @@ export function ResourceLibrary({ resources }: { resources: ResourceRow[] }) {
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-zinc-500">
                   {resources.length === 0
-                    ? "The library is empty. Add a resource here, while creating a job, or move a job's sources in from its Sources tab."
+                    ? "The library is empty. Use Find websites for suggestions, add a resource yourself, or move a job's sources in from its Sources tab."
                     : "Nothing matches."}
                 </td>
               </tr>

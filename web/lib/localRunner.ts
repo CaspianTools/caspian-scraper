@@ -88,3 +88,46 @@ export function startScrape(opts: {
 export function startAiconfig(jobId: string): RunStartResult {
   return start(["-m", "aiconfig", "--job", jobId], {}, `aiconfig-${jobId}`);
 }
+
+/**
+ * Run a Python module to completion and parse its stdout as JSON — for
+ * request/response helpers such as `python -m aiconfig.discover`. `input` is
+ * written to stdin as JSON. Rejects on a non-zero exit, bad JSON or timeout.
+ */
+export function runPythonJson(
+  args: string[],
+  input: unknown,
+  timeoutMs = 240_000
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const childEnv: NodeJS.ProcessEnv = { ...process.env, PYTHONUNBUFFERED: "1" };
+    delete childEnv.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    delete childEnv.GOOGLE_APPLICATION_CREDENTIALS;
+    const child = spawn(pythonExe(), args, { cwd: REPO_ROOT, env: childEnv, windowsHide: true });
+    let out = "";
+    let err = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+    child.stdout.on("data", (b) => (out += b));
+    child.stderr.on("data", (b) => (err += b));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(err.trim().split("\n").slice(-3).join(" ") || `exited with code ${code}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(out));
+      } catch {
+        reject(new Error("the helper returned invalid JSON"));
+      }
+    });
+    child.stdin.end(JSON.stringify(input));
+  });
+}

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { NewResourceForm } from "./NewResourceForm";
+import { FindWebsites } from "./FindWebsites";
 
 interface Props {
   /** The whole shared library. */
@@ -11,17 +12,20 @@ interface Props {
   onChange: (ids: string[]) => void;
   /** A resource was just added to the library (it is also auto-selected). */
   onCreated: (row: ResourceRow) => void;
+  /** Prefill for Find websites, e.g. the job's name and description. */
+  suggestQuery?: string;
 }
 
 /**
  * Searchable checklist over the shared resource library, with an inline
  * "add new" form. Pure selection UI — the caller decides what to save.
  */
-export function ResourcePicker({ resources, selected, onChange, onCreated }: Props) {
+export function ResourcePicker({ resources, selected, onChange, onCreated, suggestQuery }: Props) {
   const [q, setQ] = useState("");
   const [ats, setAts] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [finding, setFinding] = useState(false);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const atsOptions = useMemo(
@@ -90,16 +94,43 @@ export function ResourcePicker({ resources, selected, onChange, onCreated }: Pro
           />
           Selected only
         </label>
+        {!finding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setFinding(true);
+            }}
+            className="inline-flex items-center h-9 px-3 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          >
+            Find websites
+          </button>
+        )}
         {!adding && (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={() => {
+              setFinding(false);
+              setAdding(true);
+            }}
             className="inline-flex items-center h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
           >
             + New resource
           </button>
         )}
       </div>
+
+      {finding && (
+        <FindWebsites
+          defaultQuery={suggestQuery}
+          onClose={() => setFinding(false)}
+          onAdded={(rows) => {
+            setFinding(false);
+            rows.forEach(onCreated);
+            onChange(Array.from(new Set([...selected, ...rows.map((r) => r.id)])));
+          }}
+        />
+      )}
 
       {adding && (
         <NewResourceForm
@@ -130,8 +161,9 @@ export function ResourcePicker({ resources, selected, onChange, onCreated }: Pro
         </div>
         {resources.length === 0 ? (
           <p className="px-3 py-8 text-sm text-center text-zinc-500">
-            The shared library is empty. Add the first resource with{" "}
-            <span className="font-medium">+ New resource</span>.
+            The shared library is empty. Use{" "}
+            <span className="font-medium">Find websites</span> to get suggestions, or{" "}
+            <span className="font-medium">+ New resource</span> to add one yourself.
           </p>
         ) : visible.length === 0 ? (
           <p className="px-3 py-8 text-sm text-center text-zinc-500">

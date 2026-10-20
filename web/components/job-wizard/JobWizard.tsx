@@ -190,6 +190,7 @@ export function JobWizard({ resources: initialResources }: Props) {
               resources={library}
               selected={resourceIds}
               onChange={setResourceIds}
+              suggestQuery={[name.trim(), description.trim()].filter(Boolean).join(" — ")}
               onCreated={(row) =>
                 setLibrary((l) => [...l, row].sort((a, b) => a.name.localeCompare(b.name)))
               }
