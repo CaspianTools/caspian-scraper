@@ -75,3 +75,23 @@ def test_saved_with_lf_line_endings_on_every_os(tmp_db):
     fdb.upsert([{"id": "a.com"}, {"id": "b.com"}])
     raw = (tmp_db / "companies.jsonl").read_bytes()
     assert b"\r\n" not in raw and raw.count(b"\n") == 2
+
+
+def test_retag_adds_and_removes_case_insensitively(tmp_db):
+    fdb.upsert([{"id": "a.com", "name": "A"}, {"id": "b.com", "name": "B"}])
+    out = fdb.retag(["a.com", "b.com", "nope.com"], add=["  Priority ", "called  back"])
+    assert out == {"a.com": ["called back", "Priority"], "b.com": ["called back", "Priority"]}
+    # Same tag, other case: reuses the existing spelling instead of a second tag.
+    assert fdb.retag(["a.com"], add=["PRIORITY", "Gulf"])["a.com"] == ["called back", "Gulf", "Priority"]
+    assert fdb.retag(["a.com"], remove=["priority", "CALLED BACK"])["a.com"] == ["Gulf"]
+    assert fdb.retag(["b.com"], remove=["Priority", "called back"])["b.com"] == []
+    recs = fdb.load()
+    assert recs["a.com"]["tags"] == ["Gulf"] and "tags" not in recs["b.com"]  # no empty lists saved
+    assert "nope.com" not in recs
+
+
+def test_tags_survive_later_searches(tmp_db):
+    fdb.upsert([{"id": "a.com", "name": "A"}])
+    fdb.retag(["a.com"], add=["priority"])
+    fdb.upsert([{"id": "a.com", "name": "A", "sources": ["osm"]}])  # a search finds it again
+    assert fdb.load()["a.com"]["tags"] == ["priority"]

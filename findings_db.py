@@ -23,10 +23,13 @@ A company record (missing fields are simply absent):
     found_by      search phrases that turned it up (latest 20)
     first_seen, last_seen               ISO times
     hidden        true when someone marked it "not relevant" in the app
+    tags          labels people gave it in the app ("priority", "called")
 
 Merging only ever adds: lists are unioned, empty fields filled, and the
 careers check fields replaced by a newer check. The one exception is
 `hidden`, a person's decision, which the latest value always replaces.
+Tags are people's decisions too, but they're set through retag() — add and
+remove — so a plain merge only ever unions them.
 """
 
 from __future__ import annotations
@@ -43,11 +46,12 @@ REPO_ROOT = Path(__file__).resolve().parent
 DB_DIR = Path(os.environ.get("CASPIAN_FINDINGS_DB") or REPO_ROOT / "db")
 COMPANIES_FILE = "companies.jsonl"
 
-LIST_FIELDS = ("countries", "industries", "types", "sources")
+LIST_FIELDS = ("countries", "industries", "types", "sources", "tags")
 CHECK_FIELDS = ("careers_url", "ats", "reachable", "checked_at")
 # Decisions people make in the app: the newest value wins, even false.
 OVERRIDE_FIELDS = ("hidden",)
 FOUND_BY_KEEP = 20
+TAG_MAX = 40
 
 # Careers sub-sites belong to the company's own domain: careers.adnoc.ae → adnoc.ae.
 _CAREERS_LABEL = {"careers", "career", "jobs", "job", "recruitment", "talent", "apply", "join", "hr"}
@@ -146,3 +150,43 @@ def upsert(items: list[dict], name: str = COMPANIES_FILE) -> dict[str, dict]:
     if touched:
         save(records, name)
     return touched
+
+
+def clean_tag(tag: str) -> str:
+    """'  Call   back ' → 'Call back' (trimmed, single spaces, at most TAG_MAX)."""
+    return " ".join(str(tag).split())[:TAG_MAX].strip()
+
+
+def retag(ids: list[str], add: list[str] = (), remove: list[str] = (),
+          name: str = COMPANIES_FILE) -> dict[str, list[str]]:
+    """Add and remove tags on the given companies (ids not in the file are
+    skipped). Tags match case-insensitively, and a new tag takes the spelling
+    already used elsewhere in the file, so "priority" and "Priority" stay one
+    tag. Returns each updated company's tags, sorted."""
+    records = load(name)
+    spelling: dict[str, str] = {}
+    for rec in records.values():
+        for t in rec.get("tags") or []:
+            spelling.setdefault(t.casefold(), t)
+    adds = []
+    for t in map(clean_tag, add):
+        if t:
+            adds.append(spelling.setdefault(t.casefold(), t))
+    drop = {clean_tag(t).casefold() for t in remove}
+    out: dict[str, list[str]] = {}
+    for cid in dict.fromkeys(ids):
+        rec = records.get(cid)
+        if rec is None:
+            continue
+        tags = {t.casefold(): t for t in rec.get("tags") or [] if t.casefold() not in drop}
+        for t in adds:
+            tags.setdefault(t.casefold(), t)
+        new = sorted(tags.values(), key=str.casefold)
+        if new:
+            rec["tags"] = new
+        else:
+            rec.pop("tags", None)
+        out[cid] = new
+    if out:
+        save(records, name)
+    return out

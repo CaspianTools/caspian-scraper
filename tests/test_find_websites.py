@@ -223,3 +223,17 @@ def test_mark_hides_and_unhides_known_companies_only(monkeypatch, capsys):
     assert fw.main(["--mark"]) == 0
     assert json.loads(capsys.readouterr().out) == {"updated": 1}
     assert fw.browse()["findings"][0]["hidden"] is True and "nope.example" not in fdb.load()
+
+
+def test_tag_adds_and_removes_and_findings_carry_tags(monkeypatch, capsys):
+    fdb.upsert([{"id": "a.example", "name": "Acme"}, {"id": "b.example", "name": "Beta"}])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(
+        {"ids": ["a.example", "b.example", "nope.example"], "add": ["priority", "Gulf"]})))
+    assert fw.main(["--tag"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"updated": 2, "tags": {"a.example": ["Gulf", "priority"], "b.example": ["Gulf", "priority"]}}
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"ids": ["b.example"], "remove": ["gulf"]})))
+    assert fw.main(["--tag"]) == 0
+    capsys.readouterr()
+    tags = {f["id"]: f["tags"] for f in fw.browse()["findings"]}
+    assert tags == {"a.example": ["Gulf", "priority"], "b.example": ["priority"]}

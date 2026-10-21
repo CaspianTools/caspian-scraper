@@ -7,6 +7,7 @@ websites". Free: no AI, no API keys, no billing.
     echo '{"ids": ["adnoc.ae"]}' | python find_websites.py --enrich      # careers pages
     echo '{"browse": true}' | python find_websites.py --json             # whole database
     echo '{"ids": ["x.com"], "hidden": true}' | python find_websites.py --mark   # hide / unhide
+    echo '{"ids": ["x.com"], "add": ["priority"], "remove": []}' | python find_websites.py --tag
 
 Searches are cached (local-data/search-cache/, this computer only): the same
 words + countries within CACHE_DAYS return instantly instead of searching
@@ -792,6 +793,7 @@ def to_finding(rec: dict, *, known: bool) -> dict:
         "reachable": reachable,
         "scrapable": bool(reachable) and ats in SUPPORTED_ATS and bool(rec.get("careers_url")),
         "hidden": bool(rec.get("hidden")),
+        "tags": rec.get("tags", []),
     }
 
 
@@ -956,6 +958,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="machine output; with no query, read the request as JSON on stdin")
     ap.add_argument("--mark", action="store_true",
                     help='hide / unhide: read {"ids": [...], "hidden": true|false} on stdin')
+    ap.add_argument("--tag", action="store_true",
+                    help='add / remove tags: read {"ids": [...], "add": [...], "remove": [...]} on stdin')
     ap.add_argument("--enrich", action="store_true",
                     help='find careers pages: read {"ids": [...]} on stdin, print the updated companies')
     args = ap.parse_args(argv)
@@ -966,6 +970,13 @@ def main(argv: list[str] | None = None) -> int:
         ids = [str(i) for i in req.get("ids") or [] if str(i) in records]
         fdb.upsert([{"id": i, "hidden": bool(req.get("hidden", True))} for i in ids])
         print(json.dumps({"updated": len(ids)}))
+        return 0
+    if args.tag:
+        req = json.loads(sys.stdin.read() or "{}")
+        tags = fdb.retag([str(i) for i in req.get("ids") or []],
+                         add=[str(t) for t in req.get("add") or []],
+                         remove=[str(t) for t in req.get("remove") or []])
+        print(json.dumps({"updated": len(tags), "tags": tags}))
         return 0
     if args.enrich:
         req = json.loads(sys.stdin.read() or "{}")

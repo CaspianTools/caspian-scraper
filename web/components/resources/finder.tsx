@@ -11,7 +11,8 @@ import type { ResourceRow } from "@/lib/firestore/resources";
  * (db/) — free, no AI, no keys — saves everything to the database and caches
  * the search, then returns one list of companies.
  *
- *   useFinder()      search state + actions (search, browse, bulk actions);
+ *   useFinder()      search state + actions (search, browse, bulk actions
+ *                    incl. tags);
  *                    the last results are kept in this browser (persist)
  *   <FinderForm>     the search controls (fits a sidebar)
  *   <FinderResults>  the findings — filters, sort, bulk actions, cards / rows
@@ -34,7 +35,12 @@ export interface Finding {
   reachable: boolean | null;
   scrapable: boolean;
   hidden: boolean;
+  /** Labels people gave it (absent in results saved before tags existed). */
+  tags?: string[];
 }
+
+const tagsOf = (f: Finding): string[] => f.tags ?? [];
+const sameTag = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 export interface DiscoverResult {
   findings: Finding[];
@@ -115,7 +121,7 @@ export function useFinder({
   const [query, setQuery] = useState(defaultQuery);
   const [countries, setCountries] = useState<string[]>([]);
   const [useWeb, setUseWeb] = useState(true);
-  const [busy, setBusy] = useState<"search" | "add" | "enrich" | "hide" | null>(null);
+  const [busy, setBusy] = useState<"search" | "add" | "enrich" | "hide" | "tag" | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -319,6 +325,33 @@ export function useFinder({
     }
   }
 
+  /** Add / remove tags on the picked findings; saved to the findings database.
+   *  The selection stays, so several tags can be given in a row. */
+  async function retag(add: string[], remove: string[]) {
+    const chosen = selected();
+    if (chosen.length === 0 || add.length + remove.length === 0) return;
+    setBusy("tag");
+    setError(null);
+    try {
+      const res = await authedFetch("/api/resources/tag", {
+        method: "POST",
+        body: JSON.stringify({ ids: chosen.map((f) => f.id), add, remove }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(b.details?.[0]?.message || b.error || `Couldn't update tags (${res.status})`);
+        return;
+      }
+      const tags = (b.tags ?? {}) as Record<string, string[]>;
+      patchFindings((f) => (f.id in tags ? { ...f, tags: tags[f.id] } : f));
+      const n = Object.keys(tags).length;
+      const names = (l: string[]) => l.map((t) => `“${t}”`).join(", ");
+      setNotice(add.length > 0 ? `Tagged ${n} with ${names(add)}.` : `Removed ${names(remove)} from ${n}.`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function toggle(id: string) {
     setPicked((p) => {
       const n = new Set(p);
@@ -331,7 +364,7 @@ export function useFinder({
   return {
     query, setQuery, countries, setCountries, useWeb, setUseWeb,
     busy, progress, error, notice, setNotice, result, all, picked, setPicked, toggle,
-    search, browse, addPicked, findCareersPages, setHidden, selected,
+    search, browse, addPicked, findCareersPages, setHidden, retag, selected,
   };
 }
 
@@ -434,12 +467,19 @@ function useView(): [View, (v: View) => void] {
   ];
 }
 
-type FacetKey = "country" | "category" | "source" | "status";
+type FacetKey = "tag" | "country" | "category" | "source" | "status";
 type Filters = Record<FacetKey, Set<string>>;
-const emptyFilters = (): Filters => ({ country: new Set(), category: new Set(), source: new Set(), status: new Set() });
+const emptyFilters = (): Filters => ({
+  tag: new Set(), country: new Set(), category: new Set(), source: new Set(), status: new Set(),
+});
+/** Several tags picked: a company needs any one of them, or all of them. */
+type TagMode = "any" | "all";
+const UNTAGGED = "(untagged)";
 
 function facetValues(f: Finding, key: FacetKey): string[] {
   switch (key) {
+    case "tag":
+      return tagsOf(f).length ? tagsOf(f) : [UNTAGGED];
     case "country":
       return f.countries.length ? f.countries : ["(no country)"];
     case "category": {
@@ -452,7 +492,9 @@ function facetValues(f: Finding, key: FacetKey): string[] {
       return [statusOf(f)];
   }
 }
-const FACET_LABEL: Record<FacetKey, string> = { country: "Country", category: "Category", source: "Source", status: "Status" };
+const FACET_LABEL: Record<FacetKey, string> = {
+  tag: "Tags", country: "Country", category: "Category", source: "Source", status: "Status",
+};
 const optionLabel = (key: FacetKey, v: string) =>
   key === "source" ? (SOURCE_LABEL[v] ?? v) : key === "status" ? STATUS_LABEL[v as StatusKey] : v;
 
@@ -474,6 +516,7 @@ export function FinderResults({
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [sort, setSort] = useState<Sort>("relevance");
   const [showHidden, setShowHidden] = useState(false);
+  const [tagMode, setTagMode] = useState<TagMode>("any");
   const [shown, setShown] = useState(PAGE);
 
   const visibleBase = useMemo(() => f.all.filter((x) => showHidden || !x.hidden), [f.all, showHidden]);
@@ -481,11 +524,14 @@ export function FinderResults({
   const matches = (x: Finding, skip?: FacetKey) => {
     for (const key of Object.keys(filters) as FacetKey[]) {
       if (key === skip || filters[key].size === 0) continue;
-      if (!facetValues(x, key).some((v) => filters[key].has(v))) return false;
+      const vals = facetValues(x, key);
+      if (key === "tag" && tagMode === "all") {
+        if (![...filters.tag].every((v) => vals.includes(v))) return false;
+      } else if (!vals.some((v) => filters[key].has(v))) return false;
     }
     const needle = text.trim().toLowerCase();
     if (!needle) return true;
-    return [x.name, x.website, x.description, ...x.countries, ...x.types, ...x.industries]
+    return [x.name, x.website, x.description, ...x.countries, ...x.types, ...x.industries, ...tagsOf(x)]
       .join(" ")
       .toLowerCase()
       .includes(needle);
@@ -497,7 +543,7 @@ export function FinderResults({
     else if (sort === "sources") out.sort((a, b) => b.sources.length - a.sources.length);
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matches() reads filters/text
-  }, [visibleBase, filters, text, sort]);
+  }, [visibleBase, filters, tagMode, text, sort]);
 
   // Facet counts: for each facet, count within the other filters.
   const facetCounts = useMemo(() => {
@@ -512,9 +558,15 @@ export function FinderResults({
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matches() reads filters/text
-  }, [visibleBase, filters, text]);
+  }, [visibleBase, filters, tagMode, text]);
 
   const hiddenCount = f.all.filter((x) => x.hidden).length;
+  // Every tag in use (one spelling each), for the Tags menu.
+  const allTags = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of f.all) for (const t of tagsOf(x)) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), t);
+    return [...m.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [f.all]);
   const activeFilters = (Object.keys(filters) as FacetKey[]).flatMap((k) =>
     [...filters[k]].map((v) => [k, v] as const)
   );
@@ -527,6 +579,11 @@ export function FinderResults({
       return next;
     });
     setShown(PAGE);
+  }
+
+  /** A tag chip on a result: filter by that tag too. */
+  function filterTag(t: string) {
+    if (!filters.tag.has(t)) toggleFilter("tag", t);
   }
 
   if (f.busy === "search") return <LoadingGrid view={view} />;
@@ -598,6 +655,11 @@ export function FinderResults({
             selected={filters[key]}
             onToggle={(v) => toggleFilter(key, v)}
             onClear={() => setFilters((cur) => ({ ...cur, [key]: new Set() }))}
+            {...(key === "tag" && {
+              mode: tagMode,
+              onMode: setTagMode,
+              hint: allTags.length === 0 ? "No tags yet. Select companies and use Tags to add some." : undefined,
+            })}
           />
         ))}
         <select
@@ -631,6 +693,9 @@ export function FinderResults({
               {FACET_LABEL[k]}: {optionLabel(k, v)} <span aria-hidden>×</span>
             </button>
           ))}
+          {filters.tag.size > 1 && (
+            <span className="text-zinc-500">Tags: match {tagMode}</span>
+          )}
           <button type="button" className="underline text-zinc-500" onClick={() => setFilters(emptyFilters())}>
             Clear filters
           </button>
@@ -695,6 +760,7 @@ export function FinderResults({
                 }}
               />
             )}
+            <TagMenu tags={allTags} chosen={f.selected()} disabled={f.busy !== null} onChange={f.retag} />
             <button type="button" className={chipBtn} disabled={f.busy !== null} onClick={f.findCareersPages}>
               {f.busy === "enrich" ? "Finding…" : "Find careers pages"}
             </button>
@@ -743,13 +809,13 @@ export function FinderResults({
       ) : view === "cards" ? (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.slice(0, shown).map((x) => (
-            <ResultCard key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} />
+            <ResultCard key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} onTag={filterTag} />
           ))}
         </div>
       ) : (
         <ul className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 divide-y divide-zinc-100 dark:divide-zinc-800">
           {filtered.slice(0, shown).map((x) => (
-            <ResultRow key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} />
+            <ResultRow key={x.id} f={x} picked={f.picked.has(x.id)} onToggle={f.toggle} onTag={filterTag} />
           ))}
         </ul>
       )}
@@ -766,7 +832,7 @@ export function FinderResults({
 }
 
 function exportCsv(items: Finding[]) {
-  const cols = ["name", "website", "careers_url", "countries", "category", "sources", "status"] as const;
+  const cols = ["name", "website", "careers_url", "countries", "category", "sources", "status", "tags"] as const;
   const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const rows = items.map((x) =>
     [
@@ -777,6 +843,7 @@ function exportCsv(items: Finding[]) {
       [...x.types, ...x.industries].join("; "),
       x.sources.map((s) => SOURCE_LABEL[s] ?? s).join("; "),
       STATUS_LABEL[statusOf(x)],
+      tagsOf(x).join("; "),
     ].map(esc).join(",")
   );
   const blob = new Blob(["﻿" + [cols.join(","), ...rows].join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -812,12 +879,20 @@ function FacetMenu({
   selected,
   onToggle,
   onClear,
+  mode,
+  onMode,
+  hint,
 }: {
   label: string;
   options: { value: string; label: string; count: number }[];
   selected: Set<string>;
   onToggle: (v: string) => void;
   onClear: () => void;
+  /** Offer "match any / all" of the picked values (Tags). */
+  mode?: TagMode;
+  onMode?: (m: TagMode) => void;
+  /** Shown under the options (e.g. how to make some). */
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -832,7 +907,7 @@ function FacetMenu({
         className={
           "h-8 px-3 rounded-md text-xs border inline-flex items-center gap-1 " +
           (selected.size > 0
-            ? "border-zinc-900 dark:border-zinc-100 font-medium"
+            ? "border-brand-300 bg-brand-50/60 text-brand-800 dark:border-brand-400/40 dark:bg-brand-500/10 dark:text-brand-200 font-medium"
             : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900")
         }
       >
@@ -864,6 +939,32 @@ function FacetMenu({
             ))}
             {shownOpts.length === 0 && <li className="px-2 py-1 text-xs text-zinc-500">Nothing matches.</li>}
           </ul>
+          {hint && <p className="px-2 text-xs text-zinc-500">{hint}</p>}
+          {mode && onMode && (
+            <div className="flex items-center gap-2 px-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <span className="text-xs text-zinc-500">Match</span>
+              <div className="inline-flex p-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+                {(["any", "all"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={mode === m}
+                    onClick={() => onMode(m)}
+                    title={m === "any" ? "Has at least one of the picked tags" : "Has every picked tag"}
+                    className={
+                      "h-6 px-2 rounded text-xs " +
+                      (mode === m
+                        ? "bg-white dark:bg-zinc-800 shadow-sm font-medium text-zinc-900 dark:text-zinc-100"
+                        : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200")
+                    }
+                  >
+                    {m === "any" ? "Any" : "All"}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-zinc-400">of the picked tags</span>
+            </div>
+          )}
           {selected.size > 0 && (
             <button type="button" className="text-xs text-zinc-500 hover:underline px-2" onClick={onClear}>
               Clear {label.toLowerCase()}
@@ -928,6 +1029,132 @@ function AddToJobMenu({ disabled, onPick }: { disabled: boolean; onPick: (job: J
   );
 }
 
+/**
+ * Bulk "Tags" menu for the selected findings: tick a tag to give it to all
+ * of them, untick to take it off (a dash means only some have it); type to
+ * find a tag or create a new one.
+ */
+function TagMenu({
+  tags,
+  chosen,
+  disabled,
+  onChange,
+}: {
+  tags: string[];
+  chosen: Finding[];
+  disabled: boolean;
+  onChange: (add: string[], remove: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useOutside(open, () => setOpen(false));
+  const query = q.trim().replace(/\s+/g, " ").slice(0, 40);
+  const shownTags = tags.filter((t) => !query || t.toLowerCase().includes(query.toLowerCase()));
+  const existing = query ? tags.find((t) => sameTag(t, query)) : undefined;
+  const countWith = (t: string) => chosen.filter((x) => tagsOf(x).some((y) => sameTag(y, t))).length;
+  const onSelected = tags.filter((t) => countWith(t) > 0);
+
+  function flip(t: string) {
+    if (countWith(t) === chosen.length) onChange([], [t]);
+    else onChange([t], []);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={chipBtn + " inline-flex items-center gap-1.5"}
+      >
+        <TagIcon className="w-3.5 h-3.5 text-zinc-500" />
+        Tags <span aria-hidden className="text-zinc-400">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-72 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg p-2 space-y-2">
+          <input
+            type="text"
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || !query || disabled) return;
+              e.preventDefault();
+              if (existing) flip(existing);
+              else onChange([query], []);
+              setQ("");
+            }}
+            placeholder={tags.length ? "Find or create a tag…" : "Name a new tag…"}
+            aria-label="Find or create a tag"
+            className="w-full h-8 px-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
+          />
+          <p className="px-2 text-[11px] text-zinc-500">
+            For the {chosen.length} selected compan{chosen.length === 1 ? "y" : "ies"}. Ticked: all have it.
+          </p>
+          <ul className="max-h-64 overflow-y-auto text-sm">
+            {shownTags.map((t) => {
+              const n = countWith(t);
+              return (
+                <li key={t}>
+                  <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={n > 0 && n === chosen.length}
+                      ref={(el) => {
+                        if (el) el.indeterminate = n > 0 && n < chosen.length;
+                      }}
+                      disabled={disabled}
+                      onChange={() => flip(t)}
+                    />
+                    <span className="flex-1 truncate">{t}</span>
+                    {n > 0 && n < chosen.length && (
+                      <span className="text-xs text-zinc-500" title={`${n} of the selected have it`}>
+                        {n}/{chosen.length}
+                      </span>
+                    )}
+                  </label>
+                </li>
+              );
+            })}
+            {query && !existing && (
+              <li>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    onChange([query], []);
+                    setQ("");
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-left text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                >
+                  <span aria-hidden>+</span>
+                  <span className="truncate">
+                    Create “<span className="font-medium">{query}</span>”
+                  </span>
+                </button>
+              </li>
+            )}
+            {!query && tags.length === 0 && (
+              <li className="px-2 py-1 text-xs text-zinc-500">No tags yet. Type a name and press Enter.</li>
+            )}
+          </ul>
+          {onSelected.length > 0 && (
+            <button
+              type="button"
+              disabled={disabled}
+              className="text-xs text-zinc-500 hover:text-red-600 hover:underline px-2"
+              onClick={() => onChange([], onSelected)}
+            >
+              Remove all tags from the selection
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
   const btn = (v: View, label: string, icon: React.ReactNode) => (
     <button
@@ -985,6 +1212,40 @@ function Chip({ children, tone = "plain", title }: { children: React.ReactNode; 
   );
 }
 
+function TagIcon({ className = "w-3 h-3" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden>
+      <path d="M2 2.5v5l6.5 6.5 5-5L7 2.5z" />
+      <circle cx="5" cy="5.5" r=".9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** A finding's tags; clicking one filters by it. */
+function TagChips({ tags, onTag }: { tags: string[]; onTag?: (t: string) => void }) {
+  if (tags.length === 0) return null;
+  return (
+    <span className="flex flex-wrap gap-1">
+      {tags.map((t) => (
+        <button
+          key={t}
+          type="button"
+          title={onTag ? `Show companies tagged “${t}”` : undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onTag?.(t);
+          }}
+          className="inline-flex items-center gap-1 text-[11px] leading-4 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/20 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/25 dark:hover:bg-brand-500/20"
+        >
+          <TagIcon />
+          {t}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 /** Status, sources, place and kind — the chips every finding shows. */
 function Chips({ f }: { f: Finding }) {
   const st = statusOf(f);
@@ -1031,7 +1292,15 @@ function UrlLink({ url }: { url: string }) {
   );
 }
 
-function ResultRow({ f, picked, onToggle }: { f: Finding; picked: boolean; onToggle: (id: string) => void }) {
+interface ResultProps {
+  f: Finding;
+  picked: boolean;
+  onToggle: (id: string) => void;
+  /** Clicking a tag chip (filters by it). */
+  onTag?: (t: string) => void;
+}
+
+function ResultRow({ f, picked, onToggle, onTag }: ResultProps) {
   return (
     <li className={f.hidden ? "opacity-60" : ""}>
       <label className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
@@ -1039,6 +1308,7 @@ function ResultRow({ f, picked, onToggle }: { f: Finding; picked: boolean; onTog
         <span className="min-w-0 flex-1 space-y-1">
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm font-medium">{f.name}</span>
+            <TagChips tags={tagsOf(f)} onTag={onTag} />
             <Chips f={f} />
           </span>
           <UrlLink url={f.careers_url || f.website} />
@@ -1049,14 +1319,14 @@ function ResultRow({ f, picked, onToggle }: { f: Finding; picked: boolean; onTog
   );
 }
 
-function ResultCard({ f, picked, onToggle }: { f: Finding; picked: boolean; onToggle: (id: string) => void }) {
+function ResultCard({ f, picked, onToggle, onTag }: ResultProps) {
   return (
     <label
       className={
         "relative flex flex-col gap-2 rounded-xl border bg-white dark:bg-zinc-950 p-4 cursor-pointer transition-colors " +
         (f.hidden ? "opacity-60 " : "") +
         (picked
-          ? "border-zinc-900 dark:border-zinc-100 ring-1 ring-zinc-900 dark:ring-zinc-100"
+          ? "border-brand-500 ring-1 ring-brand-500 bg-brand-50/30 dark:bg-brand-500/5"
           : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600")
       }
     >
@@ -1074,6 +1344,7 @@ function ResultCard({ f, picked, onToggle }: { f: Finding; picked: boolean; onTo
         <span className="text-sm font-medium leading-tight line-clamp-2">{f.name}</span>
       </span>
       <UrlLink url={f.careers_url || f.website} />
+      <TagChips tags={tagsOf(f)} onTag={onTag} />
       <Chips f={f} />
       {f.description && <span className="text-xs text-zinc-500 line-clamp-2">{f.description}</span>}
     </label>
