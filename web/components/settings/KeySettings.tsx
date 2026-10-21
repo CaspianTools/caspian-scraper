@@ -53,6 +53,9 @@ const MODELS: Record<string, string[]> = {
   openai_compatible: [],
 };
 
+// The model <select> value that switches to a free-text model id.
+const CUSTOM_MODEL = "__custom__";
+
 const KEY_HINTS: Record<string, string> = {
   anthropic: "Anthropic key (starts with sk-ant-) — console.anthropic.com",
   openai: "OpenAI key (starts with sk-) — platform.openai.com",
@@ -109,6 +112,9 @@ function KeyForm() {
   const [loading, setLoading] = useState(true);
   const [provider, setProvider] = useState("anthropic");
   const [model, setModel] = useState(MODELS.anthropic[0]);
+  // "Custom model…" chosen in the dropdown (a saved model that isn't in the
+  // list counts as custom too, see isCustom).
+  const [customPicked, setCustomPicked] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -171,6 +177,7 @@ function KeyForm() {
     setProvider(next);
     // Snap the model to the new provider's first suggestion.
     setModel(MODELS[next]?.[0] ?? "");
+    setCustomPicked(false);
     if (next !== "openai_compatible") setBaseUrl("");
   }
 
@@ -241,6 +248,8 @@ function KeyForm() {
   const updatedMs = state?.updated_at ? millis(state.updated_at) : 0;
   const providerLabel =
     PROVIDERS.find((p) => p.id === state?.provider)?.label || state?.provider;
+  const suggestions = MODELS[provider] ?? [];
+  const isCustom = customPicked || !suggestions.includes(model);
   const inputBase =
     "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm";
 
@@ -319,19 +328,37 @@ function KeyForm() {
             <label className="block text-sm font-medium mb-1" htmlFor="ai-model">
               Model
             </label>
-            <input
-              id="ai-model"
-              list="ai-model-options"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="model id"
-              className={`${inputBase} font-mono`}
-            />
-            <datalist id="ai-model-options">
-              {(MODELS[provider] ?? []).map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
+            {/* A real dropdown: a datalist only lists suggestions matching what's
+                already typed, so a pre-filled model hid all the others. */}
+            {suggestions.length > 0 && (
+              <select
+                id="ai-model"
+                value={isCustom ? CUSTOM_MODEL : model}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCustomPicked(v === CUSTOM_MODEL);
+                  setModel(v === CUSTOM_MODEL ? "" : v);
+                }}
+                className={`${inputBase} font-mono`}
+              >
+                {suggestions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+                <option value={CUSTOM_MODEL}>Custom model…</option>
+              </select>
+            )}
+            {isCustom && (
+              <input
+                id={suggestions.length > 0 ? "ai-model-custom" : "ai-model"}
+                aria-label="Model id"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="model id"
+                className={`${inputBase} font-mono ${suggestions.length > 0 ? "mt-2" : ""}`}
+              />
+            )}
             {errFor("model") && (
               <p className="mt-1 text-xs text-red-600">{errFor("model")}</p>
             )}
