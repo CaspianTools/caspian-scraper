@@ -236,7 +236,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
     >
       <Row label="Name" error={errFor("name")} required>
         <input
@@ -246,7 +246,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="Carrefour UAE"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         />
       </Row>
 
@@ -265,7 +265,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
             set("retailer_id", e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
           }
           placeholder="carrefour-uae"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           disabled={isEdit}
         />
       </Row>
@@ -277,7 +277,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           value={form.home_url}
           onChange={(e) => set("home_url", e.target.value)}
           placeholder="https://www.carrefouruae.com"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
         />
       </Row>
 
@@ -293,7 +293,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           value={startUrlsText}
           onChange={(e) => setStartUrlsText(e.target.value)}
           placeholder="https://www.carrefouruae.com/mafuae/en/c/dairy"
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
         />
       </Row>
 
@@ -307,21 +307,21 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           <button
             type="button"
             onClick={() => loadPreset("jsonld")}
-            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             JSON-LD only
           </button>
           <button
             type="button"
             onClick={() => loadPreset("carrefour")}
-            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Carrefour UAE preset
           </button>
           <button
             type="button"
             onClick={() => loadPreset("bim")}
-            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="text-xs px-2 h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             BIM preset
           </button>
@@ -334,7 +334,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
             setExtractionParseError("");
           }}
           spellCheck={false}
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono shadow-xs"
         />
       </Row>
 
@@ -358,7 +358,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           value={form.schedule_cron}
           onChange={(e) => set("schedule_cron", e.target.value)}
           placeholder="30 4 * * *"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
         />
       </Row>
 
@@ -369,7 +369,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
           value={form.notes}
           onChange={(e) => set("notes", e.target.value)}
           placeholder="Optional context."
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         />
       </Row>
 
@@ -416,21 +416,21 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
               type="button"
               onClick={handleRunNow}
               disabled={busy || deleting}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Run now
             </button>
           )}
           <Link
             href="/comparison/sources"
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={busy || deleting}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Saving…" : isEdit ? "Save changes" : "Add source"}
           </button>

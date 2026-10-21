@@ -56,7 +56,7 @@ export default async function ComparisonComparePage() {
     return (
       <>
         <h2 className="text-xl font-semibold tracking-tight">Compare</h2>
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-md mx-auto">
             No canonical products yet. Once two retailers carry the same
             item — auto-linked by GTIN, or manually linked from{" "}
@@ -151,7 +151,7 @@ export default async function ComparisonComparePage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto shadow-card">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">

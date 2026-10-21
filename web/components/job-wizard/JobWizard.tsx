@@ -35,11 +35,11 @@ const FIELD_STEP: Record<string, Step> = {
 const DEFAULT_SCHEDULE = "0 */6 * * *";
 
 const inputCls =
-  "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400";
+  "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs";
 const primaryBtn =
-  "inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
+  "inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20";
 const secondaryBtn =
-  "inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50";
+  "inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium";
 
 /**
  * Step-by-step job creation in a SidebarLayout: the sidebar holds the steps
@@ -148,7 +148,7 @@ export function JobWizard({ resources: initialResources }: Props) {
                 aria-current={state === "current" ? "step" : undefined}
                 className={
                   "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left disabled:cursor-not-allowed " +
-                  (state === "current" ? "bg-zinc-100 dark:bg-zinc-800" : "hover:bg-zinc-50 dark:hover:bg-zinc-900")
+                  (state === "current" ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-zinc-50 dark:hover:bg-zinc-900")
                 }
               >
                 <span
@@ -156,7 +156,7 @@ export function JobWizard({ resources: initialResources }: Props) {
                     "w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-medium " +
                     (state === "todo"
                       ? "border border-zinc-300 dark:border-zinc-700 text-zinc-500"
-                      : "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900")
+                      : "bg-brand-600 text-white shadow-sm shadow-brand-600/30 dark:bg-brand-500")
                   }
                 >
                   {state === "done" ? "✓" : i + 1}
@@ -216,7 +216,7 @@ export function JobWizard({ resources: initialResources }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this job looking for?"
-              className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             />
           </div>
         </section>
@@ -283,7 +283,7 @@ export function JobWizard({ resources: initialResources }: Props) {
             title="Review and create"
             hint="After creating it, start a run from the job's Runs tab (or Start.bat) and review the results under Findings."
           />
-          <dl className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-5 divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
+          <dl className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-5 divide-y divide-zinc-100 dark:divide-zinc-800 text-sm shadow-card">
             <ReviewRow label="Name" onEdit={() => goTo(0)}>
               {name.trim()}
               {description.trim() && <span className="block text-zinc-500">{description.trim()}</span>}

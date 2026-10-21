@@ -65,7 +65,7 @@ export function DryRunPanel({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 space-y-4">
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 space-y-4 shadow-card">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h3 className="text-base font-medium">Dry run</h3>
@@ -80,7 +80,7 @@ export function DryRunPanel({ projectId }: { projectId: string }) {
           type="button"
           onClick={handleRun}
           disabled={busy}
-          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50 shrink-0"
+          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 shrink-0 bg-white dark:bg-zinc-900 shadow-xs"
         >
           {busy ? "Running…" : "Dry run"}
         </button>

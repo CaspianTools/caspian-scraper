@@ -37,13 +37,13 @@ function fmtDuration(seconds: number): string {
 function statusClasses(status: string): string {
   switch (status) {
     case "ok":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
     case "partial":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25";
     case "running":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25";
     case "error":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
     default:
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -80,14 +80,14 @@ export default async function CarRunDetailPage({ params }: PageProps) {
             <code className="text-xs text-zinc-500 font-mono">{rid}</code>
             <span
               className={
-                "text-xs px-2 py-0.5 rounded-full " +
+                "text-xs font-medium px-2 py-0.5 rounded-full " +
                 statusClasses(String(run.status ?? ""))
               }
             >
               {String(run.status ?? "").replace("_", " ") || "unknown"}
             </span>
             {run.dry_run && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                 dry run
               </span>
             )}
@@ -142,7 +142,7 @@ function Stat({
   small?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 shadow-card">
       <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">
         {label}
       </div>

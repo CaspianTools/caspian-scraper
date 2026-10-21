@@ -23,12 +23,13 @@ export function SidebarNav({ items, label }: { items: SidebarNavItem[]; label?: 
             href={t.href}
             aria-current={active ? "page" : undefined}
             className={
-              "text-sm px-3 py-2 rounded-lg transition-colors " +
+              "relative text-sm px-3 h-9 flex items-center rounded-lg transition-colors " +
               (active
-                ? "bg-zinc-100 text-zinc-900 font-medium dark:bg-zinc-800 dark:text-zinc-100"
-                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900")
+                ? "bg-brand-50 text-brand-700 font-medium dark:bg-brand-500/10 dark:text-brand-300"
+                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100")
             }
           >
+            {active && <span aria-hidden className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-brand-600 dark:bg-brand-400" />}
             {t.label}
           </Link>
         );

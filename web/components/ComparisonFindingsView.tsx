@@ -56,13 +56,13 @@ function fmtRelative(iso: string): string {
 function statusClasses(s: string): string {
   switch (s) {
     case "linked":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
     case "new":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25";
     case "stale":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25";
     case "failed_extract":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
     default:
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -236,7 +236,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
         <select
           value={retailerFilter}
           onChange={(e) => setRetailerFilter(e.target.value)}
-          className="ml-2 text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+          className="ml-2 text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs"
         >
           <option value="all">All retailers</option>
           {retailers.map((r) => (
@@ -250,7 +250,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, brand, retailer…"
-          className="flex-1 min-w-[12rem] text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+          className="flex-1 min-w-[12rem] text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs"
         />
       </div>
 
@@ -260,7 +260,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
         </div>
       )}
 
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
         {visible.length === 0 ? (
           <div className="p-10 text-center text-sm text-zinc-500">
             No findings match the current filters.
@@ -290,7 +290,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
                       </a>
                       <span
                         className={
-                          "text-xs px-2 py-0.5 rounded-full " +
+                          "text-xs font-medium px-2 py-0.5 rounded-full " +
                           statusClasses(f.status)
                         }
                       >
@@ -379,8 +379,8 @@ function FilterChip({
       className={
         "text-xs px-3 h-8 rounded-lg border transition-colors " +
         (active
-          ? "bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-black dark:border-white"
-          : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900")
+          ? "border-brand-200 bg-brand-50 text-brand-700 font-medium dark:border-brand-400/30 dark:bg-brand-500/10 dark:text-brand-300"
+          : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium")
       }
     >
       {label}
@@ -454,13 +454,13 @@ function MatchPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search existing canonicals…"
-          className="flex-1 min-w-0 h-8 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
+          className="flex-1 min-w-0 h-8 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs shadow-xs"
         />
         <button
           type="button"
           disabled={busy}
           onClick={onCreate}
-          className="text-xs px-3 h-8 rounded-lg bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
+          className="text-xs px-3 h-8 rounded-lg bg-brand-600 text-white hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 disabled:opacity-50 shadow-sm shadow-brand-600/20"
         >
           {busy ? "…" : "Create new"}
         </button>

@@ -29,8 +29,8 @@ export function OpenQuickAddButton({
   const sizing = size === "sm" ? "h-9 px-4" : "h-10 px-4";
   const variantClasses =
     variant === "primary"
-      ? "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-      : "border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900";
+      ? "bg-brand-600 text-white hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
+      : "border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium";
 
   return (
     <button

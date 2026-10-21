@@ -237,7 +237,7 @@ export function ConfigWizard() {
     return (
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
       >
         <Row
           label="What do you want to scrape?"
@@ -252,7 +252,7 @@ export function ConfigWizard() {
             value={intent}
             onChange={(e) => setIntent(e.target.value)}
             placeholder="Tender notices: title, buyer, closing date, and value."
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
           />
         </Row>
 
@@ -268,7 +268,7 @@ export function ConfigWizard() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/tenders"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
           />
         </Row>
 
@@ -282,7 +282,7 @@ export function ConfigWizard() {
             value={sampleUrls}
             onChange={(e) => setSampleUrls(e.target.value)}
             placeholder={"https://example.com/tenders/123\nhttps://example.com/tenders/456"}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           />
         </Row>
 
@@ -297,7 +297,7 @@ export function ConfigWizard() {
             value={recordSchemaHint}
             onChange={(e) => setRecordSchemaHint(e.target.value)}
             placeholder="title:string,deadline:string,amount:number"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           />
         </Row>
 
@@ -313,7 +313,7 @@ export function ConfigWizard() {
           <button
             type="submit"
             disabled={busy || (useAi && hasKey === false)}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Starting…" : useAi ? "Start with AI" : "Start"}
           </button>
@@ -375,7 +375,7 @@ export function ConfigWizard() {
               href={job.adapter.pr_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center h-9 px-3 mt-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-9 px-3 mt-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               View adapter PR ↗
             </a>
@@ -398,7 +398,7 @@ export function ConfigWizard() {
         <button
           type="button"
           onClick={reset}
-          className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
         >
           Start over
         </button>
@@ -407,7 +407,7 @@ export function ConfigWizard() {
             type="button"
             onClick={handleApprove}
             disabled={approving}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {approving
               ? "Approving…"
@@ -473,7 +473,7 @@ function Transcript({
                 className={
                   "max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap " +
                   (t.role === "user"
-                    ? "bg-black text-white dark:bg-white dark:text-black"
+                    ? "bg-brand-600 text-white dark:bg-brand-500 dark:text-white shadow-sm shadow-brand-600/20"
                     : t.role === "system"
                       ? "bg-zinc-100 dark:bg-zinc-900 text-zinc-500 text-xs"
                       : "bg-zinc-100 dark:bg-zinc-900")
@@ -504,7 +504,7 @@ function SampleRecords({ records }: { records: Record<string, unknown>[] }) {
     <Section title={`Sample records (${records.length})`}>
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
               {columns.map((c) => (
                 <th key={c} className="text-left px-3 py-2 font-medium">
@@ -615,7 +615,7 @@ function UseAiToggle({
           onClick={() => onChange(!checked)}
           className={
             "relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors " +
-            (checked ? "bg-black dark:bg-white" : "bg-zinc-300 dark:bg-zinc-700")
+            (checked ? "bg-brand-600 dark:bg-brand-500 shadow-sm shadow-brand-600/20" : "bg-zinc-300 dark:bg-zinc-700")
           }
         >
           <span
@@ -655,7 +655,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3">
+    <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3 shadow-card">
       <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
       {children}
     </section>

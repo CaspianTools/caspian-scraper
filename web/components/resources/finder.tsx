@@ -78,9 +78,9 @@ const PAGE = 60;
 const LAST_KEY = "caspian.finder.last";
 
 const inputCls =
-  "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400";
+  "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs";
 const primaryBtn =
-  "inline-flex items-center justify-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
+  "inline-flex items-center justify-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20";
 const chipBtn =
   "h-8 px-3 rounded-md text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50";
 
@@ -532,7 +532,7 @@ export function FinderResults({
   if (f.busy === "search") return <LoadingGrid view={view} />;
   if (!f.result) {
     return (
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500 bg-white/60 dark:bg-zinc-950/40">
         {emptyHint}
       </div>
     );
@@ -626,7 +626,7 @@ export function FinderResults({
               key={`${k}:${v}`}
               type="button"
               onClick={() => toggleFilter(k, v)}
-              className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/20 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/25"
             >
               {FACET_LABEL[k]}: {optionLabel(k, v)} <span aria-hidden>×</span>
             </button>
@@ -837,7 +837,7 @@ function FacetMenu({
         }
       >
         {label}
-        {selected.size > 0 && <span className="px-1.5 rounded bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">{selected.size}</span>}
+        {selected.size > 0 && <span className="px-1.5 rounded bg-brand-600 text-white dark:bg-brand-500">{selected.size}</span>}
         <span aria-hidden className="text-zinc-400">▾</span>
       </button>
       {open && (
@@ -974,9 +974,9 @@ function Chip({ children, tone = "plain", title }: { children: React.ReactNode; 
     plain: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
     source: "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
     known: "bg-violet-50 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-    good: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-    warn: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-    bad: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+    good: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25",
+    warn: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25",
+    bad: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25",
   };
   return (
     <span title={title} className={"text-[11px] leading-4 px-1.5 py-0.5 rounded whitespace-nowrap " + cls[tone]}>

@@ -79,7 +79,7 @@ export function QuickAddDialog() {
         type="button"
         aria-label="Close"
         onClick={close}
-        className="fixed inset-0 bg-black/50 cursor-default"
+        className="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm cursor-default"
       />
       <div
         ref={panelRef}

@@ -46,7 +46,7 @@ export function QuickAddProjectPicker() {
   }
   if (projects.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center bg-white/60 dark:bg-zinc-950/40">
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
           You don&apos;t have any projects yet. Create one first to add a{" "}
           {state.kind}.
@@ -54,7 +54,7 @@ export function QuickAddProjectPicker() {
         <button
           type="button"
           onClick={() => selectKind("project")}
-          className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          className="inline-flex items-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
         >
           Create a project
         </button>
@@ -77,7 +77,7 @@ export function QuickAddProjectPicker() {
             >
               <span className="text-sm font-medium truncate">{p.name}</span>
               {p.enabled === false && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 shrink-0">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 shrink-0">
                   disabled
                 </span>
               )}

@@ -107,11 +107,11 @@ const STATUSES: StatusFilter[] = ["all", "published", "duplicate", "failed"];
 function statusClasses(s: string): string {
   switch (s) {
     case "published":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
     case "duplicate":
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
     case "failed":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
     default:
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -155,7 +155,7 @@ export function FindingsView({ projectId, findings, destinations }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {STATUSES.map((s) => {
@@ -169,8 +169,8 @@ export function FindingsView({ projectId, findings, destinations }: Props) {
                   className={
                     "text-xs px-2.5 py-1.5 rounded-full border transition-colors " +
                     (active
-                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-black"
-                      : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900")
+                      ? "border-brand-200 bg-brand-50 text-brand-700 font-medium dark:border-brand-400/30 dark:bg-brand-500/10 dark:text-brand-300"
+                      : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium")
                   }
                 >
                   {s === "all" ? "All" : s} <span className="opacity-60">· {n}</span>
@@ -184,7 +184,7 @@ export function FindingsView({ projectId, findings, destinations }: Props) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search title / employer / location"
-              className="h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm w-64 focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             />
             <div className="flex items-center gap-1 rounded-lg border border-zinc-300 dark:border-zinc-700 p-0.5">
               {(["list", "cards"] as View[]).map((v) => (
@@ -195,7 +195,7 @@ export function FindingsView({ projectId, findings, destinations }: Props) {
                   className={
                     "text-xs px-2.5 h-8 rounded-md transition-colors " +
                     (view === v
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
+                      ? "bg-white text-zinc-900 font-medium shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-white dark:ring-zinc-700"
                       : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900")
                   }
                 >
@@ -213,7 +213,7 @@ export function FindingsView({ projectId, findings, destinations }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500 bg-white/60 dark:bg-zinc-950/40">
           {findings.length === 0
             ? "No findings yet. They land here after the scraper runs."
             : "No findings match these filters."}
@@ -245,9 +245,9 @@ function ListView({
   destinations: DestinationForFinding[];
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
       <table className="w-full text-sm">
-        <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+        <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
           <tr>
             <th className="text-right px-3 py-2 font-medium w-px">#</th>
             <th className="text-left px-4 py-2 font-medium">Title</th>
@@ -313,7 +313,7 @@ function ListView({
                 <td className="px-4 py-3">
                   <span
                     className={
-                      "text-xs px-2 py-0.5 rounded-full whitespace-nowrap " +
+                      "text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap " +
                       statusClasses(f.status)
                     }
                   >
@@ -371,7 +371,7 @@ function CardsView({
         return (
           <div
             key={f.id}
-            className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex flex-col gap-3"
+            className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex flex-col gap-3 shadow-card"
           >
             <span className="absolute top-3 left-3 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
               #{i + 1}
@@ -404,7 +404,7 @@ function CardsView({
               </div>
               <span
                 className={
-                  "text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 " +
+                  "text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 " +
                   statusClasses(f.status)
                 }
               >

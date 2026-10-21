@@ -58,7 +58,7 @@ export function RunNowButton({ projectId }: { projectId: string }) {
         type="button"
         onClick={handleClick}
         disabled={busy}
-        className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+        className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
       >
         {busy ? "Queueing…" : "Run scrape now"}
       </button>

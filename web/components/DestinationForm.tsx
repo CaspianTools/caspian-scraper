@@ -115,7 +115,7 @@ export function DestinationForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
     >
       <Row label="Name" error={errFor("name")} required>
         <input
@@ -125,7 +125,7 @@ export function DestinationForm({
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="entirelysafe.com API"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -136,7 +136,7 @@ export function DestinationForm({
           value={form.base_url}
           onChange={(e) => set("base_url", e.target.value)}
           placeholder="https://entirelysafe.com/api/v1"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -148,7 +148,7 @@ export function DestinationForm({
             value={form.list_path}
             onChange={(e) => set("list_path", e.target.value)}
             placeholder="/vacancies"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
 
@@ -159,7 +159,7 @@ export function DestinationForm({
             value={form.post_path}
             onChange={(e) => set("post_path", e.target.value)}
             placeholder="/vacancies"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
       </div>
@@ -174,7 +174,7 @@ export function DestinationForm({
           value={form.item_url_template}
           onChange={(e) => set("item_url_template", e.target.value)}
           placeholder="https://entirelysafe.com/vacancies/{destination_slug}"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -186,7 +186,7 @@ export function DestinationForm({
             value={form.auth_header_name}
             onChange={(e) => set("auth_header_name", e.target.value)}
             placeholder="X-API-Key"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
 
@@ -196,7 +196,7 @@ export function DestinationForm({
             value={form.auth_header_format}
             onChange={(e) => set("auth_header_format", e.target.value)}
             placeholder="{secret}"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
       </div>
@@ -216,7 +216,7 @@ export function DestinationForm({
             required
             value={form.secret_ref}
             onChange={(e) => set("secret_ref", e.target.value)}
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           >
             <option value="">— pick a secret —</option>
             {availableSecrets.map((s) => (
@@ -232,7 +232,7 @@ export function DestinationForm({
             value={form.secret_ref}
             onChange={(e) => set("secret_ref", e.target.value)}
             placeholder="API_KEY"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         )}
       </Row>
@@ -263,14 +263,14 @@ export function DestinationForm({
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Cancel
             </button>
           ) : (
             <Link
               href={`/projects/${projectId}/destinations`}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Cancel
             </Link>
@@ -278,7 +278,7 @@ export function DestinationForm({
           <button
             type="submit"
             disabled={busy || deleting}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Saving…" : isEdit ? "Save changes" : "Add destination"}
           </button>

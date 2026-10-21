@@ -83,7 +83,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="HSE Jobs Middle East"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         {errFor("name") && (
           <p className="mt-1 text-xs text-red-600">{errFor("name")}</p>
@@ -101,7 +101,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What does this scraper publish, and where?"
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </div>
 
@@ -136,14 +136,14 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={busy || !name.trim()}
-          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
         >
           {busy ? "Creating…" : "Create project"}
         </button>

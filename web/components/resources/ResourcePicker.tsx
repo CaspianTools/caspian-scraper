@@ -73,7 +73,7 @@ export function ResourcePicker({ resources, selected, onChange, onCreated, sugge
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search name, URL or country…"
-          className="flex-1 min-w-48 h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="flex-1 min-w-48 h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         <select
           value={ats}
@@ -103,7 +103,7 @@ export function ResourcePicker({ resources, selected, onChange, onCreated, sugge
               setAdding(false);
               setFinding(true);
             }}
-            className="inline-flex items-center h-9 px-3 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-9 px-3 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             Find websites
           </button>
@@ -115,7 +115,7 @@ export function ResourcePicker({ resources, selected, onChange, onCreated, sugge
               setFinding(false);
               setAdding(true);
             }}
-            className="inline-flex items-center h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             + New resource
           </button>

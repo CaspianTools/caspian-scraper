@@ -21,7 +21,7 @@ export function AiConfigDashboard() {
 
   return (
     <div className="space-y-6">
-      <nav className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 flex flex-wrap gap-1">
+      <nav className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 flex flex-wrap gap-1 shadow-card">
         {TABS.map(([value, label]) => (
           <button
             key={value}

@@ -122,7 +122,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
 
   if (rows === null) {
     return (
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500 shadow-card">
         Loading…
       </div>
     );
@@ -130,7 +130,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4 max-w-md mx-auto">
           No AI-configured sources yet. Start a new scrape — describe what you
           want and the agent proposes an extraction config you can approve into
@@ -140,14 +140,14 @@ export function GenericSourceList({ onNewScrape }: Props) {
           <button
             type="button"
             onClick={onNewScrape}
-            className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             New scrape
           </button>
         ) : (
           <Link
             href="/aiconfig"
-            className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             New scrape
           </Link>
@@ -166,14 +166,14 @@ export function GenericSourceList({ onNewScrape }: Props) {
           <button
             type="button"
             onClick={onNewScrape}
-            className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             New scrape
           </button>
         ) : (
           <Link
             href="/aiconfig"
-            className="inline-flex items-center text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             New scrape
           </Link>
@@ -189,7 +189,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
           return (
             <div
               key={s.id}
-              className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex items-start gap-4 flex-wrap"
+              className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 flex items-start gap-4 flex-wrap shadow-card"
             >
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -201,9 +201,9 @@ export function GenericSourceList({ onNewScrape }: Props) {
                   </Link>
                   <span
                     className={
-                      "text-xs px-2 py-0.5 rounded-full " +
+                      "text-xs font-medium px-2 py-0.5 rounded-full " +
                       (isAdapter
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                        ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25"
                         : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
                     }
                   >
@@ -211,9 +211,9 @@ export function GenericSourceList({ onNewScrape }: Props) {
                   </span>
                   <span
                     className={
-                      "text-xs px-2 py-0.5 rounded-full " +
+                      "text-xs font-medium px-2 py-0.5 rounded-full " +
                       (s.active
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25"
                         : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
                     }
                   >
@@ -250,7 +250,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
                       ? "Adapter sources activate after their module is merged to main"
                       : undefined
                   }
-                  className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50"
+                  className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium"
                 >
                   {toggling === s.id
                     ? "Saving…"
@@ -260,7 +260,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
                 </button>
                 <Link
                   href={`/aiconfig/sources/${s.id}`}
-                  className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900 inline-flex items-center"
+                  className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center bg-white dark:bg-zinc-900 shadow-xs font-medium"
                 >
                   Open
                 </Link>

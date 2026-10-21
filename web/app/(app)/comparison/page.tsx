@@ -104,14 +104,14 @@ export default async function ComparisonFindingsPage() {
         </div>
         <Link
           href="/comparison/sources/new"
-          className="inline-flex items-center h-9 px-3 rounded-lg bg-black text-white text-sm hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          className="inline-flex items-center h-9 px-3 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
         >
           + Add source
         </Link>
       </div>
 
       {productSourcesEmpty ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-md mx-auto">
             No comparison sources yet. Add one — point it at a retailer
             category page and configure an extraction strategy — and the
@@ -120,14 +120,14 @@ export default async function ComparisonFindingsPage() {
           <div className="mt-4">
             <Link
               href="/comparison/sources/new"
-              className="inline-flex items-center h-9 px-4 rounded-lg bg-black text-white text-sm hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+              className="inline-flex items-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
             >
               Add your first source
             </Link>
           </div>
         </div>
       ) : findings.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-10 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-md mx-auto">
             {sourcesCount} comparison source{sourcesCount === 1 ? "" : "s"} configured
             but no findings yet. Either the next scrape hasn&apos;t run yet, or

@@ -115,9 +115,9 @@ export function SecretsManager({ projectId, secrets }: Props) {
   return (
     <div className="space-y-6">
       {secrets.length > 0 ? (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
           <table className="w-full text-sm">
-            <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Name</th>
                 <th className="text-left px-4 py-2 font-medium">Value</th>
@@ -168,7 +168,7 @@ export function SecretsManager({ projectId, secrets }: Props) {
           </table>
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-md mx-auto">
             No secrets yet. Use <span className="font-medium">+ Add secret</span>{" "}
             above to add an API key or token this project needs.
@@ -179,7 +179,7 @@ export function SecretsManager({ projectId, secrets }: Props) {
       {overwriteName && (
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-4"
+          className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-4 shadow-card"
         >
           <h3 className="text-base font-medium">
             Replace value for{" "}
@@ -195,7 +195,7 @@ export function SecretsManager({ projectId, secrets }: Props) {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="es_live_…"
-              className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             />
             {errFor("value") && (
               <p className="mt-1 text-xs text-red-600">{errFor("value")}</p>
@@ -218,14 +218,14 @@ export function SecretsManager({ projectId, secrets }: Props) {
             <button
               type="button"
               onClick={resetForm}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+              className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
             >
               {busy ? "Saving…" : "Save new value"}
             </button>

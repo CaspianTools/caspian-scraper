@@ -54,7 +54,7 @@ export default async function DestinationsListPage({ params }: PageProps) {
       </div>
 
       {dests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4 max-w-md mx-auto">
             A destination is the API the scraper POSTs new findings to.
             Configure the base URL, the auth header, and which secret
@@ -65,9 +65,9 @@ export default async function DestinationsListPage({ params }: PageProps) {
           </OpenQuickAddButton>
         </div>
       ) : (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
           <table className="w-full text-sm">
-            <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Name</th>
                 <th className="text-left px-4 py-2 font-medium">POST endpoint</th>

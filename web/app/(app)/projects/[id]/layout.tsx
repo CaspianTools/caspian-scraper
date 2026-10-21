@@ -38,10 +38,10 @@ export default async function ProjectLayout({
             badge={
               <span
                 className={
-                  "text-xs px-2 py-0.5 rounded-full shrink-0 " +
+                  "text-xs font-medium px-2 py-0.5 rounded-full shrink-0 " +
                   (enabled
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400")
+                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25"
+                    : "bg-zinc-100 text-zinc-600 ring-1 ring-inset ring-zinc-500/15 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-400/15")
                 }
               >
                 {enabled ? "enabled" : "paused"}

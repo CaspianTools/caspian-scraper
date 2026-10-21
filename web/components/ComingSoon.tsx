@@ -8,7 +8,7 @@ export function ComingSoon({
   return (
     <>
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
         <div className="text-sm text-zinc-600 dark:text-zinc-400 max-w-md mx-auto">
           {description}
         </div>

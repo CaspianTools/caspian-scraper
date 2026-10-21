@@ -190,7 +190,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
           <select
             value={nameSelection}
             onChange={(e) => setNameSelection(e.target.value)}
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           >
             {missing.length > 0 && (
               <optgroup label="Referenced by destinations (not set yet)">
@@ -220,7 +220,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
               placeholder="MY_API_KEY"
-              className="mt-2 w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="mt-2 w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             />
           )}
 
@@ -243,7 +243,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
             value={customName}
             onChange={(e) => setCustomName(e.target.value)}
             placeholder="ENTIRELYSAFE_API_KEY"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
           {errFor("name") && (
             <p className="mt-1 text-xs text-red-600">{errFor("name")}</p>
@@ -264,7 +264,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="es_live_…"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         {errFor("value") && (
           <p className="mt-1 text-xs text-red-600">{errFor("value")}</p>
@@ -287,14 +287,14 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
         >
           {busy
             ? "Saving…"

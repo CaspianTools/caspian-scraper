@@ -63,7 +63,7 @@ export default async function SourcesListPage({ params }: PageProps) {
 
       {sources.length === 0 ? (
         attachedIds.length > 0 ? null : (
-        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center">
+        <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4 max-w-md mx-auto">
             A source is one website (or feed) to scrape. Each source has an
             ATS type so the scraper knows how to parse it. Supported today:{" "}

@@ -131,7 +131,7 @@ export function SourceForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
     >
       <Row label="Name" error={errFor("name")} required>
         <input
@@ -141,7 +141,7 @@ export function SourceForm({
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="Saudi Aramco"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -152,7 +152,7 @@ export function SourceForm({
           value={form.careers_url}
           onChange={(e) => set("careers_url", e.target.value)}
           placeholder="https://careers.aramco.com/search/?q=hse"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -163,7 +163,7 @@ export function SourceForm({
             onChange={(e) =>
               set("ats", e.target.value as SourceFormInitial["ats"])
             }
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           >
             <option value="successfactors">SAP SuccessFactors</option>
             <option value="jibe">Jibe / iCIMS</option>
@@ -177,7 +177,7 @@ export function SourceForm({
             onChange={(e) =>
               set("kind", e.target.value as SourceFormInitial["kind"])
             }
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           >
             <option value="employer">Employer</option>
             <option value="agency">Recruitment agency</option>
@@ -197,7 +197,7 @@ export function SourceForm({
             value={form.headquarters}
             onChange={(e) => set("headquarters", e.target.value)}
             placeholder="Dhahran"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
 
@@ -207,7 +207,7 @@ export function SourceForm({
             value={form.segment}
             onChange={(e) => set("segment", e.target.value)}
             placeholder="Upstream, Downstream"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
       </div>
@@ -219,7 +219,7 @@ export function SourceForm({
             value={form.website}
             onChange={(e) => set("website", e.target.value)}
             placeholder="https://www.aramco.com"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
 
@@ -229,7 +229,7 @@ export function SourceForm({
             value={form.linkedin}
             onChange={(e) => set("linkedin", e.target.value)}
             placeholder="https://www.linkedin.com/company/..."
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </Row>
       </div>
@@ -241,7 +241,7 @@ export function SourceForm({
           value={form.notes}
           onChange={(e) => set("notes", e.target.value)}
           placeholder="Anything else worth remembering about this source."
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </Row>
 
@@ -287,14 +287,14 @@ export function SourceForm({
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Cancel
             </button>
           ) : (
             <Link
               href={backHref}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Cancel
             </Link>
@@ -302,7 +302,7 @@ export function SourceForm({
           <button
             type="submit"
             disabled={busy || deleting || !form.name.trim() || !form.careers_url.trim()}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Saving…" : isEdit ? "Save changes" : "Add source"}
           </button>

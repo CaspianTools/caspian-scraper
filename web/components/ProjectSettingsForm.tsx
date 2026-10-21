@@ -99,7 +99,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
     <div className="space-y-6">
       <form
         onSubmit={handleSave}
-        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
       >
         <div>
           <label className="block text-sm font-medium mb-1">Name</label>
@@ -109,7 +109,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
             maxLength={80}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
           {errFor("name") && (
             <p className="mt-1 text-xs text-red-600">{errFor("name")}</p>
@@ -126,7 +126,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
             maxLength={500}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
         </div>
 
@@ -170,7 +170,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
           <button
             type="submit"
             disabled={busy || !name.trim()}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Saving…" : "Save changes"}
           </button>

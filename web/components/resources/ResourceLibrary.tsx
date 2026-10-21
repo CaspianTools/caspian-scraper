@@ -41,7 +41,7 @@ export function ResourceLibrary({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search name, URL, country or job…"
-          className="flex-1 min-w-48 h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="flex-1 min-w-48 h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         <label className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400">
           <input
@@ -59,7 +59,7 @@ export function ResourceLibrary({
               setAdding(false);
               setFinding(true);
             }}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             Find websites
           </button>
@@ -71,7 +71,7 @@ export function ResourceLibrary({
               setFinding(false);
               setAdding(true);
             }}
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             + New resource
           </button>
@@ -98,7 +98,7 @@ export function ResourceLibrary({
         />
       )}
 
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto shadow-card">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
@@ -146,10 +146,10 @@ export function ResourceLibrary({
                   <td className="px-4 py-2.5">
                     <span
                       className={
-                        "text-xs px-2 py-0.5 rounded-full " +
+                        "text-xs font-medium px-2 py-0.5 rounded-full " +
                         (r.active
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400")
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25"
+                          : "bg-zinc-100 text-zinc-600 ring-1 ring-inset ring-zinc-500/15 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-400/15")
                       }
                     >
                       {r.active ? "active" : "inactive"}

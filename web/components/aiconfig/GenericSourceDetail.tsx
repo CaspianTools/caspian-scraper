@@ -102,13 +102,13 @@ function fmtRelative(ms: number): string {
 function statusClasses(s: string): string {
   switch (s) {
     case "ok":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
     case "partial":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25";
     case "running":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25";
     case "error":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
     default:
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -381,9 +381,9 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
             </h2>
             <span
               className={
-                "text-xs px-2 py-0.5 rounded-full " +
+                "text-xs font-medium px-2 py-0.5 rounded-full " +
                 (isAdapter
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                  ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25"
                   : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
               }
             >
@@ -391,9 +391,9 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
             </span>
             <span
               className={
-                "text-xs px-2 py-0.5 rounded-full " +
+                "text-xs font-medium px-2 py-0.5 rounded-full " +
                 (source.active
-                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25"
                   : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
               }
             >
@@ -416,7 +416,7 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
                 ? "Adapter sources can't run until their module is merged to main"
                 : undefined
             }
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             {running ? "Queueing…" : "Run now"}
           </button>
@@ -429,7 +429,7 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
                 ? "Adapter sources activate after their module is merged to main"
                 : undefined
             }
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             {toggling
               ? "Saving…"
@@ -477,7 +477,7 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
       )}
 
       {/* Tabs */}
-      <nav className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 flex flex-wrap gap-1">
+      <nav className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 flex flex-wrap gap-1 shadow-card">
         {(
           [
             ["config", "Configuration"],
@@ -531,7 +531,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3">
+    <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3 shadow-card">
       <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
       {children}
     </section>
@@ -572,7 +572,7 @@ function ConfigTab({
     return (
       <form
         onSubmit={onSave}
-        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+        className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
       >
         <Row label="Name" error={errFor("name")} required>
           <input
@@ -581,7 +581,7 @@ function ConfigTab({
             maxLength={120}
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
           />
         </Row>
         <Row
@@ -598,7 +598,7 @@ function ConfigTab({
               setForm((f) => ({ ...f, schedule_cron: e.target.value }))
             }
             placeholder="30 4 * * *"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           />
         </Row>
         <Row
@@ -614,7 +614,7 @@ function ConfigTab({
               setForm((f) => ({ ...f, start_urls: e.target.value }))
             }
             placeholder={"https://example.com/tenders"}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           />
         </Row>
         <Row label="Notes" error={errFor("notes")}>
@@ -624,21 +624,21 @@ function ConfigTab({
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
             placeholder="Optional context."
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
           />
         </Row>
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -673,7 +673,7 @@ function ConfigTab({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Edit
           </button>
@@ -709,7 +709,7 @@ function ConfigTab({
         {schema.length > 0 ? (
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+              <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
                   <th className="text-left px-3 py-2 font-medium">Field</th>
                   <th className="text-left px-3 py-2 font-medium">Type</th>
@@ -835,14 +835,14 @@ function RecordsTab({
   }
   if (records === null) {
     return (
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500 shadow-card">
         Loading…
       </div>
     );
   }
   if (records.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500 bg-white/60 dark:bg-zinc-950/40">
         No records scraped yet. Run the source to collect some.
       </div>
     );
@@ -853,9 +853,9 @@ function RecordsTab({
       <p className="text-sm text-zinc-500">
         {records.length} record{records.length === 1 ? "" : "s"}
       </p>
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto shadow-card">
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
               {columns.map((c) => (
                 <th key={c} className="text-left px-3 py-2 font-medium">
@@ -905,9 +905,9 @@ function RecordsTab({
                 <td className="px-3 py-2 align-top">
                   <span
                     className={
-                      "text-xs px-2 py-0.5 rounded-full " +
+                      "text-xs font-medium px-2 py-0.5 rounded-full " +
                       (r.status === "new"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25"
                         : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
                     }
                   >
@@ -963,14 +963,14 @@ function RunsTab({ sid }: { sid: string }) {
   }
   if (runs === null) {
     return (
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 text-sm text-zinc-500 shadow-card">
         Loading…
       </div>
     );
   }
   if (runs.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500">
+      <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500 bg-white/60 dark:bg-zinc-950/40">
         No runs yet. Trigger Run now to start one.
       </div>
     );
@@ -981,9 +981,9 @@ function RunsTab({ sid }: { sid: string }) {
       <p className="text-sm text-zinc-500">
         {runs.length} recent run{runs.length === 1 ? "" : "s"}
       </p>
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto shadow-card">
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-900 text-xs uppercase tracking-wide text-zinc-500">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-[11px] font-medium uppercase tracking-wider text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
               <th className="text-left px-4 py-2 font-medium">Status</th>
               <th className="text-left px-4 py-2 font-medium">Started</th>
@@ -1006,7 +1006,7 @@ function RunsTab({ sid }: { sid: string }) {
                     <td className="px-4 py-3">
                       <span
                         className={
-                          "text-xs px-2 py-0.5 rounded-full " +
+                          "text-xs font-medium px-2 py-0.5 rounded-full " +
                           statusClasses(status)
                         }
                       >

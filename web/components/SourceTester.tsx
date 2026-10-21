@@ -91,7 +91,7 @@ export function SourceTester({ extractionJson, sampleUrl }: Props) {
           type="button"
           onClick={runTest}
           disabled={busy}
-          className="text-xs px-3 h-8 rounded-lg bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
+          className="text-xs px-3 h-8 rounded-lg bg-brand-600 text-white hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 disabled:opacity-50 shadow-sm shadow-brand-600/20"
         >
           {busy ? "Testing…" : "Test"}
         </button>
@@ -105,7 +105,7 @@ export function SourceTester({ extractionJson, sampleUrl }: Props) {
             ? `Sample URL (default: ${sampleUrl})`
             : "Sample URL — must be a product detail page"
         }
-        className="w-full h-8 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
+        className="w-full h-8 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono shadow-xs"
       />
       <p className="text-xs text-zinc-500">
         Runs JSON-LD and OG-meta extractors against the live page (no

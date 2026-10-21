@@ -137,12 +137,12 @@ export function SchedulePicker({ value, onChange, errorMessage }: Props) {
                 // Clamp empty / zero to 1 on blur.
                 if (!n || parseInt(n, 10) < 1) setN("1");
               }}
-              className="w-20 h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-center focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-20 h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-center focus:outline-none focus:ring-4 focus:ring-brand-500/15 disabled:opacity-50 disabled:cursor-not-allowed focus:border-brand-500 shadow-xs"
             />
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value as Unit)}
-              className="h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             >
               <option value="hours">hour(s)</option>
               <option value="days">day(s)</option>
@@ -186,7 +186,7 @@ export function SchedulePicker({ value, onChange, errorMessage }: Props) {
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="30 4 * * *"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
           />
           <p className="text-xs text-zinc-500">
             Format: <code>minute hour day-of-month month day-of-week</code>.

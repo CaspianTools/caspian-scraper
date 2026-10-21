@@ -28,7 +28,7 @@ export default async function SettingsPage() {
 
         <KeySettings canManage={session.isSuperAdmin} />
 
-        <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3">
+        <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-3 shadow-card">
           <h3 className="text-sm font-semibold tracking-tight">Where data lives</h3>
           <dl className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800">
             {DATA_PLACES.map(([dir, what]) => (

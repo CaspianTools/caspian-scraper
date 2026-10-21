@@ -127,7 +127,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5"
+      className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-5 shadow-card"
     >
       <Row label="Name" error={errFor("name")} required>
         <input
@@ -137,7 +137,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="OpenSooq Oman — Land Cruiser"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         />
       </Row>
 
@@ -147,7 +147,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           onChange={(e) =>
             set("site", e.target.value as CarSourceFormInitial["site"])
           }
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         >
           {CAR_SITES.map((s) => (
             <option key={s.value} value={s.value}>
@@ -171,7 +171,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
             value={form.country}
             onChange={(e) => set("country", e.target.value)}
             placeholder="om"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
           />
         </Row>
         <Row label="City" hint="Optional narrowing, e.g. muscat.">
@@ -181,7 +181,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
             value={form.city}
             onChange={(e) => set("city", e.target.value)}
             placeholder="muscat"
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
           />
         </Row>
       </div>
@@ -196,7 +196,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           value={form.query}
           onChange={(e) => set("query", e.target.value)}
           placeholder="land cruiser"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         />
       </Row>
 
@@ -214,7 +214,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
             max={200}
             value={form.max_listings}
             onChange={(e) => set("max_listings", Number(e.target.value))}
-            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm tabular-nums"
+            className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm tabular-nums shadow-xs"
           />
         </Row>
         <div className="flex items-end pb-2">
@@ -247,7 +247,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           max={30}
           value={form.posted_within_days}
           onChange={(e) => set("posted_within_days", Number(e.target.value))}
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm tabular-nums"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm tabular-nums shadow-xs"
         />
       </Row>
 
@@ -263,7 +263,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           value={form.schedule_cron}
           onChange={(e) => set("schedule_cron", e.target.value)}
           placeholder="30 4 * * *"
-          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono"
+          className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm font-mono shadow-xs"
         />
       </Row>
 
@@ -274,7 +274,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
           value={form.notes}
           onChange={(e) => set("notes", e.target.value)}
           placeholder="Optional context."
-          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm shadow-xs"
         />
       </Row>
 
@@ -321,21 +321,21 @@ export function CarSourceForm({ initial, sourceId }: Props) {
               type="button"
               onClick={handleRunNow}
               disabled={busy || deleting}
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium"
             >
               Run now
             </button>
           )}
           <Link
             href="/cars/sources"
-            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+            className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={busy || deleting}
-            className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             {busy ? "Saving…" : isEdit ? "Save changes" : "Add source"}
           </button>

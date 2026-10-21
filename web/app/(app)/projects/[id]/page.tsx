@@ -42,14 +42,14 @@ function fmtRelative(iso: string): string {
 function statusClasses(s: string): string {
   switch (s) {
     case "ok":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
     case "partial":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25";
     case "running":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25";
     case "error":
     case "auth_halt":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
     default:
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -228,20 +228,20 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       )}
 
       {latestRun && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-card">
           <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium">Last run</h3>
               <span
                 className={
-                  "text-xs px-2 py-0.5 rounded-full " +
+                  "text-xs font-medium px-2 py-0.5 rounded-full " +
                   statusClasses(String(latestRun.status ?? ""))
                 }
               >
                 {String(latestRun.status ?? "").replace("_", " ")}
               </span>
               {latestRun.dry_run && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                   dry run
                 </span>
               )}
@@ -291,7 +291,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       )}
 
       {trendData.length > 1 && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-card">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-medium">
@@ -315,7 +315,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       )}
 
       {recentPublished.length > 0 && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
           <div className="px-4 py-2 text-xs uppercase tracking-wide text-zinc-500 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
             Recently published
           </div>
@@ -347,7 +347,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       )}
 
       {stillSettingUp && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-card">
           <h2 className="text-lg font-medium mb-2">Next steps</h2>
           <ol className="text-sm text-zinc-600 dark:text-zinc-400 space-y-2 list-decimal list-inside">
             {needsSources && (
@@ -392,7 +392,7 @@ function StatCard({
   hint?: string;
 }) {
   const body = (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors">
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-card">
       <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">
         {label}
       </div>
