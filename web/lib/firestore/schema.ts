@@ -688,6 +688,10 @@ export const ConfigJobCreateSchema = z.object({
   sample_urls: z.array(z.string().url()).max(20).default([]),
   // Optional shorthand schema, e.g. "title:string,deadline:string,amount:number".
   record_schema_hint: z.string().max(2000).default(""),
+  // Off (default): build the config from the page itself — no model, no key
+  // (aiconfig/heuristic.py). On: the AI agent builds and checks it with the
+  // provider + key from Settings.
+  use_ai: z.boolean().default(false),
 });
 export type ConfigJobCreate = z.infer<typeof ConfigJobCreateSchema>;
 

@@ -15,7 +15,7 @@ DEFAULT_BASE = "https://api.openai.com/v1"
 
 # Reasoning models take max_completion_tokens (not max_tokens) and reject
 # temperature. Matched by prefix.
-_REASONING_PREFIXES = ("o1", "o3", "o4", "o5", "gpt-5")
+_REASONING_PREFIXES = ("o1", "o3", "o4", "o5", "gpt-5", "gpt-6")
 
 
 class OpenAIProvider:
@@ -25,7 +25,7 @@ class OpenAIProvider:
         if not api_key:
             raise ProviderError("OpenAI provider needs an API key")
         self.api_key = api_key
-        self.model = model or "gpt-4o"
+        self.model = model or "gpt-6.1-sol"
         self.base = (base_url.rstrip("/") if base_url else DEFAULT_BASE)
         # Only apply the reasoning-model quirks on the real OpenAI endpoint;
         # compatible endpoints follow the classic max_tokens contract.

@@ -144,16 +144,29 @@ def _detect_currency(product_node: dict | None, og: dict[str, str]) -> str:
     return cur.upper() if len(cur) == 3 else ""
 
 
+def _slug_template(path: str) -> str:
+    """'/catalogue/a-light-in-the-attic_1000/index.html' -> '/catalogue/*/index.html':
+    slug-like segments (digits, '-', '_' or long) collapsed, so item pages whose
+    URLs are titles rather than ids still group together."""
+    return "/".join(
+        "*" if s and (re.search(r"[\d_-]", s) or len(s) > 24) and "." not in s else s
+        for s in path.split("/")
+    )
+
+
 def _detect_repeated_blocks(html: str, base_url: str) -> list[RepeatedBlock]:
-    """Group same-shaped hrefs (digit runs collapsed) to find the listing grid."""
-    hrefs = extract.links(html, base_url, re.compile("."))
+    """Group same-shaped hrefs to find the listing grid — two ways: digit runs
+    collapsed (/p/123, /p/456) and slug segments collapsed (/blog/my-post)."""
+    hrefs = list(dict.fromkeys(extract.links(html, base_url, re.compile("."))))
     groups: dict[str, list[str]] = {}
     for h in hrefs:
         path = urlparse(h).path
         if not path or path == "/":
             continue
-        template = re.sub(r"\d+", "#", path)
-        groups.setdefault(template, []).append(h)
+        groups.setdefault("d:" + re.sub(r"\d+", "#", path), []).append(h)
+        slug = _slug_template(path)
+        if "*" in slug:
+            groups.setdefault("s:" + slug, []).append(h)
 
     blocks: list[RepeatedBlock] = []
     for _template, items in groups.items():
@@ -171,6 +184,11 @@ def _detect_repeated_blocks(html: str, base_url: str) -> list[RepeatedBlock]:
         else:
             seg = paths[0].strip("/").split("/")[0]
             href_includes = f"/{seg}/" if seg else paths[0]
+        # The selector and href_includes match the raw href attribute, so a page
+        # that writes relative links ("catalogue/x") needs the slash dropped.
+        raw = r"""href\s*=\s*["'](?:https?://[^"'/]+)?""" + re.escape(href_includes)
+        if not re.search(raw, html, re.I):
+            href_includes = href_includes.lstrip("/") or href_includes
         blocks.append(
             RepeatedBlock(
                 link_selector=_css_href_selector(href_includes),
@@ -179,8 +197,20 @@ def _detect_repeated_blocks(html: str, base_url: str) -> list[RepeatedBlock]:
                 sample_hrefs=items[:5],
             )
         )
-    blocks.sort(key=lambda b: b.count, reverse=True)
-    return blocks[:10]
+    # The two groupings often find the same group: keep the bigger one per selector.
+    best: dict[str, RepeatedBlock] = {}
+    for b in blocks:
+        if b.link_selector not in best or b.count > best[b.link_selector].count:
+            best[b.link_selector] = b
+    top = sorted(best.values(), key=lambda b: b.count, reverse=True)[:10]
+    # A broad group must not swallow a narrower one ('catalogue/' vs
+    # 'catalogue/category/'): exclude the narrower groups from its selector.
+    for b in top:
+        for other in top:
+            inc = other.href_includes
+            if inc != b.href_includes and inc.startswith(b.href_includes):
+                b.link_selector += f":not({_css_href_selector(inc)[1:]})"
+    return top
 
 
 def build_evidence_from_html(html: str, url: str) -> PageEvidence:

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuickAdd } from "@/components/quick-add/QuickAddProvider";
 
 interface Item {
   href: string;
@@ -38,6 +37,17 @@ const ITEMS: Item[] = [
     ),
   },
   {
+    href: "/db",
+    label: "DB",
+    match: ["/db"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" {...stroke} aria-hidden>
+        <ellipse cx="12" cy="5.5" rx="8" ry="2.5" />
+        <path d="M4 5.5v13c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-13M4 12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/comparison",
     label: "Compare",
     match: ["/comparison"],
@@ -61,7 +71,7 @@ const ITEMS: Item[] = [
   },
   {
     href: "/aiconfig",
-    label: "AI Setup",
+    label: "Any site",
     match: ["/aiconfig"],
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" {...stroke} aria-hidden>
@@ -77,12 +87,12 @@ function isActive(item: Item, pathname: string): boolean {
 }
 
 /**
- * The app's primary navigation: a narrow icon rail pinned to the left edge.
- * Section pages put their own controls in a <SidebarLayout> sidebar next to it.
+ * The app's primary navigation: a narrow icon rail pinned to the left edge,
+ * with Settings at the bottom (Quick add is in the AppHeader). Section pages
+ * put their own controls in a <SidebarLayout> sidebar next to it.
  */
 export function SideRail() {
   const pathname = usePathname() ?? "/";
-  const { open } = useQuickAdd();
 
   return (
     <nav
@@ -116,14 +126,21 @@ export function SideRail() {
       })}
 
       <div className="mt-auto flex flex-col items-center gap-2">
-        <button
-          type="button"
-          onClick={() => open({})}
-          title="Add a job or source"
-          className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center text-xl leading-none hover:bg-zinc-200"
+        <Link
+          href="/settings"
+          title="Settings"
+          aria-current={pathname.startsWith("/settings") ? "page" : undefined}
+          className={
+            "w-14 py-2 rounded-xl flex flex-col items-center gap-1 text-[10px] leading-none transition-colors " +
+            (pathname.startsWith("/settings") ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-zinc-200")
+          }
         >
-          +<span className="sr-only">New</span>
-        </button>
+          <svg viewBox="0 0 24 24" className="w-5 h-5" {...stroke} aria-hidden>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+          </svg>
+          <span>Settings</span>
+        </Link>
         <span
           title="Running on this computer — no sign-in. Data lives in data/ (committed) and local-data/ (this computer only)."
           className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-zinc-300"

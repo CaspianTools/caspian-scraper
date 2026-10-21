@@ -3,28 +3,20 @@
 import { useState } from "react";
 import { ConfigWizard } from "@/components/ConfigWizard";
 import { GenericSourceList } from "@/components/aiconfig/GenericSourceList";
-import { KeySettings } from "@/components/aiconfig/KeySettings";
 
-type Tab = "new" | "sources" | "key";
+type Tab = "new" | "sources";
 
 const TABS: [Tab, string][] = [
   ["new", "New scrape"],
   ["sources", "My sources"],
-  ["key", "API key"],
 ];
 
 /**
- * AI-config hub. Client-side tab switcher over the three surfaces — the
- * existing ConfigWizard (unchanged), the workspace's generic sources, and the
- * write-only provider key settings. The parent page stays a server component
- * doing the auth guard; all interactivity lives here.
- *
- * `isSuperAdmin` comes from the server session. The API-key tab is still
- * rendered for admins so the restriction is discoverable rather than a missing
- * tab, but it shows an explanatory note instead of the form. Enforcement is in
- * the route (403), not here.
+ * Scrape-any-website hub. Client-side tab switcher over the ConfigWizard
+ * (describe a site, approve the proposed config into a generic source) and
+ * the workspace's generic sources. The AI provider key lives in Settings.
  */
-export function AiConfigDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+export function AiConfigDashboard() {
   const [tab, setTab] = useState<Tab>("new");
 
   return (
@@ -51,7 +43,6 @@ export function AiConfigDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       {tab === "sources" && (
         <GenericSourceList onNewScrape={() => setTab("new")} />
       )}
-      {tab === "key" && <KeySettings canManage={isSuperAdmin} />}
     </div>
   );
 }

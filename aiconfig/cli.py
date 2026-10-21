@@ -65,6 +65,19 @@ def _print_result(result: Any, *, listing_url: str) -> None:
 
 
 def _cmd_new(args: argparse.Namespace) -> int:
+    if args.no_ai:
+        from .heuristic import propose_without_ai
+
+        print(f"Inspecting {args.url} (no AI) ...", file=sys.stderr)
+        result = propose_without_ai(
+            args.intent, args.url,
+            detail_url=args.detail_url or "",
+            record_schema_hint=args.schema or "",
+            on_event=lambda _s, text: print(f"  {text}", file=sys.stderr),
+        )
+        _print_result(result, listing_url=args.url)
+        return 0 if result.extraction and not result.incomplete else 1
+
     try:
         provider = _provider_from_args(args)
     except ProviderError as e:
@@ -271,6 +284,55 @@ def _run_job_mode(job_id: str) -> int:
     sample_urls = job.get("sample_urls") or []
     hint = str(job.get("record_schema_hint") or "")
     detail_url = str(sample_urls[0]) if isinstance(sample_urls, list) and sample_urls else ""
+    # "Use AI" is off by default: build the config from the inspector's evidence
+    # alone (aiconfig.heuristic) — no provider, no key. Jobs created before the
+    # toggle existed carry no field and ran with AI, so keep that for them.
+    use_ai = bool(job.get("use_ai", "use_ai" not in job))
+
+    def set_status(status: str) -> None:
+        ref.update({"status": status, "updated_at": SERVER_TIMESTAMP})
+
+    def append_turn(role: str, text: str) -> None:
+        from google.cloud.firestore_v1 import ArrayUnion
+
+        ref.update({
+            "turns": ArrayUnion([{"role": role, "text": text, "ts": utc_now_iso()}]),
+            "updated_at": SERVER_TIMESTAMP,
+        })
+
+    def on_event(status: str, text: str) -> None:
+        # Do NOT commit the terminal "proposed" status here: the agent emits it
+        # when it calls finish, but proposed_config isn't written until run_agent
+        # returns and the final ref.update below runs. Committing "proposed"
+        # early opens a window where status=="proposed" && proposed_config==null,
+        # which the approve route would reject (422). The final update sets both.
+        if status != "proposed":
+            set_status(status)
+        if text:
+            append_turn("agent", text)
+
+    if not use_ai:
+        from .heuristic import propose_without_ai
+
+        try:
+            set_status("inspecting")
+            append_turn("system", "Use AI is off — building the config from the page itself.")
+            result = propose_without_ai(
+                intent, url,
+                detail_url=detail_url,
+                record_schema_hint=hint,
+                on_event=on_event,
+            )
+        except Exception as e:  # noqa: BLE001
+            ref.update({
+                "status": "failed",
+                "error": f"{type(e).__name__}: {e}",
+                "finished_at": SERVER_TIMESTAMP,
+                "updated_at": SERVER_TIMESTAMP,
+            })
+            return 1
+        return _finish_job(ref, job, job_id, result, url=url, intent=intent, hint=hint,
+                           append_turn=append_turn)
 
     # Build the LLM provider from the job OWNER's saved settings (provider,
     # model, key, base_url in /aiconfig_keys/{uid}) so their job runs on the
@@ -311,34 +373,12 @@ def _run_job_mode(job_id: str) -> int:
             "status": "failed",
             "error": provider_err or (
                 "no AI provider configured — add a provider + API key in "
-                "AI Setup → API key"
+                "Settings → AI provider & key, or turn Use AI off"
             ),
             "finished_at": SERVER_TIMESTAMP,
             "updated_at": SERVER_TIMESTAMP,
         })
         return 2
-
-    def set_status(status: str) -> None:
-        ref.update({"status": status, "updated_at": SERVER_TIMESTAMP})
-
-    def append_turn(role: str, text: str) -> None:
-        from google.cloud.firestore_v1 import ArrayUnion
-
-        ref.update({
-            "turns": ArrayUnion([{"role": role, "text": text, "ts": utc_now_iso()}]),
-            "updated_at": SERVER_TIMESTAMP,
-        })
-
-    def on_event(status: str, text: str) -> None:
-        # Do NOT commit the terminal "proposed" status here: the agent emits it
-        # when it calls finish, but proposed_config isn't written until run_agent
-        # returns and the final ref.update below runs. Committing "proposed"
-        # early opens a window where status=="proposed" && proposed_config==null,
-        # which the approve route would reject (422). The final update sets both.
-        if status != "proposed":
-            set_status(status)
-        if text:
-            append_turn("agent", text)
 
     try:
         set_status("inspecting")
@@ -359,6 +399,15 @@ def _run_job_mode(job_id: str) -> int:
             "updated_at": SERVER_TIMESTAMP,
         })
         return 1
+
+    return _finish_job(ref, job, job_id, result, url=url, intent=intent, hint=hint,
+                       append_turn=append_turn)
+
+
+def _finish_job(ref, job: dict, job_id: str, result: Any, *, url: str, intent: str,
+                hint: str, append_turn) -> int:
+    """Write an AgentResult (AI or not) back to the config_jobs doc."""
+    from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 
     updates: dict[str, Any] = {
         "path": result.path,
@@ -427,6 +476,8 @@ def _build_parser() -> argparse.ArgumentParser:
     new.add_argument("--api-key", default="",
                      help="API key (else the provider's env var)")
     new.add_argument("--json", default="", help="write the session artifact here")
+    new.add_argument("--no-ai", action="store_true",
+                     help="build the config from the page alone — no model, no key")
 
     adp = sub.add_parser(
         "adapter", help="generate + validate a Python adapter for a hard site")

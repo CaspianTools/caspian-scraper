@@ -18,25 +18,26 @@ from .openai import OpenAIProvider
 PROVIDERS = ("anthropic", "openai", "gemini", "openai_compatible")
 
 DEFAULT_MODELS = {
-    "anthropic": "claude-opus-4-8",
-    "openai": "gpt-4o",
-    "gemini": "gemini-2.5-pro",
+    "anthropic": "claude-opus-5-5",
+    "openai": "gpt-6.1-sol",
+    "gemini": "gemini-4-argon",
     "openai_compatible": "",
 }
 
 # Suggested models per provider for the UI (users may type any model too).
+# Checked Oct 2026 against each provider's model list. Mirrored in
+# web/components/settings/KeySettings.tsx (MODELS).
 MODEL_CATALOG = {
     "anthropic": [
-        "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5",
+        "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1",
     ],
     "openai": [
-        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini", "o3",
+        "gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna",
     ],
     "gemini": [
-        # gemini-1.5-* were retired (shut down Sept 2025). 2.5 is GA (valid to
-        # ~Oct 2026); 3.x is the current generation. Verified vs ai.google.dev.
-        "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.5-flash",
-        "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-3.1-pro-preview",
+        # 2.5 is limited to past users and 3-pro-preview is shut down.
+        "gemini-4-argon", "gemini-3.8-flash", "gemini-3.6-flash",
+        "gemini-3.5-flash-lite", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite",
     ],
     "openai_compatible": [],
 }

@@ -12,7 +12,7 @@ import type { ResourceRow } from "@/lib/firestore/resources";
  * the search, then returns one list of companies.
  *
  *   useFinder()      search state + actions (search, browse, bulk actions);
- *                    the last results are kept in this browser
+ *                    the last results are kept in this browser (persist)
  *   <FinderForm>     the search controls (fits a sidebar)
  *   <FinderResults>  the findings — filters, sort, bulk actions, cards / rows
  */
@@ -104,7 +104,14 @@ interface Job {
   resource_ids?: string[];
 }
 
-export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {}) {
+export function useFinder({
+  defaultQuery = "",
+  persist = true,
+}: {
+  defaultQuery?: string;
+  /** Keep the last search in this browser (off for the DB page's browse). */
+  persist?: boolean;
+} = {}) {
   const [query, setQuery] = useState(defaultQuery);
   const [countries, setCountries] = useState<string[]>([]);
   const [useWeb, setUseWeb] = useState(true);
@@ -119,6 +126,7 @@ export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {})
   // Keep the last search (words, countries, results) in this browser, so
   // leaving the page or reloading doesn't start over.
   useEffect(() => {
+    if (!persist) return;
     try {
       const raw = localStorage.getItem(LAST_KEY);
       if (raw) {
@@ -134,15 +142,15 @@ export function useFinder({ defaultQuery = "" }: { defaultQuery?: string } = {})
       /* storage unavailable or old format — start empty */
     }
     restored.current = true;
-  }, [defaultQuery]);
+  }, [defaultQuery, persist]);
   useEffect(() => {
-    if (!restored.current) return;
+    if (!persist || !restored.current) return;
     try {
       localStorage.setItem(LAST_KEY, JSON.stringify({ query, countries, useWeb, result }));
     } catch {
       /* quota exceeded — keeping results is a convenience only */
     }
-  }, [query, countries, useWeb, result]);
+  }, [persist, query, countries, useWeb, result]);
 
   const all = useMemo(() => result?.findings ?? [], [result]);
 
@@ -630,7 +638,7 @@ export function FinderResults({
       )}
 
       {/* Bulk actions */}
-      <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-50/90 dark:bg-black/80 backdrop-blur flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="sticky top-14 z-10 -mx-1 px-1 py-2 bg-zinc-50/90 dark:bg-black/80 backdrop-blur flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800">
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"

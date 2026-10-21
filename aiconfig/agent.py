@@ -274,6 +274,7 @@ def run_agent(
             "role": "assistant",
             "text": resp.text,
             "tool_calls": resp.tool_calls,
+            "raw": getattr(resp, "raw_content", None),
         })
         if resp.text:
             emit("proposing_config", resp.text[:500])

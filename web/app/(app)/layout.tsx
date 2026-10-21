@@ -1,15 +1,17 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { SideRail } from "@/components/shell/SideRail";
+import { AppHeader } from "@/components/shell/AppHeader";
 import { QuickAddProvider } from "@/components/quick-add/QuickAddProvider";
 
 export const dynamic = "force-dynamic";
 
 /**
  * App route-group layout. Every page under app/(app)/ inherits this: the
- * session (always the local one — see lib/auth/session.ts) and the
- * full-height SideRail on the left. Pages fill the rest of the width, usually
- * via <SidebarLayout> (page sidebar + main area) or <FullWidth>.
+ * session (always the local one — see lib/auth/session.ts), the
+ * full-height SideRail on the left and the AppHeader (h-14, with Quick add)
+ * across the top. Pages fill the rest, usually via <SidebarLayout> (page
+ * sidebar + main area) or <FullWidth>.
  *
  * The parentheses in "(app)" make this a Next.js route group — the
  * folder doesn't appear in URLs.
@@ -26,7 +28,10 @@ export default async function AuthedLayout({
     <QuickAddProvider>
       <div className="min-h-screen flex bg-zinc-50 dark:bg-black">
         <SideRail />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0">
+          <AppHeader />
+          {children}
+        </div>
       </div>
     </QuickAddProvider>
   );

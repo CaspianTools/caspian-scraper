@@ -46,7 +46,7 @@ class GeminiProvider:
         if not api_key:
             raise ProviderError("Gemini provider needs an API key")
         self.api_key = api_key
-        self.model = model or "gemini-2.5-pro"
+        self.model = model or "gemini-4-argon"
         self.base = base_url.rstrip("/") if base_url else DEFAULT_BASE
 
     def _contents(self, history: list[dict]) -> list[dict]:

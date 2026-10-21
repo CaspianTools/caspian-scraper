@@ -15,7 +15,7 @@ class AnthropicProvider:
         if not api_key:
             raise ProviderError("Anthropic provider needs an API key")
         self.api_key = api_key
-        self.model = model or "claude-opus-4-8"
+        self.model = model or "claude-opus-5-5"
         self.url = base_url.rstrip("/") + "/v1/messages" if base_url else API_URL
 
     def _messages(self, history: list[dict]) -> list[dict]:
@@ -25,6 +25,11 @@ class AnthropicProvider:
             if role == "user":
                 out.append({"role": "user", "content": item.get("text", "")})
             elif role == "assistant":
+                if item.get("raw"):
+                    # The response's own blocks, thinking included — current
+                    # models expect them back unchanged.
+                    out.append({"role": "assistant", "content": item["raw"]})
+                    continue
                 content: list[dict] = []
                 if item.get("text"):
                     content.append({"type": "text", "text": item["text"]})
@@ -52,7 +57,7 @@ class AnthropicProvider:
 
     def complete(
         self, *, system: str, tools: list[dict], history: list[dict],
-        max_tokens: int = 4096,
+        max_tokens: int = 16000,
     ) -> LLMResponse:
         body: dict = {
             "model": self.model,
@@ -81,6 +86,13 @@ class AnthropicProvider:
             },
             body,
         )
+        raw_stop = data.get("stop_reason")
+        if raw_stop == "refusal":
+            details = data.get("stop_details") or {}
+            raise ProviderError(
+                "the model declined this request"
+                + (f" ({details.get('category')})" if details.get("category") else "")
+            )
         text_parts: list[str] = []
         calls: list[ToolCall] = []
         for block in data.get("content", []) or []:
@@ -99,7 +111,6 @@ class AnthropicProvider:
             usage.get("cache_read_input_tokens") or 0
         ) + int(usage.get("cache_creation_input_tokens") or 0)
         out_tok = int(usage.get("output_tokens") or 0)
-        raw_stop = data.get("stop_reason")
         stop = (
             "tool_calls" if calls
             else "length" if raw_stop == "max_tokens"
@@ -111,4 +122,5 @@ class AnthropicProvider:
             stop_reason=stop,
             usage=usage,
             cost_usd=estimate_cost(self.name, self.model, in_tok, out_tok),
+            raw_content=[b for b in data.get("content", []) or [] if isinstance(b, dict)] or None,
         )

@@ -260,3 +260,44 @@ def test_estimate_cost():
     assert estimate_cost("anthropic", "claude-opus-4-8", 1_000_000, 1_000_000) > 0
     assert estimate_cost("openai", "gpt-4o", 0, 0) == 0
     assert estimate_cost("gemini", "gemini-2.5-flash", 1_000_000, 0) > 0
+
+
+def test_anthropic_replays_raw_blocks_and_flags_refusal(monkeypatch):
+    blocks = [
+        {"type": "thinking", "thinking": "", "signature": "sig"},
+        {"type": "tool_use", "id": "a1", "name": "run_preview", "input": {}},
+    ]
+    cap = _patch(monkeypatch, anthropic_mod, {
+        "content": blocks, "stop_reason": "tool_use", "usage": {},
+    })
+    p = anthropic_mod.AnthropicProvider("k", "claude-opus-5-5")
+    out = p.complete(system="s", tools=[], history=[{"role": "user", "text": "hi"}])
+    assert out.raw_content == blocks
+    # Next turn sends the blocks back unchanged (thinking included).
+    p.complete(system="s", tools=[], history=[
+        {"role": "user", "text": "hi"},
+        {"role": "assistant", "text": "", "tool_calls": out.tool_calls, "raw": out.raw_content},
+        {"role": "tool", "results": [{"id": "a1", "name": "run_preview", "content": "{}"}]},
+    ])
+    assert cap["body"]["messages"][1]["content"] == blocks
+
+    _patch(monkeypatch, anthropic_mod, {
+        "content": [], "stop_reason": "refusal",
+        "stop_details": {"type": "refusal", "category": "cyber"}, "usage": {},
+    })
+    try:
+        p.complete(system="s", tools=[], history=[{"role": "user", "text": "hi"}])
+    except ProviderError as e:
+        assert "cyber" in str(e)
+    else:
+        raise AssertionError("refusal should raise ProviderError")
+
+
+def test_new_models_priced_and_reasoning_quirks():
+    from aiconfig.providers.base import estimate_cost
+
+    assert estimate_cost("anthropic", "claude-opus-5-5", 1_000_000, 0) == 4.0
+    assert estimate_cost("anthropic", "claude-haiku-5-5", 0, 1_000_000) == 0.5
+    assert estimate_cost("openai", "gpt-6-luna", 1_000_000, 0) == 0.10
+    assert estimate_cost("gemini", "gemini-3.8-flash", 1_000_000, 0) == 0.75
+    assert "gpt-6" in openai_mod._REASONING_PREFIXES

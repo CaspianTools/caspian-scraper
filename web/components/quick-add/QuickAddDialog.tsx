@@ -15,7 +15,7 @@ import { authedFetch } from "@/lib/firebase/clientFetch";
 import { useRouter } from "next/navigation";
 
 const TITLES: Record<string, string> = {
-  list: "Create new",
+  list: "Quick add",
   picker: "Pick a job",
   "form:project": "New job",
   "form:source": "Add source",
@@ -66,7 +66,7 @@ export function QuickAddDialog() {
     state.view === "form" && state.kind
       ? `form:${state.kind}`
       : state.view;
-  const title = TITLES[titleKey] ?? "Create new";
+  const title = TITLES[titleKey] ?? "Quick add";
 
   return createPortal(
     <div

@@ -8,7 +8,7 @@ No SDKs: everything is raw `requests`, matching classifieds/ai.py.
 
 Neutral history item shapes (list of dicts):
   {"role": "user", "text": str}
-  {"role": "assistant", "text": str, "tool_calls": [ToolCall, ...]}
+  {"role": "assistant", "text": str, "tool_calls": [ToolCall, ...], "raw": list | None}
   {"role": "tool", "results": [{"id": str, "name": str, "content": str}, ...]}
 """
 
@@ -39,6 +39,9 @@ class LLMResponse:
     stop_reason: str = "stop"
     usage: dict = field(default_factory=dict)
     cost_usd: float = 0.0
+    # Provider-native assistant content to replay verbatim next turn (Anthropic:
+    # thinking blocks must go back unchanged). None = rebuild from text/tool_calls.
+    raw_content: list | None = None
 
 
 def http_post_json(url: str, headers: dict, body: dict, *, timeout: int = 180) -> dict:
@@ -74,28 +77,36 @@ def http_post_json(url: str, headers: dict, body: dict, *, timeout: int = 180) -
 # are estimates for a soft hard-stop, not billing.
 _PRICING: dict[str, dict[str, tuple[float, float]]] = {
     "anthropic": {
+        "claude-fable": (10.0, 50.0),
+        "claude-opus-5-5": (4.0, 20.0),
         "claude-opus": (5.0, 25.0),
+        "claude-sonnet-5": (2.0, 10.0),
         "claude-sonnet": (3.0, 15.0),
+        "claude-haiku-5-5": (0.10, 0.50),
         "claude-haiku": (1.0, 5.0),
-        "_default": (3.0, 15.0),
+        "_default": (4.0, 20.0),
     },
     "openai": {
+        "gpt-6-astra": (10.0, 50.0),
+        "gpt-6.1-sol": (2.0, 10.0),
+        "gpt-6-luna": (0.10, 0.50),
         "gpt-4o-mini": (0.15, 0.60),
         "gpt-4o": (2.5, 10.0),
         "gpt-4.1-mini": (0.4, 1.6),
         "gpt-4.1": (2.0, 8.0),
-        "o4": (10.0, 40.0),
-        "o3": (10.0, 40.0),
-        "o1": (15.0, 60.0),
-        "_default": (2.0, 8.0),
+        "_default": (2.0, 10.0),
     },
     "gemini": {
+        "gemini-4-argon": (2.0, 10.0),
+        "gemini-3.8-flash": (0.75, 3.75),
+        "gemini-3.6-flash": (0.75, 3.75),
+        "gemini-3.5-flash-lite": (0.30, 2.5),
+        "gemini-3.1-pro": (2.0, 12.0),
+        "gemini-3.1-flash-lite": (0.25, 1.5),
         "gemini-2.5-pro": (1.25, 10.0),
         "gemini-2.5-flash": (0.30, 2.5),
         "gemini-2.5-flash-lite": (0.10, 0.40),
-        # Newer 3.x models fall through to _default (a conservative estimate for
-        # the soft budget guard only — 1.5-* are retired).
-        "_default": (1.0, 5.0),
+        "_default": (2.0, 10.0),
     },
 }
 

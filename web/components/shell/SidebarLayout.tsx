@@ -2,7 +2,8 @@ import Link from "next/link";
 
 /**
  * Full-width page body: a sidebar (page controls — section nav, filters,
- * search form) next to the app's SideRail, and the main content area. Plain
+ * search form) next to the app's SideRail, and the main content area. The
+ * sidebar sticks below the AppHeader (h-14). Plain
  * component (no hooks), so server and client pages can both use it. On narrow
  * screens the sidebar stacks above the content.
  */
@@ -14,8 +15,8 @@ export function SidebarLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col md:flex-row min-h-screen">
-      <aside className="md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-3.5rem)]">
+      <aside className="md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 md:sticky md:top-14 md:h-[calc(100vh-3.5rem)] md:overflow-y-auto">
         <div className="p-5 space-y-6">{sidebar}</div>
       </aside>
       <main className="flex-1 min-w-0 px-6 lg:px-8 py-6 space-y-6">{children}</main>

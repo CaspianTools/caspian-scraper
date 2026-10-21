@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 
@@ -49,7 +50,7 @@ const TERMINAL: Record<string, boolean> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued — waiting for the agent",
+  queued: "Queued — starting up",
   inspecting: "Inspecting the page",
   proposing_config: "Proposing a config",
   previewing: "Previewing extraction",
@@ -66,6 +67,10 @@ export function ConfigWizard() {
   const [url, setUrl] = useState("");
   const [sampleUrls, setSampleUrls] = useState("");
   const [recordSchemaHint, setRecordSchemaHint] = useState("");
+  // Off by default: the config is built from the page itself — free, no key.
+  const [useAi, setUseAi] = useState(false);
+  // Whether an AI key is saved in Settings (checked when Use AI is turned on).
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<JobDoc | null>(null);
@@ -116,6 +121,19 @@ export function ConfigWizard() {
     };
   }, [jobId]);
 
+  async function toggleAi(next: boolean) {
+    setUseAi(next);
+    if (!next || hasKey !== null) return;
+    try {
+      const res = await authedFetch("/api/aiconfig/key");
+      const b = await res.json().catch(() => ({}));
+      // A 403 means the owner manages the key — assume it's there.
+      setHasKey(res.ok ? Boolean(b.configured) : true);
+    } catch {
+      setHasKey(true);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrors([]);
@@ -132,6 +150,7 @@ export function ConfigWizard() {
           url,
           sample_urls,
           record_schema_hint: recordSchemaHint,
+          use_ai: useAi,
         }),
       });
       if (!res.ok) {
@@ -205,6 +224,7 @@ export function ConfigWizard() {
     setUrl("");
     setSampleUrls("");
     setRecordSchemaHint("");
+    setUseAi(false);
   }
 
   const errFor = (field: string) =>
@@ -281,6 +301,8 @@ export function ConfigWizard() {
           />
         </Row>
 
+        <UseAiToggle checked={useAi} onChange={toggleAi} hasKey={hasKey} />
+
         {generalErrors.map((e, i) => (
           <p key={i} className="text-sm text-red-600">
             {e.message}
@@ -290,10 +312,10 @@ export function ConfigWizard() {
         <div className="flex justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800">
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || (useAi && hasKey === false)}
             className="inline-flex items-center h-10 px-4 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
-            {busy ? "Starting…" : "Start wizard"}
+            {busy ? "Starting…" : useAi ? "Start with AI" : "Start"}
           </button>
         </div>
       </form>
@@ -320,7 +342,7 @@ export function ConfigWizard() {
         </div>
       )}
 
-      <Transcript turns={job?.turns ?? []} working={working} />
+      <Transcript turns={job?.turns ?? []} working={working} withAi={useAi} />
 
       {job?.proposed_config != null && (
         <Section title="Proposed config">
@@ -426,15 +448,17 @@ function StatusBar({ status, working }: { status: string; working: boolean }) {
 function Transcript({
   turns,
   working,
+  withAi,
 }: {
   turns: JobTurn[];
   working: boolean;
+  withAi: boolean;
 }) {
   return (
-    <Section title="Conversation">
+    <Section title={withAi ? "Conversation" : "Progress"}>
       {turns.length === 0 ? (
         <p className="text-sm text-zinc-500">
-          {working ? "The agent is starting up…" : "No messages yet."}
+          {working ? (withAi ? "The agent is starting up…" : "Opening the page…") : "No messages yet."}
         </p>
       ) : (
         <div className="space-y-3">
@@ -568,6 +592,58 @@ function Diagnostics({
         )}
       </dl>
     </Section>
+  );
+}
+
+function UseAiToggle({
+  checked,
+  onChange,
+  hasKey,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  hasKey: boolean | null;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-2">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label="Use AI"
+          onClick={() => onChange(!checked)}
+          className={
+            "relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors " +
+            (checked ? "bg-black dark:bg-white" : "bg-zinc-300 dark:bg-zinc-700")
+          }
+        >
+          <span
+            className={
+              "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white dark:bg-zinc-950 transition-transform " +
+              (checked ? "translate-x-4" : "")
+            }
+          />
+        </button>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Use AI</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {checked
+              ? "An AI model inspects the site, writes the config and checks it with live previews. Uses your provider key and is billed by the provider."
+              : "Off: the item links and fields are found automatically from the page — free, no key. Turn on for sites this can't handle."}
+          </p>
+        </div>
+      </div>
+      {checked && hasKey === false && (
+        <p className="text-xs rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 px-3 py-2">
+          No AI key yet —{" "}
+          <Link href="/settings" className="underline">
+            add one in Settings
+          </Link>
+          , or turn Use AI off.
+        </p>
+      )}
+    </div>
   );
 }
 

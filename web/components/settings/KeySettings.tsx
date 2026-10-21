@@ -34,17 +34,19 @@ const PROVIDERS: { id: string; label: string }[] = [
   { id: "openai_compatible", label: "OpenAI-compatible (custom endpoint)" },
 ];
 
-// Suggested models per provider — free text is allowed too (datalist).
+// Suggested models per provider, best default first — free text is allowed
+// too (datalist). Checked Oct 2026 against each provider's model list;
+// mirrored in aiconfig/providers/__init__.py (MODEL_CATALOG).
 const MODELS: Record<string, string[]> = {
-  anthropic: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "o4-mini", "o3"],
+  anthropic: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"],
+  openai: ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna"],
   gemini: [
-    "gemini-3.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-2.5-flash-lite",
+    "gemini-4-argon",
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
   ],
   openai_compatible: [],
 };
@@ -82,9 +84,9 @@ function KeyLocked() {
     <section className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 space-y-2">
       <h3 className="text-sm font-semibold tracking-tight">AI provider &amp; key</h3>
       <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xl">
-        The AI setup agent runs on a provider key managed by the workspace
-        owner. You can use the agent normally — you just can&apos;t view or
-        change the key itself.
+        Scrapes with <strong>Use AI</strong>{" "}on run on a provider key managed
+        by the workspace owner. You can use them normally — you just can&apos;t
+        view or change the key itself.
       </p>
       <p className="text-xs text-zinc-500">
         Need it pointed at a different provider or model? Ask the workspace
@@ -204,7 +206,7 @@ function KeyForm() {
   }
 
   async function handleRemove() {
-    if (!confirm("Remove the stored key? The AI setup agent will stop working until you set a new one.")) {
+    if (!confirm("Remove the stored key? Scrapes with Use AI on will fail until you set a new one.")) {
       return;
     }
     setErrors([]);
@@ -244,9 +246,11 @@ function KeyForm() {
       <div>
         <h3 className="text-sm font-semibold tracking-tight">AI provider &amp; key</h3>
         <p className="text-xs text-zinc-500 mt-1 max-w-xl">
-          Choose the model provider the AI setup agent uses. The key is stored{" "}
-          <strong>write-only</strong> — encrypted at rest and never returned to the
-          browser, so it can&apos;t be shown again after you save it.
+          The model used by scrapes that have <strong>Use AI</strong>{" "}on (it&apos;s
+          off by default, and nothing else in the app needs a key). The key is stored{" "}
+          <strong>write-only</strong>{" "}in <code>local-data/</code>{" "}on this computer (never
+          committed) and never returned to the browser, so it can&apos;t be shown again
+          after you save it.
         </p>
       </div>
 
@@ -354,7 +358,7 @@ function KeyForm() {
             {state?.configured ? "Replace API key" : "API key"}
           </label>
           <p className="text-xs text-zinc-500 mb-2">
-            {KEY_HINTS[provider]} — paste once; it won&apos;t be displayed again.
+            {KEY_HINTS[provider]}{" "}— paste once; it won&apos;t be displayed again.
           </p>
           <input
             id="ai-key"
