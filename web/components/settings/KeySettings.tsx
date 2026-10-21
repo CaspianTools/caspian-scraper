@@ -31,6 +31,7 @@ const PROVIDERS: { id: string; label: string }[] = [
   { id: "anthropic", label: "Anthropic (Claude)" },
   { id: "openai", label: "OpenAI (GPT)" },
   { id: "gemini", label: "Google (Gemini)" },
+  { id: "kimi", label: "Kimi (Moonshot AI)" },
   { id: "openai_compatible", label: "OpenAI-compatible (custom endpoint)" },
 ];
 
@@ -48,6 +49,7 @@ const MODELS: Record<string, string[]> = {
     "gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite",
   ],
+  kimi: ["kimi-k3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k2.7-code-highspeed"],
   openai_compatible: [],
 };
 
@@ -55,6 +57,7 @@ const KEY_HINTS: Record<string, string> = {
   anthropic: "Anthropic key (starts with sk-ant-) — console.anthropic.com",
   openai: "OpenAI key (starts with sk-) — platform.openai.com",
   gemini: "Google AI Studio key (starts with AIza) — aistudio.google.com",
+  kimi: "Kimi Open Platform key (starts with sk-) — platform.kimi.ai",
   openai_compatible: "API key for your endpoint (OpenRouter, Groq, DeepSeek, local vLLM/Ollama, …)",
 };
 

@@ -20,10 +20,14 @@ _REASONING_PREFIXES = ("o1", "o3", "o4", "o5", "gpt-5", "gpt-6")
 
 class OpenAIProvider:
     name = "openai"
+    DEFAULT_MAX_TOKENS = 4096
+    # Send each assistant message back exactly as received (subclasses whose
+    # API needs fields beyond content/tool_calls, e.g. Kimi's reasoning_content).
+    REPLAY_RAW = False
 
     def __init__(self, api_key: str, model: str, *, base_url: str = "") -> None:
         if not api_key:
-            raise ProviderError("OpenAI provider needs an API key")
+            raise ProviderError(f"{type(self).__name__.removesuffix('Provider')} provider needs an API key")
         self.api_key = api_key
         self.model = model or "gpt-6.1-sol"
         self.base = (base_url.rstrip("/") if base_url else DEFAULT_BASE)
@@ -38,6 +42,9 @@ class OpenAIProvider:
             if role == "user":
                 out.append({"role": "user", "content": item.get("text", "")})
             elif role == "assistant":
+                if self.REPLAY_RAW and item.get("raw"):
+                    out.append(item["raw"][0])
+                    continue
                 calls = item.get("tool_calls", [])
                 # OpenAI requires content to be a non-null string UNLESS
                 # tool_calls are present. An empty assistant turn (no text, no
@@ -66,15 +73,24 @@ class OpenAIProvider:
                     })
         return out
 
+    def _uses_completion_tokens(self) -> bool:
+        return self._is_openai and self.model.startswith(_REASONING_PREFIXES)
+
+    def _extra_body(self) -> dict:
+        """Provider-specific top-level request fields."""
+        return {}
+
     def complete(
         self, *, system: str, tools: list[dict], history: list[dict],
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
+        max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
         body: dict = {
             "model": self.model,
             "messages": self._messages(system, history),
+            **self._extra_body(),
         }
-        if self._is_openai and self.model.startswith(_REASONING_PREFIXES):
+        if self._uses_completion_tokens():
             body["max_completion_tokens"] = max_tokens
         else:
             body["max_tokens"] = max_tokens
@@ -129,4 +145,5 @@ class OpenAIProvider:
             stop_reason=stop,
             usage=usage,
             cost_usd=estimate_cost(self.name, self.model, in_tok, out_tok),
+            raw_content=[msg] if msg else None,
         )

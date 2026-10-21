@@ -1,7 +1,7 @@
 """Multi-provider LLM layer for the config agent.
 
-Pick a provider (Anthropic / OpenAI / Google Gemini, or any OpenAI-compatible
-endpoint via base_url) and a model; the agent is provider-agnostic. No SDKs —
+Pick a provider (Anthropic / OpenAI / Google Gemini / Kimi, or any
+OpenAI-compatible endpoint via base_url) and a model; the agent is provider-agnostic. No SDKs —
 every adapter is raw `requests`.
 """
 
@@ -12,15 +12,17 @@ import os
 from .anthropic import AnthropicProvider
 from .base import LLMResponse, ProviderError, ToolCall  # noqa: F401 — re-export
 from .gemini import GeminiProvider
+from .kimi import KimiProvider
 from .openai import OpenAIProvider
 
 # Canonical provider ids. "openai_compatible" is the OpenAI adapter + base_url.
-PROVIDERS = ("anthropic", "openai", "gemini", "openai_compatible")
+PROVIDERS = ("anthropic", "openai", "gemini", "kimi", "openai_compatible")
 
 DEFAULT_MODELS = {
     "anthropic": "claude-opus-5-5",
     "openai": "gpt-6.1-sol",
     "gemini": "gemini-4-argon",
+    "kimi": "kimi-k3",
     "openai_compatible": "",
 }
 
@@ -39,6 +41,10 @@ MODEL_CATALOG = {
         "gemini-4-argon", "gemini-3.8-flash", "gemini-3.6-flash",
         "gemini-3.5-flash-lite", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite",
     ],
+    "kimi": [
+        # kimi-k2.5 and moonshot-v1-* were discontinued Aug 31 2026.
+        "kimi-k3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k2.7-code-highspeed",
+    ],
     "openai_compatible": [],
 }
 
@@ -49,6 +55,8 @@ def _canon(provider: str) -> str:
         return "openai_compatible"
     if p == "google":
         return "gemini"
+    if p in ("moonshot", "moonshot_ai"):
+        return "kimi"
     return p
 
 
@@ -69,6 +77,8 @@ def build_provider(
         return OpenAIProvider(api_key, model, base_url=base_url)
     if p == "gemini":
         return GeminiProvider(api_key, model, base_url=base_url)
+    if p == "kimi":
+        return KimiProvider(api_key, model, base_url=base_url)
     raise ProviderError(f"unknown provider {provider!r}")
 
 
@@ -77,6 +87,8 @@ def key_env_for(provider: str) -> str:
     p = _canon(provider)
     if p == "gemini":
         return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+    if p == "kimi":
+        return os.environ.get("MOONSHOT_API_KEY") or os.environ.get("KIMI_API_KEY") or ""
     if p in ("openai", "openai_compatible"):
         return os.environ.get("OPENAI_API_KEY") or os.environ.get("AICONFIG_API_KEY") or ""
     # anthropic (default) — reuse the classifieds convention

@@ -717,13 +717,15 @@ export type ConfigJobDoc = z.infer<typeof ConfigJobDocSchema>;
 // ---------------------------------------------------------------------------
 // Per-user AI provider + key (/aiconfig_keys/{uid}) — write-only, admin-SDK
 // only. Mirrored in aiconfig/providers (Python). The agent supports Anthropic,
-// OpenAI, Google Gemini, or any OpenAI-compatible endpoint (base_url).
+// OpenAI, Google Gemini, Kimi (Moonshot AI), or any OpenAI-compatible endpoint
+// (base_url).
 // ---------------------------------------------------------------------------
 
 export const AiProvider = z.enum([
   "anthropic",
   "openai",
   "gemini",
+  "kimi",
   "openai_compatible",
 ]);
 export type AiProvider = z.infer<typeof AiProvider>;

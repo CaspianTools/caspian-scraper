@@ -96,6 +96,11 @@ _PRICING: dict[str, dict[str, tuple[float, float]]] = {
         "gpt-4.1": (2.0, 8.0),
         "_default": (2.0, 10.0),
     },
+    # Kimi's pricing page publishes no readable rates (checked Oct 2026), so
+    # this is a deliberately high estimate: the guard stops early, not late.
+    "kimi": {
+        "_default": (2.0, 10.0),
+    },
     "gemini": {
         "gemini-4-argon": (2.0, 10.0),
         "gemini-3.8-flash": (0.75, 3.75),

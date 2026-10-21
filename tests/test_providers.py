@@ -16,6 +16,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 import aiconfig.providers.anthropic as anthropic_mod  # noqa: E402
 import aiconfig.providers.gemini as gemini_mod  # noqa: E402
+import aiconfig.providers.kimi as kimi_mod  # noqa: E402
 import aiconfig.providers.openai as openai_mod  # noqa: E402
 from aiconfig.providers import build_provider  # noqa: E402
 from aiconfig.providers.base import (  # noqa: E402
@@ -301,3 +302,59 @@ def test_new_models_priced_and_reasoning_quirks():
     assert estimate_cost("openai", "gpt-6-luna", 1_000_000, 0) == 0.10
     assert estimate_cost("gemini", "gemini-3.8-flash", 1_000_000, 0) == 0.75
     assert "gpt-6" in openai_mod._REASONING_PREFIXES
+
+
+# ---------- Kimi (Moonshot AI) ----------
+
+def test_kimi_request_shape_and_raw_replay(monkeypatch):
+    # The OpenAI adapter's HTTP call is what Kimi uses under the hood.
+    msg = {
+        "role": "assistant", "content": "", "reasoning_content": "thinking…",
+        "tool_calls": [{"id": "c1", "type": "function",
+                        "function": {"name": "run_preview", "arguments": "{}"}}],
+    }
+    cap = _patch(monkeypatch, openai_mod, {
+        "choices": [{"message": msg, "finish_reason": "tool_calls"}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+    })
+    p = build_provider("moonshot", api_key="k")
+    assert isinstance(p, kimi_mod.KimiProvider) and p.model == "kimi-k3"
+    out = p.complete(system="s", tools=TOOLSPEC, history=[{"role": "user", "text": "hi"}])
+    assert cap["url"] == "https://api.moonshot.ai/v1/chat/completions"
+    body = cap["body"]
+    assert body["max_completion_tokens"] == 32000 and "max_tokens" not in body
+    assert body["reasoning_effort"] == "high"
+    assert "temperature" not in body
+    assert out.tool_calls[0].name == "run_preview"
+
+    # Next turn sends the whole message back, reasoning_content included.
+    p.complete(system="s", tools=TOOLSPEC, history=[
+        {"role": "user", "text": "hi"},
+        {"role": "assistant", "text": "", "tool_calls": out.tool_calls, "raw": out.raw_content},
+        {"role": "tool", "results": [{"id": "c1", "name": "run_preview", "content": "{}"}]},
+    ])
+    assert cap["body"]["messages"][2] == msg
+
+
+def test_kimi_k2_skips_reasoning_effort_and_openai_does_not_replay_raw(monkeypatch):
+    cap = _patch(monkeypatch, openai_mod, {
+        "choices": [{"message": {"role": "assistant", "content": "ok"}}], "usage": {},
+    })
+    build_provider("kimi", api_key="k", model="kimi-k2.6").complete(
+        system="s", tools=[], history=[{"role": "user", "text": "hi"}])
+    assert "reasoning_effort" not in cap["body"]
+
+    raw = [{"role": "assistant", "content": "x", "annotations": []}]
+    openai_mod.OpenAIProvider("k", "gpt-4o").complete(system="s", tools=[], history=[
+        {"role": "user", "text": "hi"},
+        {"role": "assistant", "text": "x", "tool_calls": [], "raw": raw},
+    ])
+    assert cap["body"]["messages"][2] == {"role": "assistant", "content": "x"}
+
+
+def test_kimi_key_from_env(monkeypatch):
+    from aiconfig.providers import key_env_for
+
+    monkeypatch.delenv("MOONSHOT_API_KEY", raising=False)
+    monkeypatch.setenv("KIMI_API_KEY", "sk-kimi")
+    assert key_env_for("kimi") == "sk-kimi"

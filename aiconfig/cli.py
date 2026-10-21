@@ -83,7 +83,7 @@ def _cmd_new(args: argparse.Namespace) -> int:
     except ProviderError as e:
         print(
             f"{e}. Set the provider's key (OPENAI_API_KEY / GEMINI_API_KEY / "
-            "ANTHROPIC_API_KEY) or pass --api-key.",
+            "MOONSHOT_API_KEY / ANTHROPIC_API_KEY) or pass --api-key.",
             file=sys.stderr,
         )
         return 2
@@ -187,7 +187,7 @@ def _cmd_adapter(args: argparse.Namespace) -> int:
     except ProviderError as e:
         print(
             f"{e}. Set the provider's key (OPENAI_API_KEY / GEMINI_API_KEY / "
-            "ANTHROPIC_API_KEY) or pass --api-key.",
+            "MOONSHOT_API_KEY / ANTHROPIC_API_KEY) or pass --api-key.",
             file=sys.stderr,
         )
         return 2
@@ -469,7 +469,7 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="schedule cron (fixed minute; default hourly)")
     new.add_argument("--model", default="", help="model id (else provider default)")
     new.add_argument("--provider", default="",
-                     help="anthropic | openai | gemini | openai_compatible "
+                     help="anthropic | openai | gemini | kimi | openai_compatible "
                           "(default: anthropic or $AICONFIG_PROVIDER)")
     new.add_argument("--base-url", default="",
                      help="base URL for openai_compatible / custom endpoints")
@@ -494,7 +494,7 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="commit + push the branch and open a PR when green")
     adp.add_argument("--model", default="", help="model id (else provider default)")
     adp.add_argument("--provider", default="",
-                     help="anthropic | openai | gemini | openai_compatible")
+                     help="anthropic | openai | gemini | kimi | openai_compatible")
     adp.add_argument("--base-url", default="",
                      help="base URL for openai_compatible / custom endpoints")
     adp.add_argument("--api-key", default="",
