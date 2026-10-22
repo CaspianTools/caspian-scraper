@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "https://sminstitut.org/az-main.html",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:06:56.406Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "Institute of Political Management",
+  "notes": "No careers page found yet - this is the company website. Found via Wikidata.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:06:56.406Z"
+  },
+  "website": "https://sminstitut.org/az-main.html"
+}

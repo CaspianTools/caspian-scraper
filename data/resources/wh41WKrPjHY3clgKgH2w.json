@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "http://www.seismology.az/",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:17:28.890Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "Republican Seismic Survey Center of Azerbaijan National Academy of Sciences",
+  "notes": "No careers page found yet - this is the company website. Found via Wikidata.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:17:28.890Z"
+  },
+  "website": "http://www.seismology.az/"
+}

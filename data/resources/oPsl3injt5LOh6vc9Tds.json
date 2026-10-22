@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "https://ingress.academy/vacancies/",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:17:27.712Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "Ingress Academy",
+  "notes": "Found via Google Maps.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:17:27.712Z"
+  },
+  "website": "https://ingress.academy/"
+}

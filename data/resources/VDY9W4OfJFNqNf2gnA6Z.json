@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "http://www.arxeologiya.az/",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:17:28.915Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "Institute of Archaeology and Anthropology of Azerbaijan",
+  "notes": "No careers page found yet - this is the company website. Found via Wikidata.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:17:28.915Z"
+  },
+  "website": "http://www.arxeologiya.az/"
+}

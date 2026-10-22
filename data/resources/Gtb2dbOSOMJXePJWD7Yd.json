@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "http://ameanb.nakhchivan.az/?p=29",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:17:29.765Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "ameanb.nakhchivan.az",
+  "notes": "No careers page found yet - this is the company website. Found via Wikidata.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:17:29.765Z"
+  },
+  "website": "http://ameanb.nakhchivan.az/?p=29"
+}

@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "ats": "unknown",
+  "careers_url": "https://muradnovruzov.org",
+  "countries": [
+    "Azerbaijan"
+  ],
+  "created_at": {
+    "__ts": "2026-10-22T12:17:29.886Z"
+  },
+  "headquarters": "",
+  "kind": "employer",
+  "linkedin": "",
+  "name": "Murad Novruzov Biomedical Research",
+  "notes": "No careers page found yet - this is the company website. Found via Wikidata.",
+  "owner_uid": "local",
+  "segment": "",
+  "updated_at": {
+    "__ts": "2026-10-22T12:17:29.886Z"
+  },
+  "website": "https://muradnovruzov.org"
+}
