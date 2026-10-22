@@ -1,4 +1,4 @@
-# HSE scraper
+# Caspian Scraper
 
 > **Current setup — runs locally, no accounts.** Double-click **`Start.bat`**
 > to run a scrape and review what it found, or **`open-admin.bat`** to open the

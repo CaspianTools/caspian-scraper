@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { ResourcePicker } from "./ResourcePicker";
 
@@ -49,7 +49,7 @@ export function SharedResourcesPanel({
     setBusy(true);
     setError(null);
     try {
-      const res = await authedFetch(`/api/projects/${projectId}`, {
+      const res = await apiFetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         body: JSON.stringify({ resource_ids: ids }),
       });
@@ -80,7 +80,7 @@ export function SharedResourcesPanel({
     setBusy(true);
     setError(null);
     try {
-      const res = await authedFetch(`/api/projects/${projectId}/sources/promote`, {
+      const res = await apiFetch(`/api/projects/${projectId}/sources/promote`, {
         method: "POST",
       });
       const b = await res.json().catch(() => ({}));

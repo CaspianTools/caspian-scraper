@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface FieldErr {
   field?: string;
@@ -37,8 +37,8 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
     (async () => {
       try {
         const [secretsRes, destsRes] = await Promise.all([
-          authedFetch(`/api/projects/${projectId}/secrets`),
-          authedFetch(`/api/projects/${projectId}/destinations`),
+          apiFetch(`/api/projects/${projectId}/secrets`),
+          apiFetch(`/api/projects/${projectId}/destinations`),
         ]);
         if (!secretsRes.ok || !destsRes.ok) {
           setLoadError(
@@ -144,7 +144,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
 
     setBusy(true);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/secrets/${encodeURIComponent(resolvedName)}`,
         { method: "PUT", body: JSON.stringify({ value }) }
       );

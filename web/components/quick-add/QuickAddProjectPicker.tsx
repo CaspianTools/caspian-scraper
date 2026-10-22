@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { useQuickAdd } from "./QuickAddProvider";
 
 interface ProjectLite {
@@ -19,7 +19,7 @@ export function QuickAddProjectPicker() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch("/api/projects");
+        const res = await apiFetch("/api/projects");
         if (!res.ok) {
           setError(`Failed to load projects (${res.status})`);
           return;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { CAR_SITES, type CarSourceFormInitial } from "./carSourceFormDefaults";
 
 // Type-only re-export — erased at compile time, so safe across the
@@ -55,7 +55,7 @@ export function CarSourceForm({ projectId, initial, sourceId }: Props) {
       const url = isEdit
         ? `/api/cars/sources/${sourceId}`
         : "/api/cars/sources";
-      const res = await authedFetch(url, {
+      const res = await apiFetch(url, {
         method: isEdit ? "PATCH" : "POST",
         body,
       });
@@ -86,7 +86,7 @@ export function CarSourceForm({ projectId, initial, sourceId }: Props) {
     if (!sourceId) return;
     setBusy(true);
     try {
-      const res = await authedFetch(`/api/cars/sources/${sourceId}/run-now`, {
+      const res = await apiFetch(`/api/cars/sources/${sourceId}/run-now`, {
         method: "POST",
       });
       if (!res.ok) {
@@ -111,7 +111,7 @@ export function CarSourceForm({ projectId, initial, sourceId }: Props) {
       return;
     setDeleting(true);
     try {
-      const res = await authedFetch(`/api/cars/sources/${sourceId}`, {
+      const res = await apiFetch(`/api/cars/sources/${sourceId}`, {
         method: "DELETE",
       });
       if (!res.ok) {

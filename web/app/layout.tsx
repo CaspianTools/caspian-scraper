@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HSE Scraper",
-  description: "Dashboard and admin for the caspian-scraper HSE job pipeline",
+  title: "Caspian Scraper",
+  description: "Caspian Scraper: jobs that collect vacancies, listings, prices or any website data, and the databases they grow",
 };
 
 export default function RootLayout({

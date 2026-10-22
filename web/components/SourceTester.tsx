@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
   extractionJson: string;
@@ -63,7 +63,7 @@ export function SourceTester({ extractionJson, sampleUrl }: Props) {
       return;
     }
     try {
-      const res = await authedFetch("/api/comparison/sources/test", {
+      const res = await apiFetch("/api/comparison/sources/test", {
         method: "POST",
         body: JSON.stringify({ extraction, sample_url: sample }),
       });

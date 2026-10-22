@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface SourceCheck {
   name: string;
@@ -47,7 +47,7 @@ export function DryRunPanel({ projectId }: { projectId: string }) {
     setErr(null);
     setResult(null);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/dry-run`,
         { method: "POST" }
       );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { SchedulePicker } from "@/components/SchedulePicker";
 import { JobKindPicker } from "@/components/JobKindPicker";
 import { JOB_KIND_INFO, type JobKind } from "@/lib/jobKinds";
@@ -30,7 +30,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
     setErrors([]);
     setBusy(true);
     try {
-      const res = await authedFetch("/api/projects", {
+      const res = await apiFetch("/api/projects", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { DestinationFormInitial } from "./destinationFormDefaults";
 
 interface Props {
@@ -57,7 +57,7 @@ export function DestinationForm({
       const url = isEdit
         ? `/api/projects/${projectId}/destinations/${destId}`
         : `/api/projects/${projectId}/destinations`;
-      const res = await authedFetch(url, {
+      const res = await apiFetch(url, {
         method: isEdit ? "PATCH" : "POST",
         body,
       });
@@ -93,7 +93,7 @@ export function DestinationForm({
     if (!confirm(`Delete "${form.name}"?`)) return;
     setDeleting(true);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/destinations/${destId}`,
         { method: "DELETE" }
       );

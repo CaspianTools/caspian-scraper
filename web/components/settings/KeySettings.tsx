@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface FieldErr {
   field?: string;
@@ -125,7 +125,7 @@ function KeyForm() {
   async function load() {
     setLoading(true);
     try {
-      const res = await authedFetch("/api/aiconfig/key");
+      const res = await apiFetch("/api/aiconfig/key");
       const b = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);
@@ -149,7 +149,7 @@ function KeyForm() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch("/api/aiconfig/key");
+        const res = await apiFetch("/api/aiconfig/key");
         const b = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
@@ -187,7 +187,7 @@ function KeyForm() {
     setSavedMsg(null);
     setBusy(true);
     try {
-      const res = await authedFetch("/api/aiconfig/key", {
+      const res = await apiFetch("/api/aiconfig/key", {
         method: "PUT",
         body: JSON.stringify({ provider, model, base_url: baseUrl, value }),
       });
@@ -223,7 +223,7 @@ function KeyForm() {
     setSavedMsg(null);
     setRemoving(true);
     try {
-      const res = await authedFetch("/api/aiconfig/key", { method: "DELETE" });
+      const res = await apiFetch("/api/aiconfig/key", { method: "DELETE" });
       if (!res.ok) {
         const b = await res.json().catch(() => ({}));
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);

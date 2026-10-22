@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { SourceTester } from "./SourceTester";
 import type {
   ComparisonSourceFormInitial,
@@ -99,7 +99,7 @@ export function ComparisonSourceForm({ initial, projectId, sourceId }: Props) {
       const url = isEdit
         ? `/api/comparison/sources/${sourceId}`
         : "/api/comparison/sources";
-      const res = await authedFetch(url, {
+      const res = await apiFetch(url, {
         method: isEdit ? "PATCH" : "POST",
         body,
       });
@@ -130,7 +130,7 @@ export function ComparisonSourceForm({ initial, projectId, sourceId }: Props) {
     if (!sourceId) return;
     setBusy(true);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/comparison/sources/${sourceId}/run-now`,
         { method: "POST" }
       );
@@ -152,7 +152,7 @@ export function ComparisonSourceForm({ initial, projectId, sourceId }: Props) {
       return;
     setDeleting(true);
     try {
-      const res = await authedFetch(`/api/comparison/sources/${sourceId}`, {
+      const res = await apiFetch(`/api/comparison/sources/${sourceId}`, {
         method: "DELETE",
       });
       if (!res.ok) {

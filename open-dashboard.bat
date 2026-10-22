@@ -1,6 +1,6 @@
 @echo off
 setlocal
-rem Opens the HSE Scraper dashboard (docs/) on a local web server and goes
+rem Opens the Caspian Scraper dashboard (docs/) on a local web server and goes
 rem straight to the dashboard view - no GitHub token sign-in screen.
 rem Double-click to run. Close the minimized "dashboard server" window to stop it.
 
@@ -21,7 +21,7 @@ if not defined PY (
   exit /b 1
 )
 
-start "HSE Scraper dashboard server (close to stop)" /min %PY% -m http.server %PORT% --bind 127.0.0.1 --directory docs
+start "Caspian Scraper dashboard server (close to stop)" /min %PY% -m http.server %PORT% --bind 127.0.0.1 --directory docs
 
 rem Wait up to ~20s for the server to answer.
 set /a TRIES=0

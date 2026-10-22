@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CountrySelect } from "@/components/CountrySelect";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import {
   AiTagDialog, AutoTagSettings, SparkIcon,
@@ -85,6 +85,8 @@ function statusOf(f: Finding): StatusKey {
 }
 
 const PAGE = 60;
+/** Companies per careers-page request: small, so each is quick and saved. */
+const ENRICH_BATCH = 25;
 const LAST_KEY = "caspian.finder.last";
 
 const inputCls =
@@ -132,6 +134,7 @@ export function useFinder({
   const [result, setResult] = useState<DiscoverResult | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const restored = useRef(false);
+  const stopRef = useRef(false);
 
   // Keep the last search (words, countries, results) in this browser, so
   // leaving the page or reloading doesn't start over.
@@ -176,7 +179,7 @@ export function useFinder({
     setNotice(null);
     let found: DiscoverResult | null = null;
     try {
-      const res = await authedFetch("/api/resources/discover", { method: "POST", body: JSON.stringify(body) });
+      const res = await apiFetch("/api/resources/discover", { method: "POST", body: JSON.stringify(body) });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(b.error || `Search failed (${res.status})`);
@@ -232,19 +235,34 @@ export function useFinder({
   const browse = () => run({ browse: true });
 
   /** Find + check careers pages for the given findings; updates them in place. */
-  async function enrich(items: Finding[]): Promise<Map<string, Finding> | null> {
-    const res = await authedFetch("/api/resources/enrich", {
-      method: "POST",
-      body: JSON.stringify({ ids: items.map((f) => f.id).slice(0, 200) }),
-    });
-    const b = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(b.error || `Careers-page lookup failed (${res.status})`);
-      return null;
+  /** Find + check careers pages for the given findings, ENRICH_BATCH per
+   *  request so every batch is saved as it finishes and progress shows; updates
+   *  them in place. Stops early (keeping what's done) when stop() is called.
+   *  Returns the checked findings, or null if the first batch failed. */
+  async function enrich(items: Finding[], label = "Finding careers pages"): Promise<Map<string, Finding> | null> {
+    const found = new Map<string, Finding>();
+    stopRef.current = false;
+    for (let i = 0; i < items.length; i += ENRICH_BATCH) {
+      if (stopRef.current) break;
+      setProgress(`${label}… ${i} of ${items.length} checked`);
+      const res = await apiFetch("/api/resources/enrich", {
+        method: "POST",
+        body: JSON.stringify({ ids: items.slice(i, i + ENRICH_BATCH).map((f) => f.id) }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(b.error || `Careers-page lookup failed (${res.status})`);
+        return found.size > 0 ? found : null;
+      }
+      for (const f of b.findings as Finding[]) found.set(f.id, f);
+      patchFindings((f) => found.get(f.id) ?? f);
     }
-    const found = new Map<string, Finding>((b.findings as Finding[]).map((f) => [f.id, f]));
-    patchFindings((f) => found.get(f.id) ?? f);
     return found;
+  }
+
+  /** Stop a long batch job (careers pages) after the current batch. */
+  function stop() {
+    stopRef.current = true;
   }
 
   const selected = () => all.filter((f) => picked.has(f.id));
@@ -253,12 +271,16 @@ export function useFinder({
     const chosen = selected();
     setBusy("enrich");
     setError(null);
-    setProgress(`Finding careers pages for ${chosen.length}…`);
     try {
       const found = await enrich(chosen);
       if (found) {
         const n = [...found.values()].filter((f) => f.careers_url).length;
-        setNotice(`Careers pages found for ${n} of ${chosen.length}. Saved to the findings database.`);
+        const rest = chosen.length - found.size;
+        setNotice(
+          `Careers pages found for ${n} of ${found.size} checked.` +
+            (rest > 0 ? ` ${rest} not checked (stopped).` : "") +
+            " Saved to the database."
+        );
       }
     } finally {
       setBusy(null);
@@ -276,12 +298,11 @@ export function useFinder({
     const added: ResourceRow[] = [];
     const addedIds = new Set<string>();
     try {
-      setProgress(`Finding careers pages for ${chosen.length} compan${chosen.length === 1 ? "y" : "ies"}…`);
       const found = (await enrich(chosen.filter((f) => !f.checked))) ?? new Map<string, Finding>();
       for (const [i, f0] of chosen.entries()) {
         const f = found.get(f0.id) ?? f0;
         setProgress(`Adding ${i + 1} of ${chosen.length}…`);
-        const r = await authedFetch("/api/resources", {
+        const r = await apiFetch("/api/resources", {
           method: "POST",
           body: JSON.stringify({
             name: f.name.slice(0, 120),
@@ -318,7 +339,7 @@ export function useFinder({
       if (job && added.length > 0) {
         setProgress(`Attaching to ${job.name}…`);
         const ids = Array.from(new Set([...(job.resource_ids ?? []), ...added.map((a) => a.id)]));
-        const r = await authedFetch(`/api/projects/${job.id}`, {
+        const r = await apiFetch(`/api/projects/${job.id}`, {
           method: "PATCH",
           body: JSON.stringify({ resource_ids: ids }),
         });
@@ -344,7 +365,7 @@ export function useFinder({
     setBusy("hide");
     setError(null);
     try {
-      const res = await authedFetch("/api/resources/mark", {
+      const res = await apiFetch("/api/resources/mark", {
         method: "POST",
         body: JSON.stringify({ ids: chosen.map((f) => f.id), hidden }),
       });
@@ -374,7 +395,7 @@ export function useFinder({
     setBusy("tag");
     setError(null);
     try {
-      const res = await authedFetch("/api/resources/tag", {
+      const res = await apiFetch("/api/resources/tag", {
         method: "POST",
         body: JSON.stringify({ ids: chosen.map((f) => f.id), add, remove }),
       });
@@ -405,7 +426,7 @@ export function useFinder({
   return {
     query, setQuery, countries, setCountries, useWeb, setUseWeb,
     busy, progress, error, notice, setNotice, result, all, picked, setPicked, toggle,
-    search, browse, addPicked, findCareersPages, setHidden, retag, applyTagMap, selected,
+    search, browse, addPicked, findCareersPages, setHidden, retag, applyTagMap, selected, stop,
   };
 }
 
@@ -847,6 +868,11 @@ export function FinderResults({
       {(f.progress || f.notice) && (
         <p className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
           {f.progress || f.notice}
+          {f.progress && (f.busy === "enrich" || f.busy === "add") && (
+            <button type="button" className="underline text-zinc-500 hover:text-red-600" onClick={f.stop}>
+              Stop
+            </button>
+          )}
           {f.notice && !f.progress && (
             <button type="button" className="text-zinc-400 hover:text-zinc-700" onClick={() => f.setNotice(null)} aria-label="Dismiss">
               ×
@@ -1061,7 +1087,7 @@ function AddToJobMenu({ disabled, onPick }: { disabled: boolean; onPick: (job: J
     setOpen((v) => !v);
     if (jobs !== null) return;
     try {
-      const res = await authedFetch("/api/projects");
+      const res = await apiFetch("/api/projects");
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(b.error || String(res.status));
       setJobs((b.projects ?? []).map((p: Job) => ({ id: p.id, name: p.name, resource_ids: p.resource_ids })));

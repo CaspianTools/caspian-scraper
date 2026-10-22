@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 export interface SecretListItem {
   name: string;
@@ -52,7 +52,7 @@ export function SecretsManager({ projectId, secrets }: Props) {
 
     setBusy(true);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/secrets/${encodeURIComponent(
           overwriteName
         )}`,
@@ -94,7 +94,7 @@ export function SecretsManager({ projectId, secrets }: Props) {
     }
     setDeletingName(secretName);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/secrets/${encodeURIComponent(secretName)}`,
         { method: "DELETE" }
       );

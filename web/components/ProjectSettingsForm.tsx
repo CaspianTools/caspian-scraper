@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { SchedulePicker } from "@/components/SchedulePicker";
 import type { JobKind } from "@/lib/jobKinds";
 
@@ -41,7 +41,7 @@ export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
     setSuccess(null);
     setBusy(true);
     try {
-      const res = await authedFetch(`/api/projects/${projectId}`, {
+      const res = await apiFetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         body: JSON.stringify({
           name: name.trim(),
@@ -81,7 +81,7 @@ export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
     if (typed !== confirmText) return;
     setDeleting(true);
     try {
-      const res = await authedFetch(`/api/projects/${projectId}`, {
+      const res = await apiFetch(`/api/projects/${projectId}`, {
         method: "DELETE",
       });
       if (!res.ok) {

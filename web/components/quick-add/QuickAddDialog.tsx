@@ -11,7 +11,7 @@ import { SourceForm } from "@/components/SourceForm";
 import { DestinationForm } from "@/components/DestinationForm";
 import { emptySourceFormInitial } from "@/components/sourceFormDefaults";
 import { emptyDestinationFormInitial } from "@/components/destinationFormDefaults";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 const TITLES: Record<string, string> = {
@@ -232,7 +232,7 @@ function DialogDestinationForm({
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch(`/api/projects/${projectId}/secrets`);
+        const res = await apiFetch(`/api/projects/${projectId}/secrets`);
         if (!res.ok) {
           setError(`Failed to load secrets (${res.status})`);
           return;

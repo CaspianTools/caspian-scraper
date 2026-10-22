@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 /**
  * AI tagging (ai_tag.py via /api/resources/ai-tag): tag findings from
@@ -33,7 +33,7 @@ export interface AiTagResult {
 const CHUNK = 100;
 
 async function post(body: Record<string, unknown>) {
-  const res = await authedFetch("/api/resources/ai-tag", { method: "POST", body: JSON.stringify(body) });
+  const res = await apiFetch("/api/resources/ai-tag", { method: "POST", body: JSON.stringify(body) });
   const b = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(b.details?.[0]?.message || b.error || `AI tagging failed (${res.status})`);
   return b;

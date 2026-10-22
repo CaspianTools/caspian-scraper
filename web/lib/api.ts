@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * fetch() for the app's own API routes. There is no sign-in in local mode
- * (see lib/auth/session.ts), so this only sets the JSON content type; the
- * name is kept so existing callers stay unchanged.
+ * fetch() for the app's own API routes. There is no sign-in (the app runs
+ * locally — see lib/auth/session.ts), so this only sets the JSON content type.
  */
-export async function authedFetch(
+export async function apiFetch(
   input: string | URL,
   init: RequestInit = {}
 ): Promise<Response> {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 // Loose client-side mirror of /config_jobs/{id}. The authoritative schema
 // lives in web/lib/firestore/schema.ts (ConfigJobDocSchema); here we only
@@ -100,7 +100,7 @@ export function ConfigWizard({ projectId }: { projectId: string }) {
 
     async function poll() {
       try {
-        const res = await authedFetch(`/api/aiconfig/jobs/${jobId}`);
+        const res = await apiFetch(`/api/aiconfig/jobs/${jobId}`);
         if (cancelled) return;
         if (!res.ok) {
           const b = await res.json().catch(() => ({}));
@@ -132,7 +132,7 @@ export function ConfigWizard({ projectId }: { projectId: string }) {
     setUseAi(next);
     if (!next || hasKey !== null) return;
     try {
-      const res = await authedFetch("/api/aiconfig/key");
+      const res = await apiFetch("/api/aiconfig/key");
       const b = await res.json().catch(() => ({}));
       // A 403 means the owner manages the key — assume it's there.
       setHasKey(res.ok ? Boolean(b.configured) : true);
@@ -150,7 +150,7 @@ export function ConfigWizard({ projectId }: { projectId: string }) {
         .split(/\s+/)
         .map((s) => s.trim())
         .filter(Boolean);
-      const res = await authedFetch("/api/aiconfig/jobs", {
+      const res = await apiFetch("/api/aiconfig/jobs", {
         method: "POST",
         body: JSON.stringify({
           intent,
@@ -190,7 +190,7 @@ export function ConfigWizard({ projectId }: { projectId: string }) {
     setErrors([]);
     setApproving(true);
     try {
-      const res = await authedFetch(`/api/aiconfig/jobs/${jobId}/approve`, {
+      const res = await apiFetch(`/api/aiconfig/jobs/${jobId}/approve`, {
         method: "POST",
       });
       const b = await res.json().catch(() => ({}));

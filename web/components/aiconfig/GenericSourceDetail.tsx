@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface FieldErr {
   field?: string;
@@ -173,7 +173,7 @@ export function GenericSourceDetail({
   async function loadSource() {
     setErrors([]);
     try {
-      const res = await authedFetch(`/api/generic/sources/${sid}`);
+      const res = await apiFetch(`/api/generic/sources/${sid}`);
       const b = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);
@@ -199,7 +199,7 @@ export function GenericSourceDetail({
     (async () => {
       setLoading(true);
       try {
-        const res = await authedFetch(`/api/generic/sources/${sid}`);
+        const res = await apiFetch(`/api/generic/sources/${sid}`);
         const b = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
@@ -233,7 +233,7 @@ export function GenericSourceDetail({
     setToggling(true);
     const next = !source.active;
     try {
-      const res = await authedFetch(`/api/generic/sources/${sid}`, {
+      const res = await apiFetch(`/api/generic/sources/${sid}`, {
         method: "PATCH",
         body: JSON.stringify({ active: next }),
       });
@@ -259,7 +259,7 @@ export function GenericSourceDetail({
         .split(/\s+/)
         .map((s) => s.trim())
         .filter(Boolean);
-      const res = await authedFetch(`/api/generic/sources/${sid}`, {
+      const res = await apiFetch(`/api/generic/sources/${sid}`, {
         method: "PATCH",
         body: JSON.stringify({
           name: form.name,
@@ -296,7 +296,7 @@ export function GenericSourceDetail({
     setRunMsg(null);
     setRunning(true);
     try {
-      const res = await authedFetch(`/api/generic/sources/${sid}/run-now`, {
+      const res = await apiFetch(`/api/generic/sources/${sid}/run-now`, {
         method: "POST",
       });
       const b = await res.json().catch(() => ({}));
@@ -327,7 +327,7 @@ export function GenericSourceDetail({
     setErrors([]);
     setDeleting(true);
     try {
-      const res = await authedFetch(`/api/generic/sources/${sid}`, {
+      const res = await apiFetch(`/api/generic/sources/${sid}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -807,7 +807,7 @@ function RecordsTab({
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch(`/api/generic/sources/${sid}/records`);
+        const res = await apiFetch(`/api/generic/sources/${sid}/records`);
         const b = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
@@ -949,7 +949,7 @@ function RunsTab({ sid }: { sid: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch(`/api/generic/sources/${sid}/runs`);
+        const res = await apiFetch(`/api/generic/sources/${sid}/runs`);
         const b = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {

@@ -188,7 +188,7 @@ export default async function LessonsPage({
                       {s.source_name}
                     </Link>{" "}
                     <span className="text-xs text-amber-700 dark:text-amber-300">
-                      · {s.consecutive} consecutive runs with no HSE roles
+                      · {s.consecutive} consecutive runs with nothing found
                       found
                     </span>
                   </li>

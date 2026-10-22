@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 interface LastRunSummary {
   ts?: string;
@@ -73,7 +73,7 @@ export function GenericSourceList({ projectId, onNewScrape }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch(
+        const res = await apiFetch(
           `/api/generic/sources?project_id=${encodeURIComponent(projectId)}`
         );
         const b = await res.json().catch(() => ({}));
@@ -98,7 +98,7 @@ export function GenericSourceList({ projectId, onNewScrape }: Props) {
     setToggling(s.id);
     const next = !s.active;
     try {
-      const res = await authedFetch(`/api/generic/sources/${s.id}`, {
+      const res = await apiFetch(`/api/generic/sources/${s.id}`, {
         method: "PATCH",
         body: JSON.stringify({ active: next }),
       });

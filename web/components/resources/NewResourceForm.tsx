@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CountrySelect } from "@/components/CountrySelect";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { emptySourceFormInitial } from "@/components/sourceFormDefaults";
 
@@ -30,7 +30,7 @@ export function NewResourceForm({ onCreated, onCancel }: Props) {
     setError(null);
     setBusy(true);
     try {
-      const res = await authedFetch("/api/resources", {
+      const res = await apiFetch("/api/resources", {
         method: "POST",
         body: JSON.stringify({ ...form, name: form.name.trim(), countries }),
       });

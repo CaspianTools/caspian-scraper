@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 export function RunNowButton({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -15,7 +15,7 @@ export function RunNowButton({ projectId }: { projectId: string }) {
     setErr(null);
     setMsg(null);
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/projects/${projectId}/run-requests`,
         { method: "POST" }
       );

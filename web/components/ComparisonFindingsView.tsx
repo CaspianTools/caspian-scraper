@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 
 export interface ComparisonFindingRow {
   id: string;
@@ -154,7 +154,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
     setBusyId(listingId);
     setError("");
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/comparison/listings/${listingId}/match`,
         {
           method: "POST",
@@ -177,7 +177,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
     setBusyId(listing.id);
     setError("");
     try {
-      const res = await authedFetch(
+      const res = await apiFetch(
         `/api/comparison/listings/${listing.id}/match`,
         {
           method: "POST",

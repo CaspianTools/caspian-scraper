@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import { ResourcePicker } from "@/components/resources/ResourcePicker";
 import { FinderForm, FinderResults, useFinder } from "@/components/resources/finder";
@@ -131,7 +131,7 @@ export function JobWizard({ resources: initialResources }: Props) {
     setBusy(true);
     setErrors({});
     try {
-      const res = await authedFetch("/api/projects", {
+      const res = await apiFetch("/api/projects", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),

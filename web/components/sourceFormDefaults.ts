@@ -1,4 +1,4 @@
-// Shared types + defaults for the per-project (HSE jobs) source form.
+// Shared types + defaults for a job's careers-page source form.
 // NOT marked "use client" so server components (e.g. the create page)
 // can import the factory function without hitting the client/server
 // boundary.

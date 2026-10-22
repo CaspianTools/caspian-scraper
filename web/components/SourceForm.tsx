@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CountrySelect } from "@/components/CountrySelect";
-import { authedFetch } from "@/lib/firebase/clientFetch";
+import { apiFetch } from "@/lib/api";
 import type { SourceFormInitial } from "./sourceFormDefaults";
 
 interface Props {
@@ -63,7 +63,7 @@ export function SourceForm({
       const body = JSON.stringify({ ...form, countries });
 
       const url = isEdit ? `${collectionUrl}/${sourceId}` : collectionUrl;
-      const res = await authedFetch(url, {
+      const res = await apiFetch(url, {
         method: isEdit ? "PATCH" : "POST",
         body,
       });
@@ -110,7 +110,7 @@ export function SourceForm({
     if (!confirm(`Delete "${form.name}"? This cannot be undone.`)) return;
     setDeleting(true);
     try {
-      const res = await authedFetch(`${collectionUrl}/${sourceId}`, {
+      const res = await apiFetch(`${collectionUrl}/${sourceId}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -145,7 +145,7 @@ export function SourceForm({
         />
       </Row>
 
-      <Row label="Careers URL" error={errFor("careers_url")} required hint="The HSE-filtered search URL on the employer's careers site. NOT the homepage.">
+      <Row label="Careers URL" error={errFor("careers_url")} required hint="The careers search page to scrape (filtered to the roles you want, if the site allows) — not the homepage.">
         <input
           type="url"
           required
