@@ -9,27 +9,39 @@ import { ResourcePicker } from "@/components/resources/ResourcePicker";
 import { FinderForm, FinderResults, useFinder } from "@/components/resources/finder";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
-import { JobKindPicker } from "@/components/JobKindPicker";
-import { JOB_KIND_INFO, jobFirstStep, type JobKind } from "@/lib/jobKinds";
+import { JobTemplatePicker } from "@/components/JobTemplatePicker";
+import { JobSetupFields, cleanFields, type JobSetup } from "@/components/job-settings/JobSetupFields";
+import { TEMPLATE_INFO, jobFirstStep, type JobTemplate } from "@/lib/jobTemplates";
 
 interface Props {
   resources: ResourceRow[];
 }
 
 const STEPS = [
-  { label: "Basics", hint: "Name and description" },
-  { label: "Resources", hint: "Websites to scrape" },
+  { label: "Basics", hint: "Template, name, description" },
+  { label: "What to collect", hint: "Record name, fields, modules" },
+  { label: "Websites", hint: "Careers pages to scrape" },
   { label: "Review", hint: "Check and create" },
 ] as const;
-type Step = 0 | 1 | 2;
-const LAST: Step = 2;
+type Step = 0 | 1 | 2 | 3;
+const LAST: Step = 3;
 
 // Which step owns each server-side field, so a 400 jumps to the right place.
 const FIELD_STEP: Record<string, Step> = {
   name: 0,
   description: 0,
-  resource_ids: 1,
+  template: 0,
+  record_label: 1,
+  fields: 1,
+  modules: 1,
+  resource_ids: 2,
 };
+
+/** What a template pre-fills. */
+function setupOf(t: JobTemplate): JobSetup {
+  const info = TEMPLATE_INFO[t];
+  return { record_label: { ...info.record_label }, fields: info.fields.map((f) => ({ ...f })), modules: { ...info.modules } };
+}
 
 // Jobs run from Start.bat / "Run now" on this computer; there is no cron
 // while the app runs locally. A schedule is still stored (the schema needs
@@ -45,19 +57,22 @@ const secondaryBtn =
   "inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 bg-white dark:bg-zinc-900 shadow-xs font-medium";
 
 /**
- * Step-by-step job creation in a SidebarLayout: the sidebar holds the steps
- * (and, on the Resources step, the Find websites search); the main area holds
- * the step — on Resources, the search results (list or cards) and the shared
- * library, as tabs. The unfinished draft is kept in this browser (./draft.ts),
- * so leaving and coming back continues where you were.
+ * Step-by-step job creation in a SidebarLayout: start from a template (it only
+ * pre-fills), say what one result is called, its fields and modules, then —
+ * for a vacancy-style job — pick its careers pages (the sidebar holds the Find
+ * websites search on that step; the main area the results and the shared
+ * library, as tabs). Other sources (classifieds, shops, any website,
+ * databases) are added on the job's Sources after creating. The unfinished
+ * draft is kept in this browser (./draft.ts).
  */
 export function JobWizard({ resources: initialResources }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
-  const [kind, setKind] = useState<JobKind>("vacancies");
-  // Only vacancy jobs pick shared resources here; the other types add their
-  // websites (car sites, shops, any site) on the job's Sources after creating.
-  const steps: Step[] = kind === "vacancies" ? [0, 1, 2] : [0, 2];
+  const [template, setTemplate] = useState<JobTemplate>("vacancies");
+  const [setup, setSetup] = useState<JobSetup>(() => setupOf("vacancies"));
+  // Careers pages are picked here for a vacancy-style job; every other kind
+  // of source is added on the job's Sources after creating.
+  const steps: Step[] = template === "vacancies" ? [0, 1, 2, 3] : [0, 1, 3];
   const nextStep = (s: Step) => steps[steps.indexOf(s) + 1] as Step | undefined;
   const prevStep = (s: Step) => steps[steps.indexOf(s) - 1] as Step | undefined;
 
@@ -80,29 +95,33 @@ export function JobWizard({ resources: initialResources }: Props) {
     const d = loadDraft();
     if (d) {
       /* eslint-disable react-hooks/set-state-in-effect -- one-time restore of the saved draft */
-      setKind(d.kind);
+      setTemplate(d.template);
+      setSetup(d.setup ?? setupOf(d.template));
       setName(d.name);
       setDescription(d.description);
       setResourceIds(d.resourceIds);
       setTab(d.tab);
-      setStep(d.name.trim() && (d.kind === "vacancies" || d.step !== 1) ? d.step : 0);
+      setStep(d.name.trim() && (d.template === "vacancies" || d.step !== 2) ? d.step : 0);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
     setReady(true);
   }, []);
   useEffect(() => {
-    if (ready && !leaving.current) saveDraft({ kind, step, name, description, resourceIds, tab });
-  }, [ready, kind, step, name, description, resourceIds, tab]);
+    if (ready && !leaving.current) saveDraft({ template, setup, step, name, description, resourceIds, tab });
+  }, [ready, template, setup, step, name, description, resourceIds, tab]);
   const chosen = library.filter((r) => resourceIds.includes(r.id));
 
   /** Blocking problem on a step, or null when it's OK to continue. */
   function problem(s: Step): string | null {
     if (s === 0 && !name.trim()) return "Give the job a name.";
+    if (s === 1 && (!setup.record_label.singular.trim() || !setup.record_label.plural.trim()))
+      return "Say what one result is called (and several).";
+    if (s === 1 && cleanFields(setup.fields).length === 0) return "Give it at least one field.";
     return null;
   }
 
   function goTo(target: Step) {
-    if (target === 1 && step === 0 && !finder.query) {
+    if (target === 2 && step < 2 && !finder.query) {
       // Prefill the search with what the job is about.
       finder.setQuery([name.trim(), description.trim()].filter(Boolean).join(" — "));
     }
@@ -135,12 +154,15 @@ export function JobWizard({ resources: initialResources }: Props) {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
-          kind,
+          template,
+          record_label: { singular: setup.record_label.singular.trim(), plural: setup.record_label.plural.trim() },
+          fields: cleanFields(setup.fields),
+          modules: setup.modules,
           description: description.trim(),
           schedule_cron: DEFAULT_SCHEDULE,
           enabled: true,
           hse_keywords: [],
-          resource_ids: kind === "vacancies" ? resourceIds : [],
+          resource_ids: template === "vacancies" ? resourceIds : [],
         }),
       });
       const b = await res.json().catch(() => ({}));
@@ -159,7 +181,7 @@ export function JobWizard({ resources: initialResources }: Props) {
       }
       leaving.current = true; // don't re-save the draft on the way out
       clearDraft();
-      router.push(jobFirstStep(b.id, kind));
+      router.push(template === "vacancies" && resourceIds.length > 0 ? `/projects/${b.id}` : jobFirstStep(b.id, template));
       router.refresh();
     } catch (e) {
       setErrors({ [LAST]: e instanceof Error ? e.message : String(e) });
@@ -207,7 +229,7 @@ export function JobWizard({ resources: initialResources }: Props) {
         })}
       </ol>
 
-      {step === 1 && (
+      {step === 2 && (
         <>
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
             <span className="font-medium">{resourceIds.length}</span> website
@@ -227,11 +249,19 @@ export function JobWizard({ resources: initialResources }: Props) {
         <section className="max-w-2xl space-y-5">
           <StepHeading
             title="What is this job?"
-            hint="A job is one scraping pipeline: what it collects and the websites it collects from. Everything it finds is listed in the job for you to review."
+            hint="A job is its own scraping project: what it collects and the websites it collects from. Everything it finds is listed in the job for you to review."
           />
           <div>
-            <span className="block text-sm font-medium mb-2">What will it collect?</span>
-            <JobKindPicker value={kind} onChange={setKind} />
+            <span className="block text-sm font-medium mb-1">Start from</span>
+            <span className="block text-xs text-zinc-500 mb-2">A template only fills in the next step; you can change everything.</span>
+            <JobTemplatePicker
+              value={template}
+              onChange={(t) => {
+                setTemplate(t);
+                setSetup(setupOf(t));
+                if (!description.trim()) setDescription(TEMPLATE_INFO[t].description);
+              }}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
@@ -242,7 +272,7 @@ export function JobWizard({ resources: initialResources }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && goNext()}
-              placeholder={JOB_KIND_INFO[kind].example}
+              placeholder={TEMPLATE_INFO[template].example}
               className={inputCls}
             />
           </div>
@@ -255,7 +285,7 @@ export function JobWizard({ resources: initialResources }: Props) {
               maxLength={500}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What is this job looking for?"
+              placeholder="What is this job collecting, in plain words?"
               className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
             />
           </div>
@@ -263,6 +293,16 @@ export function JobWizard({ resources: initialResources }: Props) {
       )}
 
       {step === 1 && (
+        <section className="max-w-3xl space-y-5">
+          <StepHeading
+            title="What does it collect?"
+            hint="Its results get these names and columns. Pre-filled from the template — change anything."
+          />
+          <JobSetupFields value={setup} onChange={setSetup} />
+        </section>
+      )}
+
+      {step === 2 && (
         <section className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <StepHeading
@@ -317,26 +357,33 @@ export function JobWizard({ resources: initialResources }: Props) {
         </section>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <section className="max-w-3xl space-y-5">
           <StepHeading
             title="Review and create"
-            hint={
-              kind === "vacancies"
-                ? "After creating it, start a run from the job's Runs tab (or Start.bat) and review what it finds under Vacancies."
-                : `After creating it you'll add its websites, run it, and review the ${JOB_KIND_INFO[kind].items.toLowerCase()} it finds — all inside the job.`
-            }
+            hint={`After creating it, add or check its sources, press Run now, and review the ${setup.record_label.plural || "results"} it finds under Results.`}
           />
           <dl className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-5 divide-y divide-zinc-100 dark:divide-zinc-800 text-sm shadow-card">
-            <ReviewRow label="Collects" onEdit={() => goTo(0)}>
-              {JOB_KIND_INFO[kind].label}
+            <ReviewRow label="Template" onEdit={() => goTo(0)}>
+              {TEMPLATE_INFO[template].label}
             </ReviewRow>
             <ReviewRow label="Name" onEdit={() => goTo(0)}>
               {name.trim()}
               {description.trim() && <span className="block text-zinc-500">{description.trim()}</span>}
             </ReviewRow>
-            {kind === "vacancies" && (
-            <ReviewRow label="Resources" onEdit={() => goTo(1)}>
+            <ReviewRow label="Collects" onEdit={() => goTo(1)}>
+              {setup.record_label.plural}
+              <span className="block text-zinc-500">
+                {cleanFields(setup.fields).map((f) => f.label).join(", ")}
+                {Object.entries(setup.modules).some(([, on]) => on) &&
+                  ` · modules: ${Object.entries(setup.modules)
+                    .filter(([, on]) => on)
+                    .map(([k]) => ({ discovery: "Discover", follow_up: "Follow-up pages", compare: "Compare" })[k])
+                    .join(", ")}`}
+              </span>
+            </ReviewRow>
+            {template === "vacancies" && (
+            <ReviewRow label="Websites" onEdit={() => goTo(2)}>
               {chosen.length === 0 ? (
                 <span className="text-zinc-500">None yet</span>
               ) : (

@@ -26,7 +26,8 @@ interface FieldErr {
 export function CarSourceForm({ projectId, initial, sourceId }: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
-  const base = `/projects/${projectId}/cars`;
+  // The job's unified Sources / Runs pages (every engine's sources and runs).
+  const base = `/projects/${projectId}`;
   const [form, setForm] = useState<CarSourceFormInitial>(initial);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);

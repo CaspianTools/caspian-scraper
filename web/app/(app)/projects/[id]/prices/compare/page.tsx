@@ -42,7 +42,7 @@ interface CanonicalRow {
  */
 export default async function PricesComparePage({ params }: PageProps) {
   const { id } = await params;
-  const job = await requireJob(id, "prices");
+  const job = await requireJob(id);
   const base = `/projects/${job.id}/prices`;
 
   const [scope, canonicalsSnap, listingsSnap] = await Promise.all([

@@ -1811,7 +1811,8 @@ def load_sources(
     project: dict | None = None,
 ) -> list[dict]:
     """
-    A project's sources = its own /projects/{id}/sources subcollection plus
+    A project's sources = its own /projects/{id}/sources subcollection, the
+    careers pages of the databases it reads from (database_sources), plus
     the shared /resources/{rid} docs listed in the project's `resource_ids`.
     Shared resources are tagged `__resource=True` so per-source writes
     (last_run_summary) land on the shared doc, and are only honoured when
@@ -1826,6 +1827,13 @@ def load_sources(
 
     if project is None:
         project = load_project(db, project_id) or {}
+    if project.get("reads_from"):
+        seen = {str(s.get("careers_url") or "").strip().rstrip("/").lower() for s in sources}
+        for v in database_sources(db, project):
+            key = v["careers_url"].strip().rstrip("/").lower()
+            if key not in seen:
+                seen.add(key)
+                sources.append(v)
     resource_ids = [
         str(r) for r in (project.get("resource_ids") or []) if str(r).strip()
     ]
@@ -1895,33 +1903,104 @@ def list_enabled_projects(db) -> list[dict]:
     return [_doc_with_id(d) for d in q.stream()]
 
 
-# Job types (web/lib/jobKinds.ts): every job collects one kind of thing. A
-# vacancy job runs here (run_project); a job of another type is the set of
-# top-level sources whose project_id is the job's id, each run by its engine.
+# Jobs are generic (web/lib/jobTemplates.ts): one job can have sources for
+# any engine. Its careers pages (own /sources, shared /resources, and the
+# websites of databases it reads from) run in run_project; every top-level
+# car / comparison / generic source whose project_id is the job's id runs in
+# its own engine. job_results.collect() then gathers all of it into the job's
+# results store.
 JOB_SOURCE_COLLECTIONS = {
-    "cars": ("car_sources", "car_source"),
-    "prices": ("comparison_sources", "comparison_source"),
-    "data": ("generic_sources", "generic_source"),
+    "car_sources": "car_source",
+    "comparison_sources": "comparison_source",
+    "generic_sources": "generic_source",
 }
+WORK_SOURCE_COLLECTION = {v: k for k, v in JOB_SOURCE_COLLECTIONS.items()}
 
 
-def job_kind(proj: dict | None) -> str:
-    """A job's type; jobs from before types existed are vacancy jobs."""
-    k = str((proj or {}).get("kind") or "vacancies")
-    return k if k in JOB_SOURCE_COLLECTIONS else "vacancies"
+def job_template(proj: dict | None) -> str:
+    """The template a job was made from (only pre-fills a job — see
+    jobTemplates.ts). Jobs from before templates: their old `kind`."""
+    p = proj or {}
+    t = str(p.get("template") or "")
+    if t:
+        return t
+    return {"cars": "cars", "prices": "prices", "data": "blank"}.get(str(p.get("kind") or ""), "vacancies")
+
+
+def job_has_careers(db, project_id: str, proj: dict | None = None) -> bool:
+    """Does the job have careers pages for run_project to scrape?"""
+    p = proj if proj is not None else (load_project(db, project_id) or {})
+    if p.get("resource_ids") or p.get("reads_from"):
+        return True
+    col = db.collection("projects").document(project_id).collection("sources")
+    return any(True for _ in col.limit(1).stream())
 
 
 def job_work(db, project_id: str, trigger: str) -> list[tuple[str, str, str]]:
-    """What running a job means: one run_project for a vacancy job, else a
-    run of each of the job's active sources."""
+    """What running a job means: run_project for its careers pages (if it
+    has any) plus a run of each of its active engine sources."""
     snap = db.collection("projects").document(project_id).get()
-    kind = job_kind(snap.to_dict() if snap.exists else None)
-    if kind == "vacancies":
-        return [("project", project_id, trigger)]
-    col, work_kind = JOB_SOURCE_COLLECTIONS[kind]
-    q = db.collection(col).where(filter=FieldFilter("project_id", "==", project_id))
-    return [(work_kind, d.id, trigger) for d in q.stream()
-            if (d.to_dict() or {}).get("active", True) is not False]
+    proj = snap.to_dict() if snap.exists else None
+    work: list[tuple[str, str, str]] = []
+    if proj is None or job_has_careers(db, project_id, proj):
+        work.append(("project", project_id, trigger))
+    for col, work_kind in JOB_SOURCE_COLLECTIONS.items():
+        q = db.collection(col).where(filter=FieldFilter("project_id", "==", project_id))
+        work += [(work_kind, d.id, trigger) for d in q.stream()
+                 if (d.to_dict() or {}).get("active", True) is not False]
+    return work
+
+
+def job_of_work(db, kind: str, work_id: str) -> str:
+    """The job a work item belongs to ("" for a source not in any job)."""
+    if kind == "project":
+        return work_id
+    snap = db.collection(WORK_SOURCE_COLLECTION[kind]).document(work_id).get()
+    return str((snap.to_dict() or {}).get("project_id") or "") if snap.exists else ""
+
+
+def database_sources(db, project: dict) -> list[dict]:
+    """Careers pages from the databases a job reads from (`reads_from`:
+    [{database, only_tags?}]): every record with a careers page on a
+    platform we can parse. Virtual sources (`__virtual`): nothing is written
+    back to them."""
+    import findings_db as fdb
+
+    out: list[dict] = []
+    for spec in project.get("reads_from") or []:
+        try:
+            name = fdb.file_of(str((spec or {}).get("database") or ""))
+        except ValueError:
+            continue
+        only = {str(t).casefold() for t in spec.get("only_tags") or []}
+        for rec in fdb.load(name).values():
+            if rec.get("hidden") or not rec.get("careers_url"):
+                continue
+            if only and not only & {str(t).casefold() for t in rec.get("tags") or []}:
+                continue
+            ats = str(rec.get("ats") or "").lower()
+            if ats not in PARSERS:
+                continue
+            out.append({"__id": f"db:{name.removesuffix('.jsonl')}:{rec['id']}", "__virtual": True,
+                        "name": rec.get("name") or rec["id"], "ats": ats,
+                        "careers_url": rec["careers_url"], "active": True})
+    return out
+
+
+def collect_job(db, project_id: str, *, ran_sources=(), run_started: str = "") -> dict:
+    """job_results.collect + relevance + saving into the job's databases."""
+    import job_results
+
+    counts = job_results.collect(db, project_id, ran_sources=ran_sources, run_started=run_started)
+    proj = load_project(db, project_id) or {}
+    try:
+        import relevance
+        counts["scored"] = relevance.score_job(project_id, proj)
+    except ImportError:
+        pass
+    if proj.get("saves_to"):
+        counts["saved"] = job_results.save_to_databases(proj, project_id, job_results.database_keys(db))
+    return counts
 
 
 def paused_job_ids(db) -> set[str]:
@@ -2046,11 +2125,11 @@ def find_due_work(
             seen_generic.add(gsid)
             work.append(("generic_source", gsid, trig))
 
-    # Then schedule-due projects. Only vacancy jobs run as a project; the
-    # sources of other job types are scheduled below, each on its own cron.
+    # Then schedule-due projects (their careers pages); the job's engine
+    # sources are scheduled below, each on its own cron.
     for proj in list_enabled_projects(db):
         pid = proj["__id"]
-        if pid in seen_projects or job_kind(proj) != "vacancies":
+        if pid in seen_projects or not job_has_careers(db, pid, proj):
             continue
         cron = str(proj.get("schedule_cron") or "").strip()
         if not cron:
@@ -2636,6 +2715,8 @@ def _write_lesson(
     # the Sources table a quick "last X / Y" badge without a runs join.
     # Shared resources keep one summary: the latest run by any job.
     try:
+        if source.get("__virtual"):
+            raise LookupError("virtual source (from a database): nothing to update")
         source_ref = (
             db.collection("resources").document(source["__id"])
             if source.get("__resource")
@@ -3914,7 +3995,21 @@ def main() -> int:
 
     results: list[dict] = []
     errored = 0
+    # Per job touched this tick: when it started and which sources ran — for
+    # job_results.collect() after the work loop.
+    job_runs: dict[str, dict] = {}
     for kind, work_id, trigger in work:
+        pid = ""
+        try:
+            pid = job_of_work(db, kind, work_id)
+            if pid:
+                jr = job_runs.setdefault(pid, {"started": utc_now_iso(), "ran": set()})
+                if kind == "project":
+                    jr["ran"].update(s["__id"] for s in load_sources(db, pid))
+                else:
+                    jr["ran"].add(work_id)
+        except Exception as e:  # noqa: BLE001 — bookkeeping must not stop a run
+            print(f"couldn't note the job of {kind} {work_id}: {e}", file=sys.stderr)
         per_item_deadline = time.monotonic() + per_project_timeout
         if kind == "project":
             result = run_project(
@@ -3954,6 +4049,16 @@ def main() -> int:
         results.append(result)
         if result.get("status") in ("error", "auth_halt"):
             errored += 1
+
+    # Gather each job's results (all engines) into its store, mark new /
+    # changed / gone, score relevance, and save into its databases.
+    if not dry_run:
+        for pid, jr in job_runs.items():
+            try:
+                collected = collect_job(db, pid, ran_sources=jr["ran"], run_started=jr["started"])
+                print(f"job {pid}: {collected}", file=sys.stderr)
+            except Exception as e:  # noqa: BLE001 — results are kept; the store catches up next run
+                print(f"job {pid}: couldn't collect results: {type(e).__name__}: {e}", file=sys.stderr)
 
     total_duration = max(0, int(time.monotonic() - started_mono))
     print(json.dumps({

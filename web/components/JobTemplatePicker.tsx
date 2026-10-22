@@ -1,8 +1,8 @@
 "use client";
 
-import { JOB_KINDS, JOB_KIND_INFO, type JobKind } from "@/lib/jobKinds";
+import { JOB_TEMPLATES, TEMPLATE_INFO, type JobTemplate } from "@/lib/jobTemplates";
 
-const ICONS: Record<JobKind, React.ReactNode> = {
+const ICONS: Record<JobTemplate, React.ReactNode> = {
   vacancies: (
     <>
       <rect x="3" y="7" width="18" height="13" rx="2" />
@@ -17,33 +17,33 @@ const ICONS: Record<JobKind, React.ReactNode> = {
     </>
   ),
   prices: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
-  data: (
+  blank: (
     <path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" />
   ),
 };
 
-export function JobKindIcon({ kind, className = "w-5 h-5" }: { kind: JobKind; className?: string }) {
+export function JobTemplateIcon({ template, className = "w-5 h-5" }: { template: JobTemplate; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {ICONS[kind]}
+      {ICONS[template]}
     </svg>
   );
 }
 
-/** "What will this job collect?" — one card per job type. */
-export function JobKindPicker({
+/** "Start from" — one card per template (it only pre-fills the job). */
+export function JobTemplatePicker({
   value,
   onChange,
   compact = false,
 }: {
-  value: JobKind;
-  onChange: (k: JobKind) => void;
+  value: JobTemplate;
+  onChange: (t: JobTemplate) => void;
   /** Two columns, no blurbs (for popups). */
   compact?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label="What will this job collect?" className={"grid gap-2 " + (compact ? "grid-cols-2" : "sm:grid-cols-2")}>
-      {JOB_KINDS.map((k) => {
+    <div role="radiogroup" aria-label="Start from a template" className={"grid gap-2 " + (compact ? "grid-cols-2" : "sm:grid-cols-2")}>
+      {JOB_TEMPLATES.map((k) => {
         const on = value === k;
         return (
           <button
@@ -65,11 +65,11 @@ export function JobKindPicker({
                 (on ? "bg-brand-600 text-white dark:bg-brand-500" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400")
               }
             >
-              <JobKindIcon kind={k} className="w-4 h-4" />
+              <JobTemplateIcon template={k} className="w-4 h-4" />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium">{JOB_KIND_INFO[k].label}</span>
-              {!compact && <span className="block text-xs text-zinc-500">{JOB_KIND_INFO[k].blurb}</span>}
+              <span className="block text-sm font-medium">{TEMPLATE_INFO[k].label}</span>
+              {!compact && <span className="block text-xs text-zinc-500">{TEMPLATE_INFO[k].blurb}</span>}
             </span>
           </button>
         );

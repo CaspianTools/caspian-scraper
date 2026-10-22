@@ -4,19 +4,21 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { SchedulePicker } from "@/components/SchedulePicker";
-import type { JobKind } from "@/lib/jobKinds";
+import { JobSetupFields, cleanFields, type JobSetup } from "@/components/job-settings/JobSetupFields";
+import { JobRulesFields, type JobRules } from "@/components/job-settings/JobRulesFields";
+import type { JobSettings } from "@/lib/jobTemplates";
 
 interface Props {
   projectId: string;
-  /** Only vacancy jobs run on the job's schedule; other types' websites
-   *  (sources) each have their own. */
-  kind: JobKind;
   initial: {
     name: string;
     description: string;
     schedule_cron: string;
     enabled: boolean;
+    settings: JobSettings;
   };
+  /** Databases the job can save into. */
+  databases: { id: string; name: string }[];
 }
 
 interface FieldErr {
@@ -24,12 +26,23 @@ interface FieldErr {
   message: string;
 }
 
-export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
+export function ProjectSettingsForm({ projectId, initial, databases }: Props) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [scheduleCron, setScheduleCron] = useState(initial.schedule_cron);
   const [enabled, setEnabled] = useState(initial.enabled);
+  const [setup, setSetup] = useState<JobSetup>({
+    record_label: initial.settings.record_label,
+    fields: initial.settings.fields,
+    modules: initial.settings.modules,
+  });
+  const [rules, setRules] = useState<JobRules>({
+    saves_to: initial.settings.saves_to,
+    relevance: initial.settings.relevance,
+    use_ai: initial.settings.use_ai,
+    ai_spend_cap: initial.settings.ai_spend_cap,
+  });
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<FieldErr[]>([]);
@@ -48,6 +61,10 @@ export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
           description: description.trim(),
           schedule_cron: scheduleCron.trim(),
           enabled,
+          record_label: { singular: setup.record_label.singular.trim(), plural: setup.record_label.plural.trim() },
+          fields: cleanFields(setup.fields),
+          modules: setup.modules,
+          ...rules,
         }),
       });
       if (!res.ok) {
@@ -76,7 +93,7 @@ export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
   async function handleDelete() {
     const confirmText = `delete ${initial.name}`;
     const typed = prompt(
-      `This permanently deletes the project AND all its sources, destinations, secrets, runs, and lessons.\n\nType "${confirmText}" to confirm.`
+      `This permanently deletes the job and its sources, runs and results.\n\nType "${confirmText}" to confirm.`
     );
     if (typed !== confirmText) return;
     setDeleting(true);
@@ -134,13 +151,24 @@ export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
           />
         </div>
 
-        {kind === "vacancies" && (
+        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5">
+          <JobSetupFields value={setup} onChange={setSetup} />
+        </div>
+
+        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5">
+          <JobRulesFields value={rules} onChange={setRules} databases={databases} />
+        </div>
+
+        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5 space-y-1">
           <SchedulePicker
             value={scheduleCron}
             onChange={setScheduleCron}
             errorMessage={errFor("schedule_cron")}
           />
-        )}
+          <p className="text-xs text-zinc-500">
+            For its careers pages; classifieds, shop and website sources each keep their own schedule.
+          </p>
+        </div>
 
         <div className="flex items-center gap-2">
           <input

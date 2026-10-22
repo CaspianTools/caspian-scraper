@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { jobSettings } from "@/lib/jobTemplates";
 import { FieldValue } from "@/lib/localdb";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSessionFromBearer } from "@/lib/auth/session";
@@ -128,7 +129,8 @@ export async function POST(req: NextRequest) {
     owner_uid: session.uid,
     slug: projectId,
     name: input.name,
-    kind: input.kind,
+    // Every setting written out, filled from the template where not given.
+    ...jobSettings(input as unknown as Record<string, unknown>),
     description: input.description,
     schedule_cron: input.schedule_cron,
     enabled: input.enabled,

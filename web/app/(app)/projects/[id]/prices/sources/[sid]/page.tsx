@@ -17,7 +17,7 @@ interface PageProps {
 /** Edit one shop of a prices job; 404 for a source of another job. */
 export default async function EditPricesSourcePage({ params }: PageProps) {
   const { id, sid } = await params;
-  const job = await requireJob(id, "prices");
+  const job = await requireJob(id);
 
   const snap = await comparisonSourcesCol().doc(sid).get();
   if (!snap.exists) notFound();
@@ -47,7 +47,7 @@ export default async function EditPricesSourcePage({ params }: PageProps) {
   return (
     <>
       <Link
-        href={`/projects/${job.id}/prices/sources`}
+        href={`/projects/${job.id}/sources`}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
         ← Sources

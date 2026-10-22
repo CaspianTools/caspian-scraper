@@ -81,34 +81,43 @@ def _path(name: str) -> Path:
 
 
 DATABASE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+JOB_STORE = re.compile(r"^job:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 
 
 def file_of(database: str | None) -> str:
-    """A database id's file name ("companies" → "companies.jsonl"); rejects
-    anything that isn't a plain database id."""
+    """A database id's file name ("companies" → "companies.jsonl"), or a
+    job's results store as is ("job:<id>", no file); rejects anything else."""
     db = (database or "companies").strip()
+    if JOB_STORE.match(db):
+        return db
     if not DATABASE_ID.match(db):
         raise ValueError(f"not a database id: {db!r}")
     return f"{db}.jsonl"
 
 
 def store_of(name: str) -> str:
-    """The record-store name of a database file: "companies.jsonl" → "db:companies"."""
-    return "db:" + name.removesuffix(".jsonl")
+    """The record-store name: "companies.jsonl" → "db:companies"; a job
+    store ("job:<id>") is its own name."""
+    return name if name.startswith("job:") else "db:" + name.removesuffix(".jsonl")
+
+
+def _file(name: str) -> Path | None:
+    """The committed file of a database; job stores have none."""
+    return None if name.startswith("job:") else _path(name)
 
 
 def load(name: str = COMPANIES_FILE) -> dict[str, dict]:
-    return recordstore.load(store_of(name), _path(name))
+    return recordstore.load(store_of(name), _file(name))
 
 
 def save(records: dict[str, dict], name: str = COMPANIES_FILE) -> None:
     """Make the database exactly `records` (and export it)."""
-    recordstore.write(store_of(name), records, file=_path(name), replace=True)
+    recordstore.write(store_of(name), records, file=_file(name), replace=True)
 
 
 def put(records: dict[str, dict], name: str = COMPANIES_FILE, deletes: list[str] = ()) -> None:
     """Write just these records (and deletions), then export."""
-    recordstore.write(store_of(name), records, deletes, file=_path(name))
+    recordstore.write(store_of(name), records, deletes, file=_file(name))
 
 
 def merge(old: dict | None, new: dict) -> dict:

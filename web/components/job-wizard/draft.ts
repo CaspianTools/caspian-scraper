@@ -5,18 +5,23 @@
  * useFinder (components/resources/finder.tsx).
  */
 
-import { jobKind, type JobKind } from "@/lib/jobKinds";
+import { jobTemplate, type JobTemplate } from "@/lib/jobTemplates";
+import type { JobSetup } from "@/components/job-settings/JobSetupFields";
 
 export const DRAFT_KEY = "caspian.jobwizard.draft";
 
 export interface JobDraft {
-  kind: JobKind;
-  step: 0 | 1 | 2;
+  template: JobTemplate;
+  /** What it collects (null in drafts from before this step existed). */
+  setup: JobSetup | null;
+  step: 0 | 1 | 2 | 3;
   name: string;
   description: string;
   resourceIds: string[];
   tab: "results" | "library";
 }
+
+const OLD_KIND: Record<string, JobTemplate> = { cars: "cars", prices: "prices", data: "blank" };
 
 export function loadDraft(): JobDraft | null {
   try {
@@ -24,9 +29,11 @@ export function loadDraft(): JobDraft | null {
     if (!raw) return null;
     const d = JSON.parse(raw);
     if (typeof d !== "object" || d === null) return null;
+    const setup = d.setup && typeof d.setup === "object" && Array.isArray(d.setup.fields) ? (d.setup as JobSetup) : null;
     return {
-      kind: jobKind(d.kind),
-      step: d.step === 1 || d.step === 2 ? d.step : 0,
+      template: d.template ? jobTemplate(d.template) : (OLD_KIND[d.kind] ?? "vacancies"),
+      setup,
+      step: [1, 2, 3].includes(d.step) ? d.step : 0,
       name: typeof d.name === "string" ? d.name : "",
       description: typeof d.description === "string" ? d.description : "",
       resourceIds: Array.isArray(d.resourceIds) ? d.resourceIds.filter((x: unknown) => typeof x === "string") : [],

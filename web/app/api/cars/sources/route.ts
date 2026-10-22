@@ -7,7 +7,6 @@ import {
   type CarSourceDoc,
 } from "@/lib/firestore/schema";
 import { carSourcesCol, projectDoc } from "@/lib/firestore/collections";
-import { jobKind } from "@/lib/jobKinds";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -83,12 +82,6 @@ export async function POST(req: NextRequest) {
   const job = jobSnap.exists ? jobSnap.data() : undefined;
   if (!job || job.owner_uid !== session.uid) {
     return NextResponse.json({ error: "job not found" }, { status: 404 });
-  }
-  if (jobKind(job.kind) !== "cars") {
-    return NextResponse.json(
-      { error: "that job doesn't collect cars" },
-      { status: 400 }
-    );
   }
 
   const now = new Date().toISOString();

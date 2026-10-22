@@ -123,8 +123,8 @@ export async function DELETE(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  // A car / prices / data job's websites are top-level sources carrying its
-  // id (lib/jobKinds.ts); delete them too, or they'd keep running on their
+  // A job's classifieds, shop and website sources are top-level docs carrying its
+  // id (lib/jobTemplates.ts); delete them too, or they'd keep running on their
   // own schedules. Their past listings/records stay but no job shows them.
   for (const col of [carSourcesCol(), comparisonSourcesCol(), genericSourcesCol()]) {
     const own = await col.where("owner_uid", "==", session.uid).get();

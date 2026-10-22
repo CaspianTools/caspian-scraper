@@ -147,7 +147,8 @@ export function GenericSourceDetail({
   sid: string;
 }) {
   const router = useRouter();
-  const jobData = `/projects/${projectId}/data`;
+  // Back to the job's unified Sources page (it lists every engine's sources).
+  const jobData = `/projects/${projectId}/sources`;
 
   const [source, setSource] = useState<GenericSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -357,7 +358,7 @@ export function GenericSourceDetail({
           href={jobData}
           className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
         >
-          ← Sources &amp; records
+          ← Sources
         </Link>
         {generalErrors.length > 0 ? (
           generalErrors.map((e, i) => (
@@ -382,7 +383,7 @@ export function GenericSourceDetail({
         href={jobData}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
-        ← Sources &amp; records
+        ← Sources
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">

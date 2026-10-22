@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromBearer } from "@/lib/auth/session";
-import { asFinding, databaseRecords, getDatabase, toCsv } from "@/lib/databases";
-import { filtersFromQuery, matches } from "@/lib/findings";
+import { databaseRecords, exportRows, getDatabase, toCsv } from "@/lib/databases";
 
 /**
  * GET /api/databases/[id]/export — CSV of the records matching the same
@@ -13,14 +12,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/databases/[i
   const { id } = await ctx.params;
   const db = await getDatabase(session.uid, id);
   if (!db) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const q = req.nextUrl.searchParams;
-  const state = filtersFromQuery(q);
-  const only = q.get("ids") ? new Set(q.get("ids")!.split(",")) : null;
-  const rows = databaseRecords(id).filter((r) => {
-    const f = asFinding(r, db.key);
-    if (only) return only.has(f.id);
-    return (q.get("hidden") === "1" || !f.hidden) && matches(f, state);
-  });
+  const rows = exportRows(databaseRecords(id), db.key, req.nextUrl.searchParams);
   return new NextResponse(toCsv(rows, db.key), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

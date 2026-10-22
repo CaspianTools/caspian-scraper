@@ -54,7 +54,7 @@ function statusClasses(status: string): string {
 /** One run of a prices job's shop; 404 for a run of another job's shop. */
 export default async function PricesRunDetailPage({ params }: PageProps) {
   const { id, rid } = await params;
-  const job = await requireJob(id, "prices");
+  const job = await requireJob(id);
 
   const [scope, runSnap] = await Promise.all([
     pricesJobScope(job.uid, job.id),
@@ -78,7 +78,7 @@ export default async function PricesRunDetailPage({ params }: PageProps) {
   return (
     <>
       <Link
-        href={`/projects/${job.id}/prices/runs`}
+        href={`/projects/${job.id}/runs`}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
         ← Runs

@@ -11,12 +11,22 @@ import {
 } from "@/components/resources/finder";
 import { AiTagDialog, SparkIcon } from "@/components/resources/AiTag";
 
-/** What the server page sends (lib/databases.ts DatabaseInfo). */
+/** What the server page sends: a database (lib/databases.ts DatabaseInfo)
+ *  or a job's results store. */
 export interface DatabaseMeta {
   id: string;
   name: string;
   key: "domain" | "url" | "id";
   record_label: { singular: string; plural: string };
+  /** "job": a job's results (its id) — adds change filters, Save to
+   *  database and Refresh; default "db". */
+  kind?: "db" | "job";
+  /** Columns for plain records (a job's fields); default: the commonest. */
+  columns?: { key: string; label: string }[];
+  /** Hide records scored below this relevance unless "show hidden". */
+  cutoff?: number;
+  /** Databases a job's results can be saved into. */
+  databases?: { id: string; name: string }[];
 }
 
 interface Page {
@@ -47,7 +57,12 @@ const HIDDEN_FIELDS = new Set(["id", "tags", "hidden", "raw", "found_by", "first
  */
 export function DatabaseView({ db }: { db: DatabaseMeta }) {
   const companies = db.key === "domain";
+  const isJob = db.kind === "job";
   const noun = db.record_label.plural;
+  // Where this store's records are read / exported, and its id for actions.
+  const listUrl = isJob ? `/api/projects/${db.id}/results` : `/api/databases/${db.id}/records`;
+  const exportUrl = isJob ? `/api/projects/${db.id}/results/export` : `/api/databases/${db.id}/export`;
+  const storeId = isJob ? `job:${db.id}` : db.id;
   const [view, setView] = useView();
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
@@ -79,16 +94,17 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
     (extra: Record<string, string> = {}) => {
       const q = filtersToQuery({ filters, tagMode, text: query });
       if (showHidden) q.set("hidden", "1");
+      if (db.cutoff) q.set("minRelevance", String(db.cutoff));
       for (const [k, v] of Object.entries(extra)) q.set(k, v);
       return q;
     },
-    [filters, tagMode, query, showHidden]
+    [filters, tagMode, query, showHidden, db.cutoff]
   );
 
   useEffect(() => {
     let live = true;
     const q = params({ sort, page: String(page), size: String(SIZE) });
-    apiFetch(`/api/databases/${db.id}/records?${q}`)
+    apiFetch(`${listUrl}?${q}`)
       .then(async (res) => {
         const b = await res.json().catch(() => ({}));
         if (!live) return;
@@ -99,7 +115,7 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
     return () => {
       live = false;
     };
-  }, [db.id, params, sort, page, reload]);
+  }, [listUrl, params, sort, page, reload]);
 
   const refresh = () => setReload((n) => n + 1);
 
@@ -116,8 +132,9 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
   /** Every matching id (with its tags), from the server. */
   async function matchingIds(all = false): Promise<{ id: string; tags: string[]; hidden: boolean }[]> {
     const q = all ? new URLSearchParams(showHidden ? { hidden: "1" } : {}) : params();
+    if (all && db.cutoff && !showHidden) q.set("minRelevance", String(db.cutoff));
     q.set("select", "1");
-    const res = await apiFetch(`/api/databases/${db.id}/records?${q}`);
+    const res = await apiFetch(`${listUrl}?${q}`);
     const b = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(b.error || `Couldn't load (${res.status})`);
     return b.items;
@@ -150,7 +167,7 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
     for (let i = 0; i < ids.length; i += IDS_PER_CALL) {
       const res = await apiFetch(path, {
         method: "POST",
-        body: JSON.stringify({ ...body, database: db.id, ids: ids.slice(i, i + IDS_PER_CALL) }),
+        body: JSON.stringify({ ...body, database: storeId, ids: ids.slice(i, i + IDS_PER_CALL) }),
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(b.details?.[0]?.message || b.error || `Failed (${res.status})`);
@@ -225,9 +242,30 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
     });
   };
 
+  const saveTo = (database: string) =>
+    run("tag", async () => {
+      const res = await apiFetch(`/api/projects/${db.id}/results/save`, {
+        method: "POST",
+        body: JSON.stringify({ database, ids: [...selected.keys()] }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(b.error || `Couldn't save (${res.status})`);
+      const name = db.databases?.find((d) => d.id === database)?.name ?? database;
+      return `Saved ${b.saved} into ${name}.`;
+    });
+
+  const refreshFromRuns = () =>
+    run("select", async () => {
+      setProgress("Gathering what the runs have found…");
+      const res = await apiFetch(`/api/projects/${db.id}/results/collect`, { method: "POST" });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(b.error || `Couldn't refresh (${res.status})`);
+      return `Up to date: ${b.new ?? 0} new, ${b.changed ?? 0} changed, ${b.gone ?? 0} gone.`;
+    });
+
   function exportCsv() {
     const q = selected.size > 0 ? new URLSearchParams({ ids: [...selected.keys()].join(",") }) : params();
-    window.location.href = `/api/databases/${db.id}/export?${q}`;
+    window.location.href = `${exportUrl}?${q}`;
   }
 
   const facetKeys = FACET_KEYS.filter(
@@ -241,10 +279,11 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
   // Columns for plain records: the most common fields on this page.
   const columns = useMemo(() => {
     if (companies) return [];
+    if (db.columns?.length) return db.columns.map((c) => c.key);
     const counts = new Map<string, number>();
     for (const x of onPage) for (const k of Object.keys(x.record ?? {})) if (!HIDDEN_FIELDS.has(k)) counts.set(k, (counts.get(k) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k);
-  }, [companies, onPage]);
+  }, [companies, onPage, db.columns]);
 
   return (
     <div className="space-y-4">
@@ -303,6 +342,11 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
           </label>
         )}
         <span className="mx-auto" />
+        {isJob && (
+          <button type="button" className={chipBtn} disabled={busy !== null} onClick={refreshFromRuns} title="Gather what this job's runs have found so far">
+            Refresh from runs
+          </button>
+        )}
         {companies && <ViewToggle view={view} onChange={setView} />}
       </div>
       {activeFilters.length > 0 && (
@@ -386,6 +430,22 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
               disabled={busy !== null}
               onChange={retag}
             />
+            {isJob && (db.databases?.length ?? 0) > 0 && (
+              <select
+                aria-label="Save to database"
+                className={chipBtn}
+                disabled={busy !== null}
+                value=""
+                onChange={(e) => e.target.value && saveTo(e.target.value)}
+              >
+                <option value="">Save to database…</option>
+                {db.databases!.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
             {companies && (
               <button type="button" className={chipBtn} disabled={busy !== null} onClick={findCareers}>
                 {busy === "enrich" ? "Finding…" : "Find careers pages"}
@@ -430,7 +490,11 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
         <LoadingGrid view={companies ? view : "list"} />
       ) : onPage.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-sm text-zinc-500 bg-white/60 dark:bg-zinc-950/40">
-          {data.totalAll === 0 ? `No ${noun} yet. Jobs that save into this database add them as they run.` : `No ${noun} match the filters.`}
+          {data.totalAll === 0
+            ? isJob
+              ? `No ${noun} yet. Add sources, then Run now (Runs) — or Refresh from runs if it has run before.`
+              : `No ${noun} yet. Jobs that save into this database add them as they run.`
+            : `No ${noun} match the filters.`}
         </div>
       ) : companies && view === "cards" ? (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -452,9 +516,10 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
                 <th className="w-10 px-3 py-2" />
                 {columns.map((c) => (
                   <th key={c} className="text-left px-3 py-2 whitespace-nowrap">
-                    {c.replace(/_/g, " ")}
+                    {db.columns?.find((x) => x.key === c)?.label ?? c.replace(/_/g, " ")}
                   </th>
                 ))}
+                {isJob && <th className="text-left px-3 py-2">Change</th>}
                 <th className="text-left px-3 py-2">Tags</th>
               </tr>
             </thead>
@@ -475,6 +540,16 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
                       )}
                     </td>
                   ))}
+                  {isJob && (
+                    <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      <ChangeChip change={finding.change} />
+                      {typeof finding.relevance === "number" && (
+                        <span className="ml-1.5 text-zinc-400" title="Relevance">
+                          {finding.relevance}
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-xs text-brand-700 dark:text-brand-300">{(finding.tags ?? []).join(", ")}</td>
                 </tr>
               ))}
@@ -516,6 +591,21 @@ export function DatabaseView({ db }: { db: DatabaseMeta }) {
         />
       )}
     </div>
+  );
+}
+
+function ChangeChip({ change }: { change?: string }) {
+  if (!change) return null;
+  const cls: Record<string, string> = {
+    new: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300",
+    changed: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300",
+    gone: "bg-zinc-100 text-zinc-500 ring-zinc-500/15 dark:bg-zinc-800 dark:text-zinc-400",
+    unchanged: "text-zinc-400 ring-transparent",
+  };
+  return (
+    <span className={"px-1.5 py-0.5 rounded-full ring-1 ring-inset font-medium " + (cls[change] ?? cls.unchanged)}>
+      {change}
+    </span>
   );
 }
 

@@ -11,11 +11,11 @@ interface PageProps {
 
 export default async function NewCarSourcePage({ params }: PageProps) {
   const { id } = await params;
-  const job = await requireJob(id, "cars");
+  const job = await requireJob(id);
   return (
     <>
       <Link
-        href={`/projects/${job.id}/cars/sources`}
+        href={`/projects/${job.id}/sources`}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
         ← Sources

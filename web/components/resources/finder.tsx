@@ -495,12 +495,16 @@ export function FinderResults({
   onAdded,
   emptyHint = "Describe what you're looking for and press Search.",
   allowAddToJob = false,
+  job,
 }: {
   finder: Finder;
   onAdded: (rows: ResourceRow[]) => void;
   emptyHint?: string;
   /** Offer "Add to job…" (not inside the New-job wizard, which adds to its own job). */
   allowAddToJob?: boolean;
+  /** Inside one job (its Discover page): the main action is "Add to this job"
+   *  — save to the library and attach to this job; no "Add to job…" menu. */
+  job?: Job;
 }) {
   const f = finder;
   const [view, setView] = useView();
@@ -605,7 +609,7 @@ export function FinderResults({
           placeholder="Filter by name, site, text…"
           className="h-8 w-56 px-2.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
         />
-        {FACET_KEYS.map((key) => (
+        {FACET_KEYS.filter((k) => k !== "change").map((key) => (
           <FacetMenu
             key={key}
             label={FACET_LABEL[key]}
@@ -712,14 +716,15 @@ export function FinderResults({
               type="button"
               disabled={f.busy !== null}
               onClick={async () => {
-                const rows = await f.addPicked();
+                const rows = await f.addPicked(job);
                 if (rows.length > 0) onAdded(rows);
               }}
+              title={job ? "Find careers pages, save to the library and attach to this job" : undefined}
               className={primaryBtn}
             >
-              {f.busy === "add" ? "Adding…" : "Add to library"}
+              {f.busy === "add" ? "Adding…" : job ? "Add to this job" : "Add to library"}
             </button>
-            {allowAddToJob && (
+            {allowAddToJob && !job && (
               <AddToJobMenu
                 disabled={f.busy !== null}
                 onPick={async (job) => {

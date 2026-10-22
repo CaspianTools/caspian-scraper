@@ -1,6 +1,9 @@
 import { databaseDoc, databasesCol } from "@/lib/firestore/collections";
 import { allRecords, databaseFile } from "@/lib/recordstore";
-import { toFinding, tagsOf, type Finding } from "@/lib/findings";
+import {
+  allTagsOf, facetCounts, filtersFromQuery, matches, sortFindings, toFinding, tagsOf,
+  type Finding, type Sort,
+} from "@/lib/findings";
 
 /**
  * Databases: named record collections (config in data/databases/<id>.json,
@@ -81,7 +84,57 @@ export function asFinding(rec: Record<string, unknown>, key: DatabaseInfo["key"]
     hidden: Boolean(rec.hidden),
     tags: tagsOf(rec as { tags?: string[] }),
     relevance: typeof rec.relevance === "number" ? rec.relevance : undefined,
+    change: typeof rec.status === "string" ? rec.status : undefined,
   };
+}
+
+/**
+ * One page of records, filtered and sorted — the body of the database and
+ * job-results list routes. Query: q, f.<facet>…, tagMode, hidden=1,
+ * minRelevance=N (records scored below it count as hidden unless hidden=1),
+ * sort, page, size; select=1 returns every matching {id, tags, hidden}.
+ */
+export function recordsPage(records: Record<string, unknown>[], key: DatabaseInfo["key"], q: URLSearchParams) {
+  const state = filtersFromQuery(q);
+  const showHidden = q.get("hidden") === "1";
+  const floor = Number(q.get("minRelevance")) || 0;
+  const rows = records.map((r) => {
+    const f = asFinding(r, key);
+    if (floor && typeof f.relevance === "number" && f.relevance < floor) f.hidden = true;
+    return { r, f };
+  });
+  const base = rows.filter((x) => showHidden || !x.f.hidden);
+  const matching = base.filter((x) => matches(x.f, state));
+  if (q.get("select") === "1") {
+    return { items: matching.map((x) => ({ id: x.f.id, tags: x.f.tags ?? [], hidden: x.f.hidden })) };
+  }
+  const sortParam = q.get("sort") ?? "";
+  const sort: Sort = sortParam === "relevance" || sortParam === "sources" ? sortParam : "name";
+  const byId = new Map(matching.map((x) => [x.f.id, x.r]));
+  const sorted = sortFindings(matching.map((x) => x.f), sort);
+  const size = Math.min(200, Math.max(1, Number(q.get("size")) || 60));
+  const page = Math.max(1, Number(q.get("page")) || 1);
+  return {
+    total: sorted.length,
+    totalAll: base.length,
+    hiddenCount: rows.filter((x) => x.f.hidden).length,
+    page,
+    size,
+    items: sorted.slice((page - 1) * size, page * size).map((f) => ({ finding: f, record: byId.get(f.id) })),
+    facets: facetCounts(base.map((x) => x.f), state),
+    allTags: allTagsOf(rows.map((x) => x.f)),
+  };
+}
+
+/** The records an export covers: a selection (ids=…) or the filters. */
+export function exportRows(records: Record<string, unknown>[], key: DatabaseInfo["key"], q: URLSearchParams) {
+  const state = filtersFromQuery(q);
+  const only = q.get("ids") ? new Set(q.get("ids")!.split(",")) : null;
+  return records.filter((r) => {
+    const f = asFinding(r, key);
+    if (only) return only.has(f.id);
+    return (q.get("hidden") === "1" || !f.hidden) && matches(f, state);
+  });
 }
 
 /** CSV of records: company columns, or every field the records have. */

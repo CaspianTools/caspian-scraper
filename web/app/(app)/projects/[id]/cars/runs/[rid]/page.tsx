@@ -51,7 +51,7 @@ function statusClasses(status: string): string {
 
 export default async function CarRunDetailPage({ params }: PageProps) {
   const { id, rid } = await params;
-  const job = await requireJob(id, "cars");
+  const job = await requireJob(id);
 
   const runSnap = await carRunsCol().doc(rid).get();
   if (!runSnap.exists) notFound();
@@ -69,7 +69,7 @@ export default async function CarRunDetailPage({ params }: PageProps) {
   return (
     <>
       <Link
-        href={`/projects/${job.id}/cars/runs`}
+        href={`/projects/${job.id}/runs`}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
         ← Runs

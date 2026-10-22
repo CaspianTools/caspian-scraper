@@ -79,12 +79,41 @@ const CronExpressionSchema = z.string().refine(
   { message: "cron must have a fixed minute (e.g. '30 4 * * *'); ≥1hr granularity" }
 );
 
-/** What a job collects (see lib/jobKinds.ts). Absent = "vacancies". */
-export const JobKindSchema = z.enum(["vacancies", "cars", "prices", "data"]);
+/** The template a job was made from (lib/jobTemplates.ts) — pre-fill only. */
+export const JobTemplateSchema = z.enum(["vacancies", "cars", "prices", "blank"]);
+const TagListSchema = z.array(z.string().trim().min(1).max(40)).max(50);
+const StoreIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/, "not a database id");
 
-export const ProjectCreateSchema = z.object({
+/** A generic job's own settings (see lib/jobTemplates.ts JobSettings). */
+export const JobSettingsSchema = z.object({
+  template: JobTemplateSchema.default("vacancies"),
+  record_label: z
+    .object({ singular: z.string().trim().min(1).max(40), plural: z.string().trim().min(1).max(40) })
+    .optional(),
+  fields: z
+    .array(z.object({ key: z.string().trim().regex(/^[a-z0-9_]{1,40}$/, "lowercase letters, digits and _"), label: z.string().trim().min(1).max(60) }))
+    .max(40)
+    .optional(),
+  modules: z.object({ discovery: z.boolean(), follow_up: z.boolean(), compare: z.boolean() }).optional(),
+  saves_to: z
+    .array(z.object({ database: StoreIdSchema, only_tags: TagListSchema.optional(), min_relevance: z.number().min(0).max(100).optional() }))
+    .max(10)
+    .optional(),
+  reads_from: z.array(z.object({ database: StoreIdSchema, only_tags: TagListSchema.optional() })).max(10).optional(),
+  relevance: z
+    .object({
+      include: z.array(z.string().trim().min(1).max(60)).max(100),
+      exclude: z.array(z.string().trim().min(1).max(60)).max(100),
+      cutoff: z.number().min(0).max(100),
+      use_ai: z.boolean(),
+    })
+    .optional(),
+  use_ai: z.boolean().optional(),
+  ai_spend_cap: z.number().min(0).max(100).optional(),
+});
+
+export const ProjectCreateSchema = JobSettingsSchema.extend({
   name: z.string().min(1).max(80),
-  kind: JobKindSchema.default("vacancies"),
   description: z.string().max(500).default(""),
   schedule_cron: CronExpressionSchema,
   enabled: z.boolean().default(true),
@@ -114,8 +143,7 @@ export const ProjectDocSchema = ProjectCreateSchema.extend({
 export type ProjectDoc = z.infer<typeof ProjectDocSchema>;
 
 // Patch (PATCH /api/projects/[id])
-// A job's kind is fixed once created (its sources and results depend on it).
-export const ProjectPatchSchema = ProjectCreateSchema.omit({ kind: true }).partial();
+export const ProjectPatchSchema = ProjectCreateSchema.partial();
 export type ProjectPatch = z.infer<typeof ProjectPatchSchema>;
 
 // /projects/{projectId}/sources/{sourceId} ----------------------------------
@@ -933,8 +961,11 @@ export type RunRequestDoc = z.infer<typeof RunRequestDocSchema>;
 // A named record database. Records live in db/<id>.jsonl (committed) through
 // the SQLite record store; jobs save into and read from databases.
 
-/** A database id: lowercase letters, digits, "-" and "_" (its file is db/<id>.jsonl). */
-export const DatabaseIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/, "not a database id");
+/** A database id — lowercase letters, digits, "-" and "_" (its file is
+ *  db/<id>.jsonl) — or a job's results store, "job:<job id>". */
+export const DatabaseIdSchema = z
+  .string()
+  .regex(/^(job:[A-Za-z0-9][A-Za-z0-9_-]{0,127}|[a-z0-9][a-z0-9_-]{0,62})$/, "not a database id");
 
 export const DatabaseKeySchema = z.enum(["domain", "url", "id"]);
 

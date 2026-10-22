@@ -1,5 +1,4 @@
 import { comparisonSourcesCol, projectDoc } from "@/lib/firestore/collections";
-import { jobKind } from "@/lib/jobKinds";
 import type { DocumentData, QueryDocumentSnapshot } from "@/lib/localdb";
 
 /**
@@ -42,12 +41,12 @@ export async function pricesJobScope(
   };
 }
 
-/** True when `projectId` is one of `uid`'s jobs of kind "prices". */
+/** True when `projectId` is one of `uid`'s jobs (any job can have shops). */
 export async function isOwnPricesJob(
   uid: string,
   projectId: string
 ): Promise<boolean> {
   const snap = await projectDoc(projectId).get();
   const data = snap.exists ? snap.data() : undefined;
-  return !!data && data.owner_uid === uid && jobKind(data.kind) === "prices";
+  return !!data && data.owner_uid === uid;
 }

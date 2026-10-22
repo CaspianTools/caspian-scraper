@@ -26,6 +26,8 @@ export interface Finding {
   tags?: string[];
   /** 0–100 against the job's relevance rules (when it has any). */
   relevance?: number;
+  /** A job result's change since the last run: new / changed / unchanged / gone. */
+  change?: string;
 }
 
 export const tagsOf = (f: { tags?: string[] }): string[] => f.tags ?? [];
@@ -88,11 +90,11 @@ export function toFinding(rec: Record<string, unknown>): Finding {
 
 // ---- filters ------------------------------------------------------------------
 
-export const FACET_KEYS = ["tag", "country", "category", "source", "status"] as const;
+export const FACET_KEYS = ["change", "tag", "country", "category", "source", "status"] as const;
 export type FacetKey = (typeof FACET_KEYS)[number];
 export type Filters = Record<FacetKey, Set<string>>;
 export const emptyFilters = (): Filters => ({
-  tag: new Set(), country: new Set(), category: new Set(), source: new Set(), status: new Set(),
+  change: new Set(), tag: new Set(), country: new Set(), category: new Set(), source: new Set(), status: new Set(),
 });
 /** Several tags picked: a company needs any one of them, or all of them. */
 export type TagMode = "any" | "all";
@@ -100,6 +102,8 @@ export const UNTAGGED = "(untagged)";
 
 export function facetValues(f: Finding, key: FacetKey): string[] {
   switch (key) {
+    case "change":
+      return [f.change ?? "(none)"];
     case "tag":
       return tagsOf(f).length ? tagsOf(f) : [UNTAGGED];
     case "country":
@@ -115,10 +119,17 @@ export function facetValues(f: Finding, key: FacetKey): string[] {
   }
 }
 export const FACET_LABEL: Record<FacetKey, string> = {
-  tag: "Tags", country: "Country", category: "Category", source: "Source", status: "Status",
+  change: "Change", tag: "Tags", country: "Country", category: "Category", source: "Source", status: "Status",
 };
+const CHANGE_LABEL: Record<string, string> = { new: "New", changed: "Changed", unchanged: "Unchanged", gone: "Gone" };
 export const optionLabel = (key: FacetKey, v: string) =>
-  key === "source" ? (SOURCE_LABEL[v] ?? v) : key === "status" ? STATUS_LABEL[v as StatusKey] : v;
+  key === "source"
+    ? (SOURCE_LABEL[v] ?? v)
+    : key === "status"
+      ? STATUS_LABEL[v as StatusKey]
+      : key === "change"
+        ? (CHANGE_LABEL[v] ?? v)
+        : v;
 
 export interface FilterState {
   filters: Filters;

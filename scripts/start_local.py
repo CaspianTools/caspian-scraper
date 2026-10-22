@@ -36,13 +36,13 @@ def write_review(review_file: Path | None, page: str) -> None:
         review_file.write_text(page, encoding="utf-8")
 
 
-# Where each job type's results are (web/lib/jobKinds.ts: jobHome).
-KIND_LABEL = {"vacancies": "Vacancies", "cars": "Cars", "prices": "Prices", "data": "Website data"}
-KIND_PAGE = {"vacancies": "findings", "cars": "cars", "prices": "prices", "data": "data"}
+# Templates a job was made from (web/lib/jobTemplates.ts), for the list.
+TEMPLATE_LABEL = {"vacancies": "Vacancies", "cars": "Car listings", "prices": "Product prices", "blank": "Blank"}
 
 
 def review_page(job: dict) -> str:
-    return f"projects/{job['__id']}/{KIND_PAGE[scrape.job_kind(job)]}"
+    """A job opens on its Results."""
+    return f"projects/{job['__id']}"
 
 
 def main() -> int:
@@ -61,8 +61,8 @@ def main() -> int:
     print("\nJobs:")
     for i, j in enumerate(jobs, 1):
         state = "" if j.get("enabled", True) else "  (paused)"
-        kind = KIND_LABEL[scrape.job_kind(j)]
-        print(f"  {i}. {j.get('name') or j['__id']}  [{kind}]{state}")
+        tpl = TEMPLATE_LABEL.get(scrape.job_template(j), "")
+        print(f"  {i}. {j.get('name') or j['__id']}  [{tpl}]{state}")
     pick = ask("\nWhich job? Number, or Enter for all enabled jobs: ", "")
     if pick:
         try:

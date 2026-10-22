@@ -20,8 +20,8 @@ export type {
 
 interface Props {
   initial: ComparisonSourceFormInitial;
-  /** The prices job the source (shop) belongs to — sent on create, and the
-   *  base of every link: /projects/[projectId]/prices/… */
+  /** The job the source (shop) belongs to — sent on create, and the base
+   *  of every link: the job's Sources / Runs pages (/projects/[projectId]/…). */
   projectId: string;
   sourceId?: string;
 }
@@ -34,7 +34,7 @@ interface FieldErr {
 export function ComparisonSourceForm({ initial, projectId, sourceId }: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
-  const base = `/projects/${projectId}/prices`;
+  const base = `/projects/${projectId}`;
   const [form, setForm] = useState<ComparisonSourceFormInitial>(initial);
   const [extractionJson, setExtractionJson] = useState<string>(
     JSON.stringify(initial.extraction, null, 2)

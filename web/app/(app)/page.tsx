@@ -5,8 +5,8 @@ import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import { DraftJobCard } from "@/components/job-wizard/DraftJobCard";
-import { JobKindIcon } from "@/components/JobKindPicker";
-import { JOB_KIND_INFO, jobHome, jobKind, type JobKind } from "@/lib/jobKinds";
+import { JobTemplateIcon } from "@/components/JobTemplatePicker";
+import { TEMPLATE_INFO, jobSettings, type JobTemplate } from "@/lib/jobTemplates";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,9 @@ const newJobCls =
 interface ProjectListItem {
   id: string;
   name: string;
-  kind: JobKind;
+  template: JobTemplate;
+  /** "vacancies", "listings"… */
+  plural: string;
   description: string;
   enabled: boolean;
   schedule_cron: string;
@@ -38,7 +40,8 @@ export default async function Home() {
     return {
       id: d.id,
       name: data.name ?? "(unnamed)",
-      kind: jobKind(data.kind),
+      template: jobSettings(data).template,
+      plural: jobSettings(data).record_label.plural,
       description: data.description ?? "",
       enabled: data.enabled !== false,
       schedule_cron: data.schedule_cron ?? "",
@@ -71,7 +74,7 @@ export default async function Home() {
               {projects.map((p) => (
                 <Link
                   key={p.id}
-                  href={jobHome(p.id, p.kind)}
+                  href={`/projects/${p.id}`}
                   className="flex items-center gap-2.5 text-sm px-3 h-9 rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 transition-colors"
                 >
                   <span
@@ -106,7 +109,7 @@ export default async function Home() {
 function ProjectCard({ project }: { project: ProjectListItem }) {
   return (
     <Link
-      href={jobHome(project.id, project.kind)}
+      href={`/projects/${project.id}`}
       className="group flex flex-col rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-card hover:shadow-card-hover hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-px transition-all"
     >
       <div className="p-5 flex-1">
@@ -115,15 +118,16 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
             aria-hidden
             className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20 flex items-center justify-center shrink-0"
           >
-            <JobKindIcon kind={project.kind} className="w-[18px] h-[18px]" />
+            <JobTemplateIcon template={project.template} className="w-[18px] h-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold tracking-tight text-zinc-900 dark:text-white truncate group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
               {project.name}
             </h3>
             <p className="text-xs text-zinc-500 truncate" title={project.schedule_cron}>
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">{JOB_KIND_INFO[project.kind].label}</span>
-              {project.kind === "vacancies" && <> · {humanizeCron(project.schedule_cron)}</>}
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">Collects {project.plural}</span>
+              {" · "}
+              {TEMPLATE_INFO[project.template].label} template · {humanizeCron(project.schedule_cron)}
             </p>
           </div>
           <span
@@ -177,9 +181,9 @@ function EmptyState() {
       </span>
       <h2 className="text-base font-semibold tracking-tight mb-1">No jobs yet</h2>
       <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 max-w-md mx-auto">
-        A job collects one kind of thing — vacancies, cars, product prices or
-        any other website data — from the websites you give it. Everything it
-        finds is listed inside the job for you to review.
+        A job is its own scraping project: you say what it collects (vacancies,
+        car listings, product prices, anything) and from which websites, and
+        everything it finds is listed inside the job for you to review.
       </p>
       <Link href="/projects/new" className={newJobCls + " h-9 px-4"}>
         Create your first job

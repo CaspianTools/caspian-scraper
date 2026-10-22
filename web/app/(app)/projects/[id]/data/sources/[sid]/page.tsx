@@ -17,7 +17,7 @@ interface PageProps {
  */
 export default async function GenericSourcePage({ params }: PageProps) {
   const { id, sid } = await params;
-  const job = await requireJob(id, "data");
+  const job = await requireJob(id);
 
   const snap = await genericSourcesCol().doc(sid).get();
   const src = snap.exists ? snap.data() : undefined;

@@ -66,7 +66,7 @@ function labelFor(key: string): string {
 
 export default async function CarListingDetailPage({ params }: PageProps) {
   const { id, lid } = await params;
-  const job = await requireJob(id, "cars");
+  const job = await requireJob(id);
 
   // The doc id is "<site>:<listing_id>" (e.g. "opensooq:284135018"); the colon
   // is percent-encoded in the URL and may or may not be decoded back into the
@@ -123,10 +123,10 @@ export default async function CarListingDetailPage({ params }: PageProps) {
   return (
     <>
       <Link
-        href={`/projects/${job.id}/cars`}
+        href={`/projects/${job.id}`}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
-        ← Cars
+        ← Results
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { SchedulePicker } from "@/components/SchedulePicker";
-import { JobKindPicker } from "@/components/JobKindPicker";
-import { JOB_KIND_INFO, type JobKind } from "@/lib/jobKinds";
+import { JobTemplatePicker } from "@/components/JobTemplatePicker";
+import { TEMPLATE_INFO, type JobTemplate } from "@/lib/jobTemplates";
 
 interface FieldErr {
   field?: string;
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
-  const [kind, setKind] = useState<JobKind>("vacancies");
+  const [template, setTemplate] = useState<JobTemplate>("vacancies");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scheduleCron, setScheduleCron] = useState("0 */6 * * *");
@@ -34,7 +34,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
-          kind,
+          template,
           description: description.trim(),
           schedule_cron: scheduleCron.trim(),
           enabled,
@@ -79,8 +79,8 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <span className="block text-sm font-medium mb-1">What will it collect?</span>
-        <JobKindPicker value={kind} onChange={setKind} compact />
+        <span className="block text-sm font-medium mb-1">Start from</span>
+        <JobTemplatePicker value={template} onChange={setTemplate} compact />
       </div>
       <div>
         <label className="block text-sm font-medium mb-1">Name</label>
@@ -90,7 +90,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
           maxLength={80}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={JOB_KIND_INFO[kind].example}
+          placeholder={TEMPLATE_INFO[template].example}
           className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         {errFor("name") && (

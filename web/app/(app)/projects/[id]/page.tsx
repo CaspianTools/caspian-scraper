@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getSessionFromCookie } from "@/lib/auth/session";
+import { requireJob } from "@/lib/jobs";
 import {
-  projectDoc,
+  carSourcesCol,
+  comparisonSourcesCol,
+  genericSourcesCol,
   sourcesCol,
-  runsCol,
-  lessonsCol,
-  publishedCol,
 } from "@/lib/firestore/collections";
-import { attachedResources } from "@/lib/firestore/resources";
-import { humanizeCron } from "@/lib/cron/humanize";
-import { TrendBars, type TrendBarRun } from "@/components/TrendBars";
-import { jobHome, jobKind } from "@/lib/jobKinds";
+import { listDatabases } from "@/lib/databases";
+import { allRecords } from "@/lib/recordstore";
+import { countLabel } from "@/lib/jobTemplates";
+import { DatabaseView } from "@/components/databases/DatabaseView";
+import { RunNowButton } from "@/components/RunNowButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,414 +18,99 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const CONSECUTIVE_ZERO_ALERT = 3;
-
-function tsToIso(v: unknown): string {
-  if (!v) return "";
-  const t = v as { toDate?: () => Date };
-  if (typeof t.toDate === "function") return t.toDate().toISOString();
-  if (typeof v === "string") return v;
-  return "";
-}
-
-function fmtRelative(iso: string): string {
-  if (!iso) return "never";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return iso;
-  const delta = Math.round((Date.now() - t) / 1000);
-  if (delta < 60) return `${delta}s ago`;
-  if (delta < 3600) return `${Math.round(delta / 60)}m ago`;
-  if (delta < 86400) return `${Math.round(delta / 3600)}h ago`;
-  return `${Math.round(delta / 86400)}d ago`;
-}
-
-function statusClasses(s: string): string {
-  switch (s) {
-    case "ok":
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/25";
-    case "partial":
-      return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/25";
-    case "running":
-      return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/25";
-    case "error":
-    case "auth_halt":
-      return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/25";
-    default:
-      return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-  }
-}
-
-function computeStaleSources(
-  lessons: { source_id: string; source_name: string; verdict: string }[]
-) {
-  const bySource = new Map<
-    string,
-    { source_id: string; source_name: string; verdict: string }[]
-  >();
-  for (const l of lessons) {
-    const list = bySource.get(l.source_id) ?? [];
-    list.push(l);
-    bySource.set(l.source_id, list);
-  }
-  const stale: {
-    source_id: string;
-    source_name: string;
-    consecutive: number;
-  }[] = [];
-  for (const [sid, list] of bySource.entries()) {
-    let count = 0;
-    for (const l of list) {
-      if (l.verdict === "zero_found") count++;
-      else break;
-    }
-    if (count >= CONSECUTIVE_ZERO_ALERT) {
-      stale.push({
-        source_id: sid,
-        source_name: list[0]?.source_name ?? sid,
-        consecutive: count,
-      });
-    }
-  }
-  return stale.sort((a, b) => b.consecutive - a.consecutive);
-}
-
-export default async function ProjectOverviewPage({ params }: PageProps) {
-  const session = await getSessionFromCookie();
-  if (!session) redirect("/signin");
+/**
+ * A job's Results — every engine's records gathered into one store
+ * (job_results.py), paged and filtered on the server, worded in the job's
+ * own record name ("42 vacancies"). New / changed / gone are since the last
+ * run; records below the job's relevance cutoff are hidden by default.
+ */
+export default async function JobResultsPage({ params }: PageProps) {
   const { id } = await params;
+  const job = await requireJob(id);
+  const s = job.settings;
 
-  const snap = await projectDoc(id).get();
-  if (!snap.exists) notFound();
-  const data = snap.data();
-  if (!data || data.owner_uid !== session.uid) notFound();
-  // Only vacancy jobs have this overview; other types open on their results.
-  const kind = jobKind(data.kind);
-  if (kind !== "vacancies") redirect(jobHome(id, kind));
-
-  const [
-    sourcesCountSnap,
-    runsSnap,
-    lessonsSnap,
-    publishedSnap,
-    sharedResources,
-  ] = await Promise.all([
+  const [own, cars, shops, sites, databases] = await Promise.all([
     sourcesCol(id).count().get(),
-    runsCol(id).orderBy("started_at", "desc").limit(14).get(),
-    lessonsCol(id).orderBy("ts", "desc").limit(200).get(),
-    publishedCol(id).orderBy("published_at", "desc").limit(5).get(),
-    attachedResources(session.uid, data.resource_ids),
+    carSourcesCol().where("owner_uid", "==", job.uid).get(),
+    comparisonSourcesCol().where("owner_uid", "==", job.uid).get(),
+    genericSourcesCol().where("owner_uid", "==", job.uid).get(),
+    listDatabases(job.uid),
   ]);
+  const mine = (snap: typeof cars) => snap.docs.filter((d) => d.data().project_id === id).length;
+  const sourceCount =
+    own.data().count +
+    ((job.data.resource_ids as string[] | undefined)?.length ?? 0) +
+    s.reads_from.length +
+    mine(cars) +
+    mine(shops) +
+    mine(sites);
 
-  // Own /sources plus attached shared resources — what the scraper runs.
-  const sourcesCount = sourcesCountSnap.data().count + sharedResources.length;
-
-  // Trend chart wants oldest → newest; the query was newest first.
-  const recentRuns = runsSnap.docs.map((d) => d.data());
-  const trendData: TrendBarRun[] = recentRuns
-    .slice()
-    .reverse()
-    .map((r, i) => {
-      const totals = (r.totals ?? {}) as Record<string, number>;
-      return {
-        id: runsSnap.docs[runsSnap.docs.length - 1 - i].id,
-        status: String(r.status ?? ""),
-        started_at: tsToIso(r.started_at),
-        found: Number(totals.found ?? 0),
-        published: Number(totals.published ?? 0),
-        errors_count: Number(totals.errors_count ?? 0),
-      };
-    });
-
-  const latestRun = recentRuns[0];
-  const latestRunId = runsSnap.docs[0]?.id;
-
-  // Stale-source detection.
-  const lessons = lessonsSnap.docs.map((d) => {
-    const data = d.data();
-    return {
-      source_id: String(data.source_id ?? ""),
-      source_name: String(data.source_name ?? ""),
-      verdict: String(data.verdict ?? ""),
-    };
-  });
-  const stale = computeStaleSources(lessons);
-
-  // Recent published.
-  const recentPublished = publishedSnap.docs.map((d) => d.data());
-
-  const lastRunIso =
-    tsToIso(data.last_run_at) ||
-    (latestRun ? tsToIso(latestRun.started_at) : "");
-
-  const needsSources = sourcesCount === 0;
-  const stillSettingUp = needsSources;
+  const records = allRecords(`job:${id}`);
+  const live = records.filter((r) => r.status !== "gone" && !r.hidden);
+  const fresh = live.filter((r) => r.status === "new").length;
+  const changed = live.filter((r) => r.status === "changed").length;
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          label="Schedule"
-          value={humanizeCron(data.schedule_cron)}
-          hint={data.schedule_cron}
-        />
-        <StatCard
-          label="Sources"
-          value={String(sourcesCount)}
-          link={`/projects/${id}/sources`}
-        />
-        <StatCard
-          label="Last run"
-          value={lastRunIso ? fmtRelative(lastRunIso) : "never"}
-          hint={lastRunIso}
-          link={latestRunId ? `/projects/${id}/runs/${latestRunId}` : undefined}
-        />
-        <StatCard
-          label="Status"
-          value={data.enabled !== false ? "enabled" : "disabled"}
-        />
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {countLabel(live.length, s)} found
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+            {fresh > 0 || changed > 0 ? (
+              <>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">{fresh} new</span>
+                {" · "}
+                <span className="font-medium text-amber-700 dark:text-amber-400">{changed} changed</span>
+                {" since the last run · "}
+              </>
+            ) : null}
+            From {sourceCount} source{sourceCount === 1 ? "" : "s"}
+            {s.saves_to.length > 0 && <> · saved into {s.saves_to.map((t) => t.database).join(", ")}</>}
+          </p>
+        </div>
+        <div className="ml-auto">
+          <RunNowButton projectId={id} />
+        </div>
       </div>
 
-      {stale.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 p-5">
-          <div className="flex items-start gap-3">
-            <span
-              aria-hidden
-              className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-bold shrink-0"
-            >
-              !
-            </span>
-            <div className="min-w-0">
-              <h3 className="font-medium text-amber-900 dark:text-amber-200">
-                Action required: {stale.length} source
-                {stale.length === 1 ? "" : "s"} found nothing in the last{" "}
-                {CONSECUTIVE_ZERO_ALERT}+ runs
-              </h3>
-              <ul className="mt-2 space-y-1 text-sm">
-                {stale.slice(0, 5).map((s) => (
-                  <li key={s.source_id}>
-                    <Link
-                      href={`/projects/${id}/sources/${s.source_id}`}
-                      className="underline hover:no-underline text-amber-900 dark:text-amber-200"
-                    >
-                      {s.source_name}
-                    </Link>{" "}
-                    <span className="text-xs text-amber-700 dark:text-amber-300">
-                      · {s.consecutive} consecutive zero_found
-                    </span>
-                  </li>
-                ))}
-                {stale.length > 5 && (
-                  <li className="text-xs">
-                    <Link
-                      href={`/projects/${id}/lessons?verdict=zero_found`}
-                      className="underline text-amber-900 dark:text-amber-200"
-                    >
-                      and {stale.length - 5} more…
-                    </Link>
-                  </li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {latestRun && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-card">
-          <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-medium">Last run</h3>
-              <span
-                className={
-                  "text-xs font-medium px-2 py-0.5 rounded-full " +
-                  statusClasses(String(latestRun.status ?? ""))
-                }
-              >
-                {String(latestRun.status ?? "").replace("_", " ")}
-              </span>
-              {latestRun.dry_run && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                  dry run
-                </span>
-              )}
-            </div>
-            {latestRunId && (
-              <Link
-                href={`/projects/${id}/runs/${latestRunId}`}
-                className="text-sm underline text-zinc-700 dark:text-zinc-300"
-              >
-                View details →
-              </Link>
-            )}
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-            <RunStat
-              label="Checked"
-              value={Number(
-                (latestRun.totals as Record<string, number>)?.checked ?? 0
-              )}
-            />
-            <RunStat
-              label="Found"
-              value={Number(
-                (latestRun.totals as Record<string, number>)?.found ?? 0
-              )}
-            />
-            <RunStat
-              label="Published"
-              value={Number(
-                (latestRun.totals as Record<string, number>)?.published ?? 0
-              )}
-            />
-            <RunStat
-              label="Duplicates"
-              value={Number(
-                (latestRun.totals as Record<string, number>)?.skipped_duplicate ?? 0
-              )}
-            />
-            <RunStat
-              label="Errors"
-              value={Number(
-                (latestRun.totals as Record<string, number>)?.errors_count ?? 0
-              )}
-            />
-          </div>
-        </div>
-      )}
-
-      {trendData.length > 1 && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-card">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="font-medium">
-                Trend (last {trendData.length} runs)
-              </h3>
-              <p className="text-xs text-zinc-500 mt-1">
-                Bar height = found · colour = status · click to open
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Legend color="bg-emerald-500" label="ok" />
-              <Legend color="bg-amber-500" label="partial" />
-              <Legend color="bg-red-500" label="error" />
-              <Legend color="bg-blue-400" label="running" />
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <TrendBars projectId={id} runs={trendData} />
-          </div>
-        </div>
-      )}
-
-      {recentPublished.length > 0 && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
-          <div className="px-4 py-2 text-xs uppercase tracking-wide text-zinc-500 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-            Recently published
-          </div>
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
-            {recentPublished.map((p, i) => {
-              const published_at = tsToIso(p.published_at);
-              return (
-                <li key={i} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">
-                      {String(p.title ?? "(untitled)")}
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      {String(p.employer ?? "")}
-                      {p.location ? ` · ${p.location}` : ""}
-                      {p.country
-                        ? ` · ${String(p.country).toUpperCase()}`
-                        : ""}
-                    </div>
-                  </div>
-                  <span className="text-xs text-zinc-500 shrink-0">
-                    {fmtRelative(published_at)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {stillSettingUp && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-card">
-          <h2 className="text-lg font-medium mb-2">Next steps</h2>
-          <ol className="text-sm text-zinc-600 dark:text-zinc-400 space-y-2 list-decimal list-inside">
-            {needsSources && (
-              <li>
-                Add{" "}
-                <Link
-                  href={`/projects/${id}/sources`}
-                  className="underline"
-                >
-                  sources
-                </Link>{" "}
-                — the URLs to scrape (each tagged with an ATS type).
-              </li>
-            )}
+      {sourceCount === 0 && (
+        <div className="rounded-2xl border border-brand-200 dark:border-brand-400/30 bg-brand-50/60 dark:bg-brand-500/5 p-5 text-sm">
+          <p className="font-semibold tracking-tight">Next steps</p>
+          <ol className="mt-2 space-y-1 list-decimal list-inside text-zinc-700 dark:text-zinc-300">
             <li>
-              Start a run from{" "}
-              <Link href={`/projects/${id}/runs`} className="underline">
-                Runs
-              </Link>{" "}
-              (or Start.bat), then review what it found under{" "}
-              <Link href={`/projects/${id}/findings`} className="underline">
-                Vacancies
+              Add the websites to collect {s.record_label.plural} from under{" "}
+              <Link href={`/projects/${id}/sources`} className="underline">
+                Sources
               </Link>
+              {s.modules.discovery && (
+                <>
+                  {" "}— or find them with{" "}
+                  <Link href={`/projects/${id}/discover`} className="underline">
+                    Discover
+                  </Link>
+                </>
+              )}
               .
             </li>
+            <li>Press Run now (or use Start.bat); what it finds appears here.</li>
           </ol>
         </div>
       )}
+
+      <DatabaseView
+        db={{
+          id,
+          name: job.name,
+          key: "url",
+          kind: "job",
+          record_label: s.record_label,
+          columns: s.fields,
+          cutoff: s.relevance.cutoff,
+          databases: databases.map((d) => ({ id: d.id, name: d.name })),
+        }}
+      />
     </>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  link,
-  hint,
-}: {
-  label: string;
-  value: string;
-  link?: string;
-  hint?: string;
-}) {
-  const body = (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-card">
-      <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">
-        {label}
-      </div>
-      <div
-        className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate"
-        title={hint || value}
-      >
-        {value}
-      </div>
-    </div>
-  );
-  return link ? <Link href={link}>{body}</Link> : body;
-}
-
-function RunStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-zinc-500 mb-0.5">
-        {label}
-      </div>
-      <div className="text-base font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span className={"w-2.5 h-2.5 rounded-sm inline-block " + color} />
-      {label}
-    </span>
   );
 }
