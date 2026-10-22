@@ -12,6 +12,8 @@ import { CAR_SITES, type CarSourceFormInitial } from "./carSourceFormDefaults";
 export type { CarSourceFormInitial } from "./carSourceFormDefaults";
 
 interface Props {
+  /** The car job this source belongs to; links stay within its pages. */
+  projectId: string;
   initial: CarSourceFormInitial;
   sourceId?: string;
 }
@@ -21,9 +23,10 @@ interface FieldErr {
   message: string;
 }
 
-export function CarSourceForm({ initial, sourceId }: Props) {
+export function CarSourceForm({ projectId, initial, sourceId }: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
+  const base = `/projects/${projectId}/cars`;
   const [form, setForm] = useState<CarSourceFormInitial>(initial);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -46,6 +49,8 @@ export function CarSourceForm({ initial, sourceId }: Props) {
         country: form.country.trim().toLowerCase(),
         max_listings: Number(form.max_listings) || 50,
         posted_within_days: Number(form.posted_within_days),
+        // Only read on create; a source stays in the job it was made in.
+        ...(isEdit ? {} : { project_id: projectId }),
       });
       const url = isEdit
         ? `/api/cars/sources/${sourceId}`
@@ -68,7 +73,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
         }
         return;
       }
-      router.push("/cars/sources");
+      router.push(`${base}/sources`);
       router.refresh();
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
@@ -89,7 +94,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
         setErrors([{ message: b.error || `Run-now failed (${res.status})` }]);
         return;
       }
-      router.push("/cars/runs");
+      router.push(`${base}/runs`);
       router.refresh();
     } finally {
       setBusy(false);
@@ -100,7 +105,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
     if (!sourceId) return;
     if (
       !confirm(
-        `Delete "${form.name}"? Existing listings are kept; only future scrapes stop.`
+        `Delete "${form.name}"? Future runs stop and its cars no longer show in this job.`
       )
     )
       return;
@@ -114,7 +119,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
         setErrors([{ message: b.error || `Delete failed (${res.status})` }]);
         return;
       }
-      router.push("/cars/sources");
+      router.push(`${base}/sources`);
       router.refresh();
     } finally {
       setDeleting(false);
@@ -327,7 +332,7 @@ export function CarSourceForm({ initial, sourceId }: Props) {
             </button>
           )}
           <Link
-            href="/cars/sources"
+            href={`${base}/sources`}
             className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Cancel

@@ -36,6 +36,15 @@ def write_review(review_file: Path | None, page: str) -> None:
         review_file.write_text(page, encoding="utf-8")
 
 
+# Where each job type's results are (web/lib/jobKinds.ts: jobHome).
+KIND_LABEL = {"vacancies": "Vacancies", "cars": "Cars", "prices": "Prices", "data": "Website data"}
+KIND_PAGE = {"vacancies": "findings", "cars": "cars", "prices": "prices", "data": "data"}
+
+
+def review_page(job: dict) -> str:
+    return f"projects/{job['__id']}/{KIND_PAGE[scrape.job_kind(job)]}"
+
+
 def main() -> int:
     review_file = Path(sys.argv[1]) if len(sys.argv) > 1 else None
 
@@ -52,7 +61,8 @@ def main() -> int:
     print("\nJobs:")
     for i, j in enumerate(jobs, 1):
         state = "" if j.get("enabled", True) else "  (paused)"
-        print(f"  {i}. {j.get('name') or j['__id']}{state}")
+        kind = KIND_LABEL[scrape.job_kind(j)]
+        print(f"  {i}. {j.get('name') or j['__id']}  [{kind}]{state}")
     pick = ask("\nWhich job? Number, or Enter for all enabled jobs: ", "")
     if pick:
         try:
@@ -74,10 +84,7 @@ def main() -> int:
         os.environ["ONLY_PROJECT_ID"] = j["__id"]
         worst = max(worst, scrape.main())
 
-    write_review(
-        review_file,
-        f"projects/{chosen[0]['__id']}/findings" if len(chosen) == 1 else "",
-    )
+    write_review(review_file, review_page(chosen[0]) if len(chosen) == 1 else "")
     return worst
 
 

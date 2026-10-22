@@ -5,9 +5,12 @@
  * useFinder (components/resources/finder.tsx).
  */
 
+import { jobKind, type JobKind } from "@/lib/jobKinds";
+
 export const DRAFT_KEY = "caspian.jobwizard.draft";
 
 export interface JobDraft {
+  kind: JobKind;
   step: 0 | 1 | 2;
   name: string;
   description: string;
@@ -22,6 +25,7 @@ export function loadDraft(): JobDraft | null {
     const d = JSON.parse(raw);
     if (typeof d !== "object" || d === null) return null;
     return {
+      kind: jobKind(d.kind),
       step: d.step === 1 || d.step === 2 ? d.step : 0,
       name: typeof d.name === "string" ? d.name : "",
       description: typeof d.description === "string" ? d.description : "",

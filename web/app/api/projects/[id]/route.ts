@@ -3,7 +3,12 @@ import { FieldValue } from "@/lib/localdb";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { ProjectPatchSchema } from "@/lib/firestore/schema";
-import { projectDoc } from "@/lib/firestore/collections";
+import {
+  carSourcesCol,
+  comparisonSourcesCol,
+  genericSourcesCol,
+  projectDoc,
+} from "@/lib/firestore/collections";
 import { invalidResourceIds } from "@/lib/firestore/resources";
 
 /**
@@ -116,6 +121,16 @@ export async function DELETE(
   const snap = await ref.get();
   if (!snap.exists || snap.data()?.owner_uid !== session.uid) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  // A car / prices / data job's websites are top-level sources carrying its
+  // id (lib/jobKinds.ts); delete them too, or they'd keep running on their
+  // own schedules. Their past listings/records stay but no job shows them.
+  for (const col of [carSourcesCol(), comparisonSourcesCol(), genericSourcesCol()]) {
+    const own = await col.where("owner_uid", "==", session.uid).get();
+    for (const d of own.docs) {
+      if (d.data().project_id === id) await col.doc(d.id).delete();
+    }
   }
 
   // recursiveDelete walks all subcollections + their docs in batches.

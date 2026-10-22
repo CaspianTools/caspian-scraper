@@ -3,13 +3,15 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectDoc } from "@/lib/firestore/collections";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import { ProjectNav } from "@/components/ProjectNav";
+import { JOB_KIND_INFO, jobKind } from "@/lib/jobKinds";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Job (project) layout: the sidebar holds "← Jobs", the job's name and
- * enabled chip, and its section nav (Overview / Sources / Runs / …); pages
- * render in the main area. 404s for a job that isn't the session's.
+ * Job (project) layout: the sidebar holds "← Jobs", the job's name, type
+ * and enabled chip, and its section nav — which depends on the job's type
+ * (lib/jobKinds.ts: Vacancies / Cars / Prices / Website data); pages render in
+ * the main area. 404s for a job that isn't the session's.
  */
 export default async function ProjectLayout({
   children,
@@ -27,6 +29,7 @@ export default async function ProjectLayout({
   if (!data || data.owner_uid !== session?.uid) notFound();
 
   const enabled = data.enabled !== false;
+  const kind = jobKind(data.kind);
   return (
     <SidebarLayout
       sidebar={
@@ -34,7 +37,14 @@ export default async function ProjectLayout({
           <SidebarHeader
             back={{ href: "/", label: "Jobs" }}
             title={data.name}
-            subtitle={data.description || undefined}
+            subtitle={
+              <>
+                <span className="inline-flex items-center px-1.5 py-0.5 mr-1.5 rounded-md bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/15 text-[11px] font-medium dark:bg-brand-500/10 dark:text-brand-300">
+                  {JOB_KIND_INFO[kind].label}
+                </span>
+                {data.description || null}
+              </>
+            }
             badge={
               <span
                 className={
@@ -48,7 +58,7 @@ export default async function ProjectLayout({
               </span>
             }
           />
-          <ProjectNav projectId={id} />
+          <ProjectNav projectId={id} kind={kind} />
         </>
       }
     >

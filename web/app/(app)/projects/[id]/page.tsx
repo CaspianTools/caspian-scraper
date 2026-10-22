@@ -11,6 +11,7 @@ import {
 import { attachedResources } from "@/lib/firestore/resources";
 import { humanizeCron } from "@/lib/cron/humanize";
 import { TrendBars, type TrendBarRun } from "@/components/TrendBars";
+import { jobHome, jobKind } from "@/lib/jobKinds";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,9 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
   if (!snap.exists) notFound();
   const data = snap.data();
   if (!data || data.owner_uid !== session.uid) notFound();
+  // Only vacancy jobs have this overview; other types open on their results.
+  const kind = jobKind(data.kind);
+  if (kind !== "vacancies") redirect(jobHome(id, kind));
 
   const [
     sourcesCountSnap,
@@ -369,7 +373,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
               </Link>{" "}
               (or Start.bat), then review what it found under{" "}
               <Link href={`/projects/${id}/findings`} className="underline">
-                Findings
+                Vacancies
               </Link>
               .
             </li>

@@ -3,6 +3,7 @@ import { FieldValue, type DocumentData } from "@/lib/localdb";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { GenericSourcePatchSchema } from "@/lib/firestore/schema";
 import { genericSourcesCol } from "@/lib/firestore/collections";
+import { isOwnedDataJob } from "@/app/api/generic/dataJob";
 
 async function loadOwned(
   sid: string,
@@ -34,7 +35,8 @@ export async function GET(
 
 /**
  * PATCH /api/generic/sources/[sid] — partial update. source_key is
- * mutable but enforces the per-owner uniqueness invariant.
+ * mutable but enforces the per-owner uniqueness invariant; a new
+ * project_id must be another of the owner's "Website data" jobs.
  */
 export async function PATCH(
   req: NextRequest,
@@ -61,6 +63,20 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid patch", details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  if (
+    parsed.data.project_id &&
+    parsed.data.project_id !== existing.project_id &&
+    !(await isOwnedDataJob(parsed.data.project_id, session.uid))
+  ) {
+    return NextResponse.json(
+      {
+        error: "invalid patch",
+        details: [{ path: ["project_id"], message: "not one of your Website data jobs" }],
+      },
       { status: 400 }
     );
   }

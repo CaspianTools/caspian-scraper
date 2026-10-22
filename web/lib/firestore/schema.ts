@@ -79,8 +79,12 @@ const CronExpressionSchema = z.string().refine(
   { message: "cron must have a fixed minute (e.g. '30 4 * * *'); ≥1hr granularity" }
 );
 
+/** What a job collects (see lib/jobKinds.ts). Absent = "vacancies". */
+export const JobKindSchema = z.enum(["vacancies", "cars", "prices", "data"]);
+
 export const ProjectCreateSchema = z.object({
   name: z.string().min(1).max(80),
+  kind: JobKindSchema.default("vacancies"),
   description: z.string().max(500).default(""),
   schedule_cron: CronExpressionSchema,
   enabled: z.boolean().default(true),
@@ -110,7 +114,8 @@ export const ProjectDocSchema = ProjectCreateSchema.extend({
 export type ProjectDoc = z.infer<typeof ProjectDocSchema>;
 
 // Patch (PATCH /api/projects/[id])
-export const ProjectPatchSchema = ProjectCreateSchema.partial();
+// A job's kind is fixed once created (its sources and results depend on it).
+export const ProjectPatchSchema = ProjectCreateSchema.omit({ kind: true }).partial();
 export type ProjectPatch = z.infer<typeof ProjectPatchSchema>;
 
 // /projects/{projectId}/sources/{sourceId} ----------------------------------
@@ -376,6 +381,8 @@ export const ComparisonSourceCreateSchema = z.object({
   schedule_cron: CronExpressionSchema,
   active: z.boolean().default(true),
   notes: z.string().max(2000).default(""),
+  /** The job (project of a matching kind) this source belongs to. */
+  project_id: z.string().min(1).max(128).optional(),
 });
 export type ComparisonSourceCreate = z.infer<
   typeof ComparisonSourceCreateSchema
@@ -545,6 +552,8 @@ export const GenericSourceCreateSchema = z.object({
   destination_id: z.string().max(200).optional(),
   active: z.boolean().default(true),
   notes: z.string().max(2000).default(""),
+  /** The job (project of a matching kind) this source belongs to. */
+  project_id: z.string().min(1).max(128).optional(),
 });
 export type GenericSourceCreate = z.infer<typeof GenericSourceCreateSchema>;
 
@@ -629,7 +638,8 @@ export type GenericRunDoc = z.infer<typeof GenericRunDocSchema>;
 // `python -m aiconfig --job <id>` reads it, drives the browser, and writes
 // back its progress (turns/status/proposed_config/…); the wizard UI
 // subscribes to the doc via client onSnapshot. On Approve the API route
-// materialises `proposed_config` into a real /generic_sources/{sid} doc.
+// materialises `proposed_config` into a real /generic_sources/{sid} doc,
+// owned by the config job's `project_id` (a "Website data" job).
 //
 // Mirrored manually in the Python `aiconfig` package — keep the two in sync.
 // ---------------------------------------------------------------------------
@@ -692,6 +702,8 @@ export const ConfigJobCreateSchema = z.object({
   // (aiconfig/heuristic.py). On: the AI agent builds and checks it with the
   // provider + key from Settings.
   use_ai: z.boolean().default(false),
+  // The "Website data" job (project of kind "data") the approved source joins.
+  project_id: z.string().min(1).max(128),
 });
 export type ConfigJobCreate = z.infer<typeof ConfigJobCreateSchema>;
 
@@ -772,6 +784,8 @@ export const CarSourceCreateSchema = z.object({
   schedule_cron: CronExpressionSchema,
   active: z.boolean().default(true),
   notes: z.string().max(2000).default(""),
+  /** The job (project of a matching kind) this source belongs to. */
+  project_id: z.string().min(1).max(128).optional(),
 });
 export type CarSourceCreate = z.infer<typeof CarSourceCreateSchema>;
 

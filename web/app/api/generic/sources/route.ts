@@ -7,6 +7,7 @@ import {
   type GenericSourceDoc,
 } from "@/lib/firestore/schema";
 import { genericSourcesCol } from "@/lib/firestore/collections";
+import { isOwnedDataJob } from "@/app/api/generic/dataJob";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -22,8 +23,8 @@ function millis(v: unknown): number {
 
 /**
  * GET /api/generic/sources — the signed-in user's generic sources, newest
- * first. Equality-only query + in-memory sort so no composite index is
- * required.
+ * first; `?project_id=` keeps one "Website data" job's. Equality-only query
+ * + in-memory sort so no composite index is required.
  */
 export async function GET(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -33,15 +34,18 @@ export async function GET(req: NextRequest) {
   const snap = await genericSourcesCol()
     .where("owner_uid", "==", session.uid)
     .get();
+  const projectId = req.nextUrl.searchParams.get("project_id");
   const sources = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }) as Record<string, unknown>)
+    .filter((s) => !projectId || s.project_id === projectId)
     .sort((a, b) => millis(b.created_at) - millis(a.created_at));
   return NextResponse.json({ sources });
 }
 
 /**
  * POST /api/generic/sources — create a generic source owned by the
- * signed-in user. source_key must be unique per user (it's the record-uid
+ * signed-in user, in one of their "Website data" jobs (`project_id`,
+ * required). source_key must be unique per user (it's the record-uid
  * prefix — collisions would clash across sources).
  */
 export async function POST(req: NextRequest) {
@@ -65,6 +69,15 @@ export async function POST(req: NextRequest) {
     );
   }
   const input = parsed.data;
+  if (!input.project_id || !(await isOwnedDataJob(input.project_id, session.uid))) {
+    return NextResponse.json(
+      {
+        error: "invalid source",
+        details: [{ path: ["project_id"], message: "not one of your Website data jobs" }],
+      },
+      { status: 400 }
+    );
+  }
 
   const clashSnap = await genericSourcesCol()
     .where("owner_uid", "==", session.uid)

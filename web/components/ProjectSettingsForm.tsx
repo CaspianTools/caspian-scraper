@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import { SchedulePicker } from "@/components/SchedulePicker";
+import type { JobKind } from "@/lib/jobKinds";
 
 interface Props {
   projectId: string;
+  /** Only vacancy jobs run on the job's schedule; other types' websites
+   *  (sources) each have their own. */
+  kind: JobKind;
   initial: {
     name: string;
     description: string;
@@ -20,7 +24,7 @@ interface FieldErr {
   message: string;
 }
 
-export function ProjectSettingsForm({ projectId, initial }: Props) {
+export function ProjectSettingsForm({ projectId, kind, initial }: Props) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
@@ -130,11 +134,13 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
           />
         </div>
 
-        <SchedulePicker
-          value={scheduleCron}
-          onChange={setScheduleCron}
-          errorMessage={errFor("schedule_cron")}
-        />
+        {kind === "vacancies" && (
+          <SchedulePicker
+            value={scheduleCron}
+            onChange={setScheduleCron}
+            errorMessage={errFor("schedule_cron")}
+          />
+        )}
 
         <div className="flex items-center gap-2">
           <input
@@ -147,7 +153,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
           <label htmlFor="enabled" className="text-sm">
             Enabled{" "}
             <span className="text-zinc-500">
-              — uncheck to pause scrapes without deleting the project
+              — uncheck to pause this job&apos;s scheduled runs without deleting it
             </span>
           </label>
         </div>
@@ -182,8 +188,8 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
           Danger zone
         </h3>
         <p className="text-sm text-red-800 dark:text-red-400 mt-1 mb-4">
-          Permanently delete this project and everything in it — sources,
-          destinations, secrets, runs, lessons. This cannot be undone.
+          Permanently delete this job and its websites (sources), runs and
+          settings. This cannot be undone.
         </p>
         <button
           type="button"
@@ -191,7 +197,7 @@ export function ProjectSettingsForm({ projectId, initial }: Props) {
           disabled={deleting}
           className="inline-flex items-center h-10 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
         >
-          {deleting ? "Deleting…" : "Delete this project"}
+          {deleting ? "Deleting…" : "Delete this job"}
         </button>
       </div>
     </div>

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import { SchedulePicker } from "@/components/SchedulePicker";
+import { JobKindPicker } from "@/components/JobKindPicker";
+import { JOB_KIND_INFO, type JobKind } from "@/lib/jobKinds";
 
 interface FieldErr {
   field?: string;
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
+  const [kind, setKind] = useState<JobKind>("vacancies");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scheduleCron, setScheduleCron] = useState("0 */6 * * *");
@@ -31,6 +34,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
+          kind,
           description: description.trim(),
           schedule_cron: scheduleCron.trim(),
           enabled,
@@ -75,6 +79,10 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
+        <span className="block text-sm font-medium mb-1">What will it collect?</span>
+        <JobKindPicker value={kind} onChange={setKind} compact />
+      </div>
+      <div>
         <label className="block text-sm font-medium mb-1">Name</label>
         <input
           type="text"
@@ -82,7 +90,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
           maxLength={80}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="HSE Jobs Middle East"
+          placeholder={JOB_KIND_INFO[kind].example}
           className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
         {errFor("name") && (
@@ -100,7 +108,7 @@ export function QuickAddProjectForm({ onSuccess, onCancel }: Props) {
           maxLength={500}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="What does this scraper publish, and where?"
+          placeholder="What is this job looking for?"
           className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs"
         />
       </div>

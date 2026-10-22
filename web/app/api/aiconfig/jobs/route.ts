@@ -8,6 +8,7 @@ import {
 } from "@/lib/firestore/schema";
 import { configJobsCol } from "@/lib/firestore/collections";
 import { startAiconfig } from "@/lib/localRunner";
+import { isOwnedDataJob } from "@/app/api/generic/dataJob";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -23,8 +24,8 @@ function millis(v: unknown): number {
 
 /**
  * GET /api/aiconfig/jobs — the signed-in user's recent config jobs,
- * newest first. Equality-only query + in-memory sort so no composite
- * index is required.
+ * newest first; `?project_id=` keeps one job's. Equality-only query +
+ * in-memory sort so no composite index is required.
  */
 export async function GET(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -34,8 +35,10 @@ export async function GET(req: NextRequest) {
   const snap = await configJobsCol()
     .where("owner_uid", "==", session.uid)
     .get();
+  const projectId = req.nextUrl.searchParams.get("project_id");
   const jobs = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }) as Record<string, unknown>)
+    .filter((j) => !projectId || j.project_id === projectId)
     .sort((a, b) => millis(b.created_at) - millis(a.created_at));
   return NextResponse.json({ jobs });
 }
@@ -44,9 +47,9 @@ export async function GET(req: NextRequest) {
  * POST /api/aiconfig/jobs
  *
  * Create a config job owned by the signed-in user (status:"queued",
- * empty transcript) and fire the aiconfig workflow so the Python agent
- * picks it up. Dispatch is fire-and-forget — the cron/manual dispatch is
- * the fallback.
+ * empty transcript) for one of their "Website data" jobs (`project_id` —
+ * the approved source joins it) and start the Python agent on this
+ * computer for it.
  */
 export async function POST(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -65,6 +68,15 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid job", details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+  if (!(await isOwnedDataJob(parsed.data.project_id, session.uid))) {
+    return NextResponse.json(
+      {
+        error: "invalid job",
+        details: [{ path: ["project_id"], message: "not one of your Website data jobs" }],
+      },
       { status: 400 }
     );
   }

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectDoc } from "@/lib/firestore/collections";
 import { ProjectSettingsForm } from "@/components/ProjectSettingsForm";
+import { jobKind } from "@/lib/jobKinds";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,12 @@ export default async function SettingsPage({ params }: PageProps) {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Settings</h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-          Edit project metadata, pause scraping, or delete the project.
+          Rename the job, pause it, or delete it.
         </p>
       </div>
       <ProjectSettingsForm
         projectId={id}
+        kind={jobKind(data.kind)}
         initial={{
           name: data.name ?? "",
           description: data.description ?? "",

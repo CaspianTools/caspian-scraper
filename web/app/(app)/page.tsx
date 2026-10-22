@@ -5,6 +5,8 @@ import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import { DraftJobCard } from "@/components/job-wizard/DraftJobCard";
+import { JobKindIcon } from "@/components/JobKindPicker";
+import { JOB_KIND_INFO, jobHome, jobKind, type JobKind } from "@/lib/jobKinds";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ const newJobCls =
 interface ProjectListItem {
   id: string;
   name: string;
+  kind: JobKind;
   description: string;
   enabled: boolean;
   schedule_cron: string;
@@ -35,6 +38,7 @@ export default async function Home() {
     return {
       id: d.id,
       name: data.name ?? "(unnamed)",
+      kind: jobKind(data.kind),
       description: data.description ?? "",
       enabled: data.enabled !== false,
       schedule_cron: data.schedule_cron ?? "",
@@ -67,7 +71,7 @@ export default async function Home() {
               {projects.map((p) => (
                 <Link
                   key={p.id}
-                  href={`/projects/${p.id}`}
+                  href={jobHome(p.id, p.kind)}
                   className="flex items-center gap-2.5 text-sm px-3 h-9 rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 transition-colors"
                 >
                   <span
@@ -102,23 +106,24 @@ export default async function Home() {
 function ProjectCard({ project }: { project: ProjectListItem }) {
   return (
     <Link
-      href={`/projects/${project.id}`}
+      href={jobHome(project.id, project.kind)}
       className="group flex flex-col rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-card hover:shadow-card-hover hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-px transition-all"
     >
       <div className="p-5 flex-1">
         <div className="flex items-start gap-3 mb-3">
           <span
             aria-hidden
-            className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20 flex items-center justify-center text-sm font-semibold shrink-0"
+            className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20 flex items-center justify-center shrink-0"
           >
-            {project.name.trim().charAt(0).toUpperCase() || "?"}
+            <JobKindIcon kind={project.kind} className="w-[18px] h-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold tracking-tight text-zinc-900 dark:text-white truncate group-hover:text-brand-700 dark:group-hover:text-brand-300 transition-colors">
               {project.name}
             </h3>
             <p className="text-xs text-zinc-500 truncate" title={project.schedule_cron}>
-              {humanizeCron(project.schedule_cron)}
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">{JOB_KIND_INFO[project.kind].label}</span>
+              {project.kind === "vacancies" && <> · {humanizeCron(project.schedule_cron)}</>}
             </p>
           </div>
           <span
@@ -172,9 +177,9 @@ function EmptyState() {
       </span>
       <h2 className="text-base font-semibold tracking-tight mb-1">No jobs yet</h2>
       <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 max-w-md mx-auto">
-        A job is one scraping pipeline — websites to scrape, picked from the
-        shared resource library. Everything a run finds is listed under the
-        job&apos;s Findings for review.
+        A job collects one kind of thing — vacancies, cars, product prices or
+        any other website data — from the websites you give it. Everything it
+        finds is listed inside the job for you to review.
       </p>
       <Link href="/projects/new" className={newJobCls + " h-9 px-4"}>
         Create your first job

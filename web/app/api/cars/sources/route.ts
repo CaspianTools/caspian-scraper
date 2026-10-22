@@ -6,7 +6,8 @@ import {
   CarSourceDocSchema,
   type CarSourceDoc,
 } from "@/lib/firestore/schema";
-import { carSourcesCol } from "@/lib/firestore/collections";
+import { carSourcesCol, projectDoc } from "@/lib/firestore/collections";
+import { jobKind } from "@/lib/jobKinds";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
 function millis(v: unknown): number {
@@ -23,23 +24,28 @@ function millis(v: unknown): number {
 /**
  * GET /api/cars/sources — the signed-in user's car sources, newest first.
  * Equality-only query + in-memory sort so no composite index is required.
+ *
+ *   ?project_id=<id>   only the sources of that car job
  */
 export async function GET(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
   if (!session) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
+  const projectId = new URL(req.url).searchParams.get("project_id");
   const snap = await carSourcesCol()
     .where("owner_uid", "==", session.uid)
     .get();
   const sources = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }) as Record<string, unknown>)
+    .filter((s) => !projectId || s.project_id === projectId)
     .sort((a, b) => millis(b.created_at) - millis(a.created_at));
   return NextResponse.json({ sources });
 }
 
 /**
- * POST /api/cars/sources — create a car source owned by the signed-in user.
+ * POST /api/cars/sources — create a car source owned by the signed-in user,
+ * in one of their car jobs (`project_id` required; the job's runs scrape it).
  * No extraction config: the site adapter (OpenSooq/…) is purpose-built.
  */
 export async function POST(req: NextRequest) {
@@ -59,6 +65,28 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid source", details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const projectId = parsed.data.project_id;
+  if (!projectId) {
+    return NextResponse.json(
+      {
+        error: "invalid source",
+        details: [{ path: ["project_id"], message: "project_id is required" }],
+      },
+      { status: 400 }
+    );
+  }
+  const jobSnap = await projectDoc(projectId).get();
+  const job = jobSnap.exists ? jobSnap.data() : undefined;
+  if (!job || job.owner_uid !== session.uid) {
+    return NextResponse.json({ error: "job not found" }, { status: 404 });
+  }
+  if (jobKind(job.kind) !== "cars") {
+    return NextResponse.json(
+      { error: "that job doesn't collect cars" },
       { status: 400 }
     );
   }

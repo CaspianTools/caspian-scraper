@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
     owner_uid: session.uid,
     slug: projectId,
     name: input.name,
+    kind: input.kind,
     description: input.description,
     schedule_cron: input.schedule_cron,
     enabled: input.enabled,

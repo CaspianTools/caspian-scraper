@@ -38,7 +38,8 @@ export async function GET(
  * PATCH /api/comparison/sources/[sid]
  *
  * Partial update. retailer_id is mutable but enforces the per-owner
- * uniqueness invariant.
+ * uniqueness invariant. project_id (the owning job) is fixed at create and
+ * ignored here.
  */
 export async function PATCH(
   req: NextRequest,
@@ -69,13 +70,13 @@ export async function PATCH(
     );
   }
 
-  if (
-    parsed.data.retailer_id &&
-    parsed.data.retailer_id !== existing.retailer_id
-  ) {
+  const patch = { ...parsed.data };
+  delete patch.project_id;
+
+  if (patch.retailer_id && patch.retailer_id !== existing.retailer_id) {
     const clashSnap = await comparisonSourcesCol()
       .where("owner_uid", "==", session.uid)
-      .where("retailer_id", "==", parsed.data.retailer_id)
+      .where("retailer_id", "==", patch.retailer_id)
       .limit(1)
       .get();
     if (!clashSnap.empty) {
@@ -85,7 +86,7 @@ export async function PATCH(
           details: [
             {
               path: ["retailer_id"],
-              message: `retailer_id '${parsed.data.retailer_id}' already used by another of your sources`,
+              message: `retailer_id '${patch.retailer_id}' already used by another of your sources`,
             },
           ],
         },
@@ -97,7 +98,7 @@ export async function PATCH(
   await comparisonSourcesCol()
     .doc(sid)
     .update({
-      ...parsed.data,
+      ...patch,
       updated_at: FieldValue.serverTimestamp(),
     });
 
@@ -108,8 +109,9 @@ export async function PATCH(
 /**
  * DELETE /api/comparison/sources/[sid]
  *
- * Deletes the source. Existing listings and canonicals are left intact
- * (price history stays useful) — only the source's future scrapes stop.
+ * Deletes the source. Existing listings and canonicals are left on disk —
+ * only the source's future scrapes stop — but the job's pages no longer show
+ * them (a listing belongs to a job through its source).
  */
 export async function DELETE(
   req: NextRequest,

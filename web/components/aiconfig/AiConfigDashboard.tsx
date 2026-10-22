@@ -4,20 +4,27 @@ import { useState } from "react";
 import { ConfigWizard } from "@/components/ConfigWizard";
 import { GenericSourceList } from "@/components/aiconfig/GenericSourceList";
 
-type Tab = "new" | "sources";
+export type DashboardTab = "new" | "sources";
 
-const TABS: [Tab, string][] = [
+const TABS: [DashboardTab, string][] = [
+  ["sources", "Sources"],
   ["new", "New scrape"],
-  ["sources", "My sources"],
 ];
 
+interface Props {
+  /** The "Website data" job whose sources are listed and created. */
+  projectId: string;
+  initialTab?: DashboardTab;
+}
+
 /**
- * Scrape-any-website hub. Client-side tab switcher over the ConfigWizard
- * (describe a site, approve the proposed config into a generic source) and
- * the workspace's generic sources. The AI provider key lives in Settings.
+ * A "Website data" job's sources hub (/projects/[id]/data). Client-side tab
+ * switcher over the job's generic sources and the ConfigWizard (describe a
+ * site, approve the proposed config into a source of this job). The AI
+ * provider key lives in Settings.
  */
-export function AiConfigDashboard() {
-  const [tab, setTab] = useState<Tab>("new");
+export function AiConfigDashboard({ projectId, initialTab = "new" }: Props) {
+  const [tab, setTab] = useState<DashboardTab>(initialTab);
 
   return (
     <div className="space-y-6">
@@ -39,9 +46,12 @@ export function AiConfigDashboard() {
         ))}
       </nav>
 
-      {tab === "new" && <ConfigWizard />}
+      {tab === "new" && <ConfigWizard projectId={projectId} />}
       {tab === "sources" && (
-        <GenericSourceList onNewScrape={() => setTab("new")} />
+        <GenericSourceList
+          projectId={projectId}
+          onNewScrape={() => setTab("new")}
+        />
       )}
     </div>
   );

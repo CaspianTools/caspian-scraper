@@ -11,6 +11,7 @@ import {
   configJobsCol,
   genericSourcesCol,
 } from "@/lib/firestore/collections";
+import { isOwnedDataJob } from "@/app/api/generic/dataJob";
 
 /**
  * POST /api/aiconfig/jobs/[id]/approve
@@ -18,7 +19,8 @@ import {
  * Materialise a proposed config job into a real /generic_sources/{sid}
  * doc. Requires the job to be owned by the caller and in status
  * "proposed". The agent's `proposed_config` is re-validated with
- * GenericSourceCreateSchema before it's written.
+ * GenericSourceCreateSchema before it's written. The source joins the
+ * config job's `project_id` (one of the caller's "Website data" jobs).
  *
  *   path "config"   -> active:true; goes live on the next cron tick.
  *   path "adapter"  -> active:false; the generated Python adapter must be
@@ -44,6 +46,19 @@ export async function POST(
   if (job.status !== "proposed") {
     return NextResponse.json(
       { error: `job is not ready to approve (status: ${job.status})` },
+      { status: 409 }
+    );
+  }
+
+  // The job the source joins comes from the config job, never from the
+  // proposal; it must still be the caller's "Website data" job.
+  const projectId = typeof job.project_id === "string" ? job.project_id : "";
+  if (!(await isOwnedDataJob(projectId, session.uid))) {
+    return NextResponse.json(
+      {
+        error:
+          "this setup doesn't belong to one of your Website data jobs — start it again from the job's Sources & records page",
+      },
       { status: 409 }
     );
   }
@@ -90,6 +105,7 @@ export async function POST(
   const now = new Date().toISOString();
   const doc: GenericSourceDoc = {
     ...configParsed.data,
+    project_id: projectId,
     owner_uid: session.uid,
     created_at: now,
     updated_at: now,

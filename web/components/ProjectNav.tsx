@@ -1,21 +1,9 @@
 "use client";
 
 import { SidebarNav } from "@/components/shell/SidebarNav";
+import { jobNav, type JobKind } from "@/lib/jobKinds";
 
-/** A job's section nav, shown in the job layout's sidebar. */
-export function ProjectNav({ projectId }: { projectId: string }) {
-  const base = `/projects/${projectId}`;
-  return (
-    <SidebarNav
-      label="Job"
-      items={[
-        { href: base, label: "Overview", exact: true },
-        { href: `${base}/sources`, label: "Sources" },
-        { href: `${base}/runs`, label: "Runs" },
-        { href: `${base}/findings`, label: "Findings" },
-        { href: `${base}/lessons`, label: "Lessons" },
-        { href: `${base}/settings`, label: "Settings" },
-      ]}
-    />
-  );
+/** A job's section nav, shown in the job layout's sidebar — by job type. */
+export function ProjectNav({ projectId, kind }: { projectId: string; kind: JobKind }) {
+  return <SidebarNav label="Job" items={jobNav(projectId, kind)} />;
 }

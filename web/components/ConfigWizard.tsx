@@ -62,7 +62,12 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "Failed",
 };
 
-export function ConfigWizard() {
+/**
+ * Describe a site → a proposed scraper config → approve it into a generic
+ * source of the "Website data" job `projectId` (the config job carries it to
+ * the approve route).
+ */
+export function ConfigWizard({ projectId }: { projectId: string }) {
   const [intent, setIntent] = useState("");
   const [url, setUrl] = useState("");
   const [sampleUrls, setSampleUrls] = useState("");
@@ -80,6 +85,8 @@ export function ConfigWizard() {
 
   const [approving, setApproving] = useState(false);
   const [approveMsg, setApproveMsg] = useState<string | null>(null);
+  // The source the approval created, for an "Open the source" link.
+  const [approvedId, setApprovedId] = useState<string | null>(null);
 
   // Poll the config job doc (owner-guarded admin-SDK route) until it reaches a
   // terminal status. We poll rather than use a client Firestore onSnapshot so
@@ -151,6 +158,7 @@ export function ConfigWizard() {
           sample_urls,
           record_schema_hint: recordSchemaHint,
           use_ai: useAi,
+          project_id: projectId,
         }),
       });
       if (!res.ok) {
@@ -199,6 +207,7 @@ export function ConfigWizard() {
         }
         return;
       }
+      setApprovedId(b.id ? String(b.id) : null);
       if (b.adapter_pr_url) {
         setApproveMsg(
           `Source created (inactive). Merge the adapter PR, then activate the source to start scraping.`
@@ -219,6 +228,7 @@ export function ConfigWizard() {
     setJobId(null);
     setJob(null);
     setApproveMsg(null);
+    setApprovedId(null);
     setErrors([]);
     setIntent("");
     setUrl("");
@@ -391,6 +401,17 @@ export function ConfigWizard() {
       {approveMsg && (
         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-4 text-sm text-emerald-700 dark:text-emerald-300">
           {approveMsg}
+          {approvedId && (
+            <>
+              {" "}
+              <Link
+                href={`/projects/${projectId}/data/sources/${approvedId}`}
+                className="font-medium underline"
+              >
+                Open the source →
+              </Link>
+            </>
+          )}
         </div>
       )}
 

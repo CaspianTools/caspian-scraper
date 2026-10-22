@@ -7,11 +7,14 @@ import {
   type ComparisonSourceDoc,
 } from "@/lib/firestore/schema";
 import { comparisonSourcesCol } from "@/lib/firestore/collections";
+import { isOwnPricesJob } from "../jobScope";
 
 /**
  * GET /api/comparison/sources
  *
  * List the signed-in user's comparison sources, newest first.
+ *
+ *   ?project_id=<id>   only that prices job's sources
  */
 export async function GET(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -19,20 +22,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
+  const projectId = new URL(req.url).searchParams.get("project_id");
   const snap = await comparisonSourcesCol()
     .where("owner_uid", "==", session.uid)
     .orderBy("created_at", "desc")
     .get();
-  const sources = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const sources = snap.docs
+    .filter((d) => !projectId || d.data().project_id === projectId)
+    .map((d) => ({ id: d.id, ...d.data() }));
   return NextResponse.json({ sources });
 }
 
 /**
  * POST /api/comparison/sources
  *
- * Create a comparison source owned by the signed-in user. retailer_id
- * must be unique per user — used as the column key in the side-by-side
- * comparison table.
+ * Create a comparison source (a shop) in one of the signed-in user's prices
+ * jobs — `project_id` is required. retailer_id must be unique per user —
+ * used as the column key in the side-by-side Compare table, and listing ids
+ * derive from it.
  */
 export async function POST(req: NextRequest) {
   const session = await getSessionFromBearer(req.headers.get("authorization"));
@@ -55,6 +62,21 @@ export async function POST(req: NextRequest) {
     );
   }
   const input = parsed.data;
+  if (!input.project_id) {
+    return NextResponse.json(
+      {
+        error: "invalid source",
+        details: [{ path: ["project_id"], message: "project_id is required" }],
+      },
+      { status: 400 }
+    );
+  }
+  if (!(await isOwnPricesJob(session.uid, input.project_id))) {
+    return NextResponse.json(
+      { error: "job not found or not a prices job" },
+      { status: 404 }
+    );
+  }
 
   // retailer_id uniqueness per owner — prevents two sources clashing in
   // the comparison table column key.

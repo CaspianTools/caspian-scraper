@@ -52,16 +52,19 @@ function fmtRelative(ms: number): string {
 }
 
 interface Props {
+  /** The "Website data" job whose sources are listed. */
+  projectId: string;
   onNewScrape?: () => void;
 }
 
 /**
- * The signed-in user's generic (AI-configured) sources. Reads through
- * /api/generic/sources; the active toggle PATCHes the source. Adapter-mode
+ * One "Website data" job's generic sources. Reads through
+ * /api/generic/sources?project_id=…; the active toggle PATCHes the source. Adapter-mode
  * sources stay inactive until their generated Python module is merged, so the
  * toggle is disabled for them with an explanatory hint.
  */
-export function GenericSourceList({ onNewScrape }: Props) {
+export function GenericSourceList({ projectId, onNewScrape }: Props) {
+  const base = `/projects/${projectId}/data`;
   const [rows, setRows] = useState<GenericSource[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -70,7 +73,9 @@ export function GenericSourceList({ onNewScrape }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authedFetch("/api/generic/sources");
+        const res = await authedFetch(
+          `/api/generic/sources?project_id=${encodeURIComponent(projectId)}`
+        );
         const b = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
@@ -85,7 +90,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [projectId]);
 
   async function toggleActive(s: GenericSource) {
     if (s.strategy?.mode === "adapter") return;
@@ -132,9 +137,9 @@ export function GenericSourceList({ onNewScrape }: Props) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center bg-white/60 dark:bg-zinc-950/40">
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4 max-w-md mx-auto">
-          No AI-configured sources yet. Start a new scrape — describe what you
-          want and the agent proposes an extraction config you can approve into
-          a source.
+          This job has no sources yet. Start a new scrape — describe a site and
+          what to collect, and you get a scraper config to approve into a
+          source.
         </p>
         {onNewScrape ? (
           <button
@@ -146,7 +151,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
           </button>
         ) : (
           <Link
-            href="/aiconfig"
+            href={base}
             className="inline-flex items-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
             New scrape
@@ -172,7 +177,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
           </button>
         ) : (
           <Link
-            href="/aiconfig"
+            href={base}
             className="inline-flex items-center text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             New scrape
@@ -194,7 +199,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
-                    href={`/aiconfig/sources/${s.id}`}
+                    href={`${base}/sources/${s.id}`}
                     className="font-medium hover:underline line-clamp-1"
                   >
                     {s.name || s.source_key || s.id}
@@ -259,7 +264,7 @@ export function GenericSourceList({ onNewScrape }: Props) {
                       : "Activate"}
                 </button>
                 <Link
-                  href={`/aiconfig/sources/${s.id}`}
+                  href={`${base}/sources/${s.id}`}
                   className="text-sm px-3 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 inline-flex items-center bg-white dark:bg-zinc-900 shadow-xs font-medium"
                 >
                   Open

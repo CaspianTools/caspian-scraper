@@ -20,7 +20,8 @@ Required environment variables:
       project default.
 
 Optional environment variables:
-  ONLY_PROJECT_ID    Run only this project (for workflow_dispatch).
+  ONLY_PROJECT_ID    Run only this job: a vacancy job, or every source of a
+                     car / prices / data job (see job_work).
   DRY_RUN            "true" / "1" / "yes" → skip every POST and skip
                      writing /published; still writes /runs + /lessons
                      so the dashboard reflects what *would* have run.
@@ -1894,6 +1895,41 @@ def list_enabled_projects(db) -> list[dict]:
     return [_doc_with_id(d) for d in q.stream()]
 
 
+# Job types (web/lib/jobKinds.ts): every job collects one kind of thing. A
+# vacancy job runs here (run_project); a job of another type is the set of
+# top-level sources whose project_id is the job's id, each run by its engine.
+JOB_SOURCE_COLLECTIONS = {
+    "cars": ("car_sources", "car_source"),
+    "prices": ("comparison_sources", "comparison_source"),
+    "data": ("generic_sources", "generic_source"),
+}
+
+
+def job_kind(proj: dict | None) -> str:
+    """A job's type; jobs from before types existed are vacancy jobs."""
+    k = str((proj or {}).get("kind") or "vacancies")
+    return k if k in JOB_SOURCE_COLLECTIONS else "vacancies"
+
+
+def job_work(db, project_id: str, trigger: str) -> list[tuple[str, str, str]]:
+    """What running a job means: one run_project for a vacancy job, else a
+    run of each of the job's active sources."""
+    snap = db.collection("projects").document(project_id).get()
+    kind = job_kind(snap.to_dict() if snap.exists else None)
+    if kind == "vacancies":
+        return [("project", project_id, trigger)]
+    col, work_kind = JOB_SOURCE_COLLECTIONS[kind]
+    q = db.collection(col).where(filter=FieldFilter("project_id", "==", project_id))
+    return [(work_kind, d.id, trigger) for d in q.stream()
+            if (d.to_dict() or {}).get("active", True) is not False]
+
+
+def paused_job_ids(db) -> set[str]:
+    """Jobs switched off — their sources don't run on schedule either."""
+    q = db.collection("projects").where(filter=FieldFilter("enabled", "==", False))
+    return {d.id for d in q.stream()}
+
+
 def list_active_comparison_sources(db) -> list[dict]:
     """Top-level /comparison_sources, active==True. Used by find_due_work
     + the run-now request handler."""
@@ -1991,7 +2027,15 @@ def find_due_work(
         trig = f"request:{req['__id']}"
         if pid and pid not in seen_projects:
             seen_projects.add(pid)
-            work.append(("project", pid, trig))
+            # A job of another type runs its sources (job_work).
+            seen = {"comparison_source": seen_comparison, "car_source": seen_cars,
+                    "generic_source": seen_generic}
+            for item in job_work(db, pid, trig):
+                if item[0] in seen:
+                    if item[1] in seen[item[0]]:
+                        continue
+                    seen[item[0]].add(item[1])
+                work.append(item)
         elif csid and csid not in seen_comparison:
             seen_comparison.add(csid)
             work.append(("comparison_source", csid, trig))
@@ -2002,10 +2046,11 @@ def find_due_work(
             seen_generic.add(gsid)
             work.append(("generic_source", gsid, trig))
 
-    # Then schedule-due projects.
+    # Then schedule-due projects. Only vacancy jobs run as a project; the
+    # sources of other job types are scheduled below, each on its own cron.
     for proj in list_enabled_projects(db):
         pid = proj["__id"]
-        if pid in seen_projects:
+        if pid in seen_projects or job_kind(proj) != "vacancies":
             continue
         cron = str(proj.get("schedule_cron") or "").strip()
         if not cron:
@@ -2016,10 +2061,12 @@ def find_due_work(
         seen_projects.add(pid)
         work.append(("project", pid, "schedule"))
 
+    paused = paused_job_ids(db)
+
     # Then schedule-due comparison sources (top-level, per-user).
     for src in list_active_comparison_sources(db):
         sid = src["__id"]
-        if sid in seen_comparison:
+        if sid in seen_comparison or src.get("project_id") in paused:
             continue
         cron = str(src.get("schedule_cron") or "").strip()
         if not cron:
@@ -2033,7 +2080,7 @@ def find_due_work(
     # Then schedule-due car sources (top-level, per-user).
     for src in list_active_car_sources(db):
         sid = src["__id"]
-        if sid in seen_cars:
+        if sid in seen_cars or src.get("project_id") in paused:
             continue
         cron = str(src.get("schedule_cron") or "").strip()
         if not cron:
@@ -2047,7 +2094,7 @@ def find_due_work(
     # Then schedule-due generic sources (top-level, per-user).
     for src in list_active_generic_sources(db):
         sid = src["__id"]
-        if sid in seen_generic:
+        if sid in seen_generic or src.get("project_id") in paused:
             continue
         cron = str(src.get("schedule_cron") or "").strip()
         if not cron:
@@ -3806,9 +3853,8 @@ def main() -> int:
     # Build the work list.
     if only_project_id:
         trigger = f"request:{request_id}" if request_id else "manual"
-        work: list[tuple[str, str, str]] = [
-            ("project", only_project_id, trigger)
-        ]
+        # A vacancy job, or every source of a car / prices / data job.
+        work: list[tuple[str, str, str]] = job_work(db, only_project_id, trigger)
         print(
             f"ONLY_PROJECT_ID={only_project_id} trigger={trigger} "
             f"dry_run={dry_run}",

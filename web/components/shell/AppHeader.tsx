@@ -9,9 +9,6 @@ const SECTIONS: [string, string][] = [
   ["/projects", "Jobs"],
   ["/resources", "Resources"],
   ["/db", "Findings database"],
-  ["/comparison", "Compare"],
-  ["/cars", "Cars"],
-  ["/aiconfig", "Scrape any website"],
   ["/settings", "Settings"],
 ];
 

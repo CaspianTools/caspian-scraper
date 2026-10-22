@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromBearer } from "@/lib/auth/session";
-import { carRunsCol } from "@/lib/firestore/collections";
+import { carRunsCol, carSourcesCol } from "@/lib/firestore/collections";
 import type { Query } from "@/lib/localdb";
 
 /** Millis from a Firestore Timestamp, ISO string, or 0. */
@@ -22,6 +22,7 @@ const FETCH_CAP = 1000;
  * newest first. Equality-only filter + in-memory sort (no composite index).
  *
  *   ?source_id=<sid>   filter to one source
+ *   ?project_id=<id>   only the sources of that car job
  *   ?limit=<n>         default 50, capped at 200
  */
 export async function GET(req: NextRequest) {
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const sourceId = url.searchParams.get("source_id");
+  const projectId = url.searchParams.get("project_id");
   const limitRaw = parseInt(url.searchParams.get("limit") || "50", 10);
   const limit = Math.min(Math.max(1, Number.isNaN(limitRaw) ? 50 : limitRaw), 200);
 
@@ -43,9 +45,23 @@ export async function GET(req: NextRequest) {
   if (sourceId) q = q.where("source_id", "==", sourceId);
   q = q.limit(FETCH_CAP);
 
+  // A job's items are those of its sources (car_sources.project_id).
+  let jobSources: Set<string> | null = null;
+  if (projectId) {
+    const srcSnap = await carSourcesCol()
+      .where("owner_uid", "==", session.uid)
+      .get();
+    jobSources = new Set(
+      srcSnap.docs
+        .filter((d) => d.data().project_id === projectId)
+        .map((d) => d.id)
+    );
+  }
+
   const snap = await q.get();
   const runs = snap.docs
     .map((d) => ({ id: d.id, ...d.data() }) as Record<string, unknown>)
+    .filter((r) => !jobSources || jobSources.has(String(r.source_id ?? "")))
     .sort((a, b) => millis(b.started_at) - millis(a.started_at))
     .slice(0, limit);
   return NextResponse.json({ runs });

@@ -138,8 +138,16 @@ function safeHref(url: unknown): string | null {
 
 type Tab = "config" | "records" | "runs";
 
-export function GenericSourceDetail({ sid }: { sid: string }) {
+export function GenericSourceDetail({
+  projectId,
+  sid,
+}: {
+  /** The "Website data" job the source belongs to (for its links). */
+  projectId: string;
+  sid: string;
+}) {
   const router = useRouter();
+  const jobData = `/projects/${projectId}/data`;
 
   const [source, setSource] = useState<GenericSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -296,7 +304,11 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);
         return;
       }
-      setRunMsg("Run queued. The next cron tick picks it up.");
+      setRunMsg(
+        b.started
+          ? "Run started on this computer — new records show under Records when it finishes."
+          : `Run queued, but the scraper couldn't start here${b.error ? `: ${b.error}` : "."}`
+      );
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
     } finally {
@@ -323,7 +335,7 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
         setErrors([{ message: b.error || `Request failed (${res.status})` }]);
         return;
       }
-      router.push("/aiconfig");
+      router.push(jobData);
       router.refresh();
     } finally {
       setDeleting(false);
@@ -342,10 +354,10 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
     return (
       <div className="space-y-4">
         <Link
-          href="/aiconfig"
+          href={jobData}
           className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
         >
-          ← Sources
+          ← Sources &amp; records
         </Link>
         {generalErrors.length > 0 ? (
           generalErrors.map((e, i) => (
@@ -367,10 +379,10 @@ export function GenericSourceDetail({ sid }: { sid: string }) {
   return (
     <div className="space-y-6">
       <Link
-        href="/aiconfig"
+        href={jobData}
         className="text-sm text-zinc-600 dark:text-zinc-400 hover:underline inline-block"
       >
-        ← Sources
+        ← Sources &amp; records
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">

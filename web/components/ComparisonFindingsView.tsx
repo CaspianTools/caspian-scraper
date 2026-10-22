@@ -238,7 +238,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
           onChange={(e) => setRetailerFilter(e.target.value)}
           className="ml-2 text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs"
         >
-          <option value="all">All retailers</option>
+          <option value="all">All shops</option>
           {retailers.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
@@ -249,7 +249,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, brand, retailer…"
+          placeholder="Search name, brand, shop…"
           className="flex-1 min-w-[12rem] text-sm h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs"
         />
       </div>
@@ -263,7 +263,7 @@ export function ComparisonFindingsView({ findings, canonicals }: Props) {
       <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-card">
         {visible.length === 0 ? (
           <div className="p-10 text-center text-sm text-zinc-500">
-            No findings match the current filters.
+            No products match the current filters.
           </div>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">

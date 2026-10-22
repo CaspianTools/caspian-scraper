@@ -72,14 +72,10 @@ export default async function FindingsPage({ params }: PageProps) {
   return (
     <>
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">Findings</h2>
+        <h2 className="text-xl font-semibold tracking-tight">Vacancies</h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-          Every role the scraper has encountered, with the latest upload
-          status to the destination. <strong>Published</strong> = uploaded
-          successfully. <strong>Duplicate</strong> = already present on
-          the destination so we skipped it. <strong>Failed</strong> = post
-          was attempted but rejected (validation, auth, etc.) — see the
-          error inline.
+          Every vacancy this job&apos;s runs have found, newest first. Nothing is
+          published anywhere — review them here.
         </p>
       </div>
 

@@ -20,6 +20,9 @@ export type {
 
 interface Props {
   initial: ComparisonSourceFormInitial;
+  /** The prices job the source (shop) belongs to — sent on create, and the
+   *  base of every link: /projects/[projectId]/prices/… */
+  projectId: string;
   sourceId?: string;
 }
 
@@ -28,9 +31,10 @@ interface FieldErr {
   message: string;
 }
 
-export function ComparisonSourceForm({ initial, sourceId }: Props) {
+export function ComparisonSourceForm({ initial, projectId, sourceId }: Props) {
   const router = useRouter();
   const isEdit = !!sourceId;
+  const base = `/projects/${projectId}/prices`;
   const [form, setForm] = useState<ComparisonSourceFormInitial>(initial);
   const [extractionJson, setExtractionJson] = useState<string>(
     JSON.stringify(initial.extraction, null, 2)
@@ -89,6 +93,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
         ...form,
         start_urls,
         extraction,
+        ...(isEdit ? {} : { project_id: projectId }),
       });
 
       const url = isEdit
@@ -112,7 +117,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
         }
         return;
       }
-      router.push("/comparison/sources");
+      router.push(`${base}/sources`);
       router.refresh();
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
@@ -134,7 +139,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
         setErrors([{ message: b.error || `Run-now failed (${res.status})` }]);
         return;
       }
-      router.push("/comparison/runs");
+      router.push(`${base}/runs`);
       router.refresh();
     } finally {
       setBusy(false);
@@ -143,7 +148,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
 
   async function handleDelete() {
     if (!sourceId) return;
-    if (!confirm(`Delete "${form.name}"? Existing listings are kept; only future scrapes stop.`))
+    if (!confirm(`Delete "${form.name}"? Its products leave this job's lists and future scrapes stop.`))
       return;
     setDeleting(true);
     try {
@@ -155,7 +160,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
         setErrors([{ message: b.error || `Delete failed (${res.status})` }]);
         return;
       }
-      router.push("/comparison/sources");
+      router.push(`${base}/sources`);
       router.refresh();
     } finally {
       setDeleting(false);
@@ -254,7 +259,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
         label="Retailer ID"
         error={errFor("retailer_id")}
         required
-        hint="Stable slug used as the column key in the side-by-side compare table. Lowercase letters, digits, dash, underscore only."
+        hint="Short, stable id for this shop — its column in the Compare table. Lowercase letters, digits, dash, underscore only; unique across your jobs."
       >
         <input
           type="text"
@@ -422,7 +427,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
             </button>
           )}
           <Link
-            href="/comparison/sources"
+            href={`${base}/sources`}
             className="inline-flex items-center h-10 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900 shadow-xs font-medium"
           >
             Cancel
@@ -432,7 +437,7 @@ export function ComparisonSourceForm({ initial, sourceId }: Props) {
             disabled={busy || deleting}
             className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
           >
-            {busy ? "Saving…" : isEdit ? "Save changes" : "Add source"}
+            {busy ? "Saving…" : isEdit ? "Save changes" : "Add shop"}
           </button>
         </div>
       </div>

@@ -4,6 +4,8 @@ Mirrors web/lib/firestore/schema.ts → GenericSourceCreateSchema /
 GenericSourceDocSchema. Config-strategy sources are written active:true (the
 cron picks them up on the next tick); adapter-strategy sources are written
 active:false (they can't run until the generated module is merged to main).
+A source belongs to a "Website data" job (`project_id`) — the web wizard's
+config job carries it, and the CLI takes it as --project.
 """
 
 from __future__ import annotations
@@ -92,9 +94,11 @@ def build_generic_source_doc(
     notes: str = "",
     origin_via: str = "cli",
     config_job_id: str = "",
+    project_id: str = "",
 ) -> dict:
     """Assemble a GenericSourceCreate-shaped dict (+ owner/origin). Exactly one
-    of `extraction` (config strategy) or `adapter_key` (adapter strategy)."""
+    of `extraction` (config strategy) or `adapter_key` (adapter strategy).
+    `project_id` (the owning data job) is included when given."""
     if adapter_key:
         strategy: dict[str, Any] = {"mode": "adapter", "adapter_key": adapter_key}
         if adapter_pr_url:
@@ -108,7 +112,7 @@ def build_generic_source_doc(
     if config_job_id:
         origin["config_job_id"] = config_job_id
 
-    return {
+    doc: dict[str, Any] = {
         "name": name[:120],
         "source_key": (source_key or slugify(name))[:80],
         "record_schema": build_record_schema(
@@ -121,6 +125,9 @@ def build_generic_source_doc(
         "notes": notes[:2000],
         "origin": origin,
     }
+    if project_id:
+        doc["project_id"] = project_id[:128]
+    return doc
 
 
 def write_generic_source(db, doc: dict) -> str:

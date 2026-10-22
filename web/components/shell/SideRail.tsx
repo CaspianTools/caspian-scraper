@@ -60,37 +60,6 @@ const GROUPS: { label: string; items: Item[] }[] = [
       },
     ],
   },
-  {
-    label: "Tools",
-    items: [
-      {
-        href: "/comparison",
-        label: "Compare",
-        match: ["/comparison"],
-        icon: icon(<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />),
-      },
-      {
-        href: "/cars",
-        label: "Cars",
-        match: ["/cars"],
-        icon: icon(
-          <>
-            <path d="M5 16V11l2-5h10l2 5v5M5 16h14M5 16v2M19 16v2M3 11h18" />
-            <circle cx="8" cy="13.5" r=".5" />
-            <circle cx="16" cy="13.5" r=".5" />
-          </>,
-        ),
-      },
-      {
-        href: "/aiconfig",
-        label: "Any site",
-        match: ["/aiconfig"],
-        icon: icon(
-          <path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" />,
-        ),
-      },
-    ],
-  },
 ];
 
 const SETTINGS: Item = {

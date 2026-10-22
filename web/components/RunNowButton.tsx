@@ -24,25 +24,11 @@ export function RunNowButton({ projectId }: { projectId: string }) {
         setErr(body.error || `Request failed (${res.status})`);
         return;
       }
-      if (body.reused && body.dispatched) {
-        setMsg(
-          "A run request was already pending — re-fired dispatch. Workflow runs within ~1 minute."
-        );
-      } else if (body.reused) {
-        setMsg(
-          "A run request is already pending for this project. It will run on the next cron tick."
-        );
-      } else if (body.dispatched) {
-        setMsg("Dispatched. Workflow fires within ~1 minute.");
-      } else if (body.dispatch_error) {
-        setMsg(
-          `Queued (cron ≤15 min). Instant dispatch failed: ${body.dispatch_error}`
-        );
+      // Runs start on this computer (lib/localRunner.ts).
+      if (body.dispatched) {
+        setMsg(body.reused ? "Already running — started it again on this computer." : "Started on this computer. Results appear as it finishes.");
       } else {
-        setMsg(
-          "Queued. The next cron tick (≤15 min) will pick it up. " +
-            "Set GH_DISPATCH_TOKEN for instant dispatch."
-        );
+        setMsg(`Queued, but it couldn't start here${body.dispatch_error ? `: ${body.dispatch_error}` : ""}. Try Start.bat.`);
       }
       router.refresh();
     } catch (e) {
@@ -60,7 +46,7 @@ export function RunNowButton({ projectId }: { projectId: string }) {
         disabled={busy}
         className="inline-flex items-center h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20"
       >
-        {busy ? "Queueing…" : "Run scrape now"}
+        {busy ? "Starting…" : "Run now"}
       </button>
       {msg && (
         <span className="text-xs text-emerald-700 dark:text-emerald-400">

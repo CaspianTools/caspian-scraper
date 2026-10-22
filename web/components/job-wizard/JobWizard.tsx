@@ -9,6 +9,8 @@ import { ResourcePicker } from "@/components/resources/ResourcePicker";
 import { FinderForm, FinderResults, useFinder } from "@/components/resources/finder";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
+import { JobKindPicker } from "@/components/JobKindPicker";
+import { JOB_KIND_INFO, jobFirstStep, type JobKind } from "@/lib/jobKinds";
 
 interface Props {
   resources: ResourceRow[];
@@ -52,6 +54,12 @@ const secondaryBtn =
 export function JobWizard({ resources: initialResources }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
+  const [kind, setKind] = useState<JobKind>("vacancies");
+  // Only vacancy jobs pick shared resources here; the other types add their
+  // websites (car sites, shops, any site) on the job's Sources after creating.
+  const steps: Step[] = kind === "vacancies" ? [0, 1, 2] : [0, 2];
+  const nextStep = (s: Step) => steps[steps.indexOf(s) + 1] as Step | undefined;
+  const prevStep = (s: Step) => steps[steps.indexOf(s) - 1] as Step | undefined;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -72,18 +80,19 @@ export function JobWizard({ resources: initialResources }: Props) {
     const d = loadDraft();
     if (d) {
       /* eslint-disable react-hooks/set-state-in-effect -- one-time restore of the saved draft */
+      setKind(d.kind);
       setName(d.name);
       setDescription(d.description);
       setResourceIds(d.resourceIds);
       setTab(d.tab);
-      setStep(d.name.trim() ? d.step : 0);
+      setStep(d.name.trim() && (d.kind === "vacancies" || d.step !== 1) ? d.step : 0);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
     setReady(true);
   }, []);
   useEffect(() => {
-    if (ready && !leaving.current) saveDraft({ step, name, description, resourceIds, tab });
-  }, [ready, step, name, description, resourceIds, tab]);
+    if (ready && !leaving.current) saveDraft({ kind, step, name, description, resourceIds, tab });
+  }, [ready, kind, step, name, description, resourceIds, tab]);
   const chosen = library.filter((r) => resourceIds.includes(r.id));
 
   /** Blocking problem on a step, or null when it's OK to continue. */
@@ -103,7 +112,8 @@ export function JobWizard({ resources: initialResources }: Props) {
   function goNext() {
     const p = problem(step);
     setErrors((e) => ({ ...e, [step]: p ?? undefined }));
-    if (!p && step < LAST) goTo((step + 1) as Step);
+    const n = nextStep(step);
+    if (!p && n !== undefined) goTo(n);
   }
 
   /** Steps are clickable once everything before them is valid. */
@@ -125,11 +135,12 @@ export function JobWizard({ resources: initialResources }: Props) {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
+          kind,
           description: description.trim(),
           schedule_cron: DEFAULT_SCHEDULE,
           enabled: true,
           hse_keywords: [],
-          resource_ids: resourceIds,
+          resource_ids: kind === "vacancies" ? resourceIds : [],
         }),
       });
       const b = await res.json().catch(() => ({}));
@@ -148,7 +159,7 @@ export function JobWizard({ resources: initialResources }: Props) {
       }
       leaving.current = true; // don't re-save the draft on the way out
       clearDraft();
-      router.push(`/projects/${b.id}`);
+      router.push(jobFirstStep(b.id, kind));
       router.refresh();
     } catch (e) {
       setErrors({ [LAST]: e instanceof Error ? e.message : String(e) });
@@ -161,8 +172,8 @@ export function JobWizard({ resources: initialResources }: Props) {
     <>
       <SidebarHeader back={{ href: "/", label: "Jobs" }} title="New job" />
       <ol className="space-y-1">
-        {STEPS.map((st, i) => {
-          const s = i as Step;
+        {steps.map((s, i) => {
+          const st = STEPS[s];
           const state = s === step ? "current" : s < step ? "done" : "todo";
           return (
             <li key={st.label}>
@@ -216,8 +227,12 @@ export function JobWizard({ resources: initialResources }: Props) {
         <section className="max-w-2xl space-y-5">
           <StepHeading
             title="What is this job?"
-            hint="A job is one scraping pipeline: a set of websites to scrape. Everything it finds is listed under the job's Findings for you to review."
+            hint="A job is one scraping pipeline: what it collects and the websites it collects from. Everything it finds is listed in the job for you to review."
           />
+          <div>
+            <span className="block text-sm font-medium mb-2">What will it collect?</span>
+            <JobKindPicker value={kind} onChange={setKind} />
+          </div>
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input
@@ -227,7 +242,7 @@ export function JobWizard({ resources: initialResources }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && goNext()}
-              placeholder="HSE Jobs Middle East"
+              placeholder={JOB_KIND_INFO[kind].example}
               className={inputCls}
             />
           </div>
@@ -306,13 +321,21 @@ export function JobWizard({ resources: initialResources }: Props) {
         <section className="max-w-3xl space-y-5">
           <StepHeading
             title="Review and create"
-            hint="After creating it, start a run from the job's Runs tab (or Start.bat) and review the results under Findings."
+            hint={
+              kind === "vacancies"
+                ? "After creating it, start a run from the job's Runs tab (or Start.bat) and review what it finds under Vacancies."
+                : `After creating it you'll add its websites, run it, and review the ${JOB_KIND_INFO[kind].items.toLowerCase()} it finds — all inside the job.`
+            }
           />
           <dl className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-5 divide-y divide-zinc-100 dark:divide-zinc-800 text-sm shadow-card">
+            <ReviewRow label="Collects" onEdit={() => goTo(0)}>
+              {JOB_KIND_INFO[kind].label}
+            </ReviewRow>
             <ReviewRow label="Name" onEdit={() => goTo(0)}>
               {name.trim()}
               {description.trim() && <span className="block text-zinc-500">{description.trim()}</span>}
             </ReviewRow>
+            {kind === "vacancies" && (
             <ReviewRow label="Resources" onEdit={() => goTo(1)}>
               {chosen.length === 0 ? (
                 <span className="text-zinc-500">None yet</span>
@@ -326,6 +349,7 @@ export function JobWizard({ resources: initialResources }: Props) {
                 </>
               )}
             </ReviewRow>
+            )}
           </dl>
         </section>
       )}
@@ -345,11 +369,11 @@ export function JobWizard({ resources: initialResources }: Props) {
             Cancel
           </Link>
         ) : (
-          <button type="button" onClick={() => goTo((step - 1) as Step)} disabled={busy} className={secondaryBtn}>
+          <button type="button" onClick={() => goTo(prevStep(step) ?? 0)} disabled={busy} className={secondaryBtn}>
             ← Back
           </button>
         )}
-        {step < LAST ? (
+        {nextStep(step) !== undefined ? (
           <button type="button" onClick={goNext} className={primaryBtn}>
             Next →
           </button>

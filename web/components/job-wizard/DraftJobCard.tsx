@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { clearDraft, loadDraft, type JobDraft } from "./draft";
+import { JOB_KIND_INFO } from "@/lib/jobKinds";
 
 const STEP_LABEL = ["Basics", "Resources", "Review"];
 
@@ -21,7 +22,7 @@ export function DraftJobCard() {
           Unfinished job{draft.name.trim() ? `: ${draft.name.trim()}` : ""}
         </p>
         <p className="text-xs text-zinc-600 dark:text-zinc-400">
-          Not created yet · stopped at {STEP_LABEL[draft.step]}
+          {JOB_KIND_INFO[draft.kind].label} · not created yet · stopped at {STEP_LABEL[draft.step]}
           {draft.resourceIds.length > 0 &&
             ` · ${draft.resourceIds.length} website${draft.resourceIds.length === 1 ? "" : "s"} picked`}
         </p>

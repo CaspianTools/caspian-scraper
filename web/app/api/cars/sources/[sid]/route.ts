@@ -32,7 +32,8 @@ export async function GET(
   return NextResponse.json({ id: sid, ...data });
 }
 
-/** PATCH /api/cars/sources/[sid] — partial update. */
+/** PATCH /api/cars/sources/[sid] — partial update. The owning job
+ *  (`project_id`) can't be changed here. */
 export async function PATCH(
   req: NextRequest,
   ctx: RouteContext<"/api/cars/sources/[sid]">
@@ -62,10 +63,12 @@ export async function PATCH(
     );
   }
 
+  const patch = { ...parsed.data };
+  delete patch.project_id;
   await carSourcesCol()
     .doc(sid)
     .update({
-      ...parsed.data,
+      ...patch,
       updated_at: FieldValue.serverTimestamp(),
     });
 
@@ -74,8 +77,9 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/cars/sources/[sid] — deletes the source. Existing listings
- * are left intact (history stays useful); only future scrapes stop.
+ * DELETE /api/cars/sources/[sid] — deletes the source; its job's runs stop
+ * scraping it. The listing docs stay in car_listings but no longer show in
+ * the job (its pages list listings by the job's source ids).
  */
 export async function DELETE(
   req: NextRequest,

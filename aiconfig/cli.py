@@ -155,6 +155,7 @@ def _cmd_new(args: argparse.Namespace) -> int:
         schedule_cron=args.cron,
         schema_hint=args.schema or "",
         origin_via="cli",
+        project_id=args.project,
     )
     doc["owner_uid"] = owner
     from scrape import get_db
@@ -437,6 +438,7 @@ def _finish_job(ref, job: dict, job_id: str, result: Any, *, url: str, intent: s
             schema_hint=hint,
             origin_via="wizard",
             config_job_id=job_id,
+            project_id=str(job.get("project_id") or ""),
         )
     else:
         updates["status"] = "failed"
@@ -465,6 +467,9 @@ def _build_parser() -> argparse.ArgumentParser:
     new.add_argument("--owner", default=os.environ.get("AICONFIG_OWNER_UID", ""),
                      help="owner uid for the written source (or AICONFIG_OWNER_UID)")
     new.add_argument("--name", default="", help="name for the source")
+    new.add_argument("--project", default="",
+                     help="id of the Website data job the source joins "
+                          "(without it the source shows on no job's page)")
     new.add_argument("--cron", default="0 * * * *",
                      help="schedule cron (fixed minute; default hourly)")
     new.add_argument("--model", default="", help="model id (else provider default)")

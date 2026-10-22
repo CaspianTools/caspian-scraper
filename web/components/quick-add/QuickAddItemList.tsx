@@ -21,9 +21,9 @@ const ITEMS: ReadonlyArray<Item> = [
     hint: "A website or feed to scrape for new findings.",
   },
   {
-    href: "/aiconfig",
-    title: "Scrape any website",
-    hint: "Describe what to collect from a listing page; Use AI is optional.",
+    href: "/projects/new",
+    title: "Job, step by step",
+    hint: "Pick what it collects (vacancies, cars, prices or any website data) and its websites.",
   },
   {
     href: "/resources",
