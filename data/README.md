@@ -8,12 +8,16 @@ sign-in. Everything they store is plain JSON files, one per record:
 | `data/projects/<id>.json` | jobs | yes |
 | `data/projects/<id>/sources/<id>.json` | a job's own sources | yes |
 | `data/resources/<id>.json` | the shared resource library | yes |
-| `data/{comparison,car,generic}_sources/` | other scraper sources | yes |
-| `local-data/` | runs, findings, lessons, listings, logs, and each config record's `last_run_*` fields | no — this computer only |
+| `data/{comparison,car,generic}_sources/` | a job's classifieds, shop and website sources (`project_id` = the job) | yes |
+| `data/databases/<id>.json` | databases (name, record name, key) | yes |
+| `db/<id>.jsonl` | a database's records, one per line (exported from the SQLite store) | yes |
+| `local-data/scraper.db` | SQLite record store: databases' working copy + each job's results | no — this computer only |
+| `local-data/` | runs, engine records, lessons, logs, and each config record's `last_run_*` fields | no — this computer only |
 
-So **jobs and resources travel with the repo**: create or edit them in the
-admin app, commit `data/`, and every computer that pulls gets the same setup.
-What a run *finds* stays on the computer that ran it.
+So **jobs, sources and databases travel with the repo**: create or edit them
+in the admin app, commit `data/` and `db/`, and every computer that pulls
+gets the same setup and the same databases. A job's own results stay on the
+computer that ran it — save them into a database to share them.
 
 You don't edit these files by hand — use the admin app (`open-admin.bat`), or
 `Start.bat` to run a scrape and review it. Both read and write the files

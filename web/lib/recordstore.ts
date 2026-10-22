@@ -115,6 +115,17 @@ export function allRecords(store: string, file?: string): Record<string, unknown
   return rows;
 }
 
+/** Drop a local-only store (a deleted job's results); never a database. */
+export function dropStore(store: string): void {
+  if (store.startsWith("db:")) throw new Error("databases are dropped through their file");
+  const c = conn();
+  c.prepare("DELETE FROM records WHERE store = ?").run(store);
+  c.prepare("DELETE FROM synced WHERE store = ?").run(store);
+  c.prepare(
+    "INSERT INTO versions(store, version) VALUES (?, 1) ON CONFLICT(store) DO UPDATE SET version = version + 1"
+  ).run(store);
+}
+
 export function countRecords(store: string, file?: string): number {
   if (file) syncIn(store, file);
   const row = conn().prepare("SELECT COUNT(*) AS n FROM records WHERE store = ?").get(store) as { n: number };

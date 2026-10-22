@@ -1,9 +1,11 @@
 # caspian-scraper web
 
-Next.js 16 admin UI for the HSE scraper, deployed to Firebase App Hosting
-inside the `caspian-tools` Firebase project. The web app and the Python
-scraper share **Firestore** as the single source of truth for employers,
-runs, and lessons — no per-file JSON in the repo, no GitHub API calls.
+The Caspian Scraper admin app (Next.js 16), run locally with `open-admin.bat`
+(http://localhost:4444): Jobs · Databases · Settings. It reads and writes the
+committed config in `../data/` through `lib/localdb.ts` and the SQLite record
+store `../local-data/scraper.db` through `lib/recordstore.ts`, and starts the
+Python scraper for Run now (`lib/localRunner.ts`). See the repo's CLAUDE.md.
+The sections below describe the earlier Firebase setup and are historical.
 
 ## Architecture
 

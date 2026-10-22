@@ -1,14 +1,26 @@
 # Caspian Scraper
 
 > **Current setup — runs locally, no accounts.** Double-click **`Start.bat`**
-> to run a scrape and review what it found, or **`open-admin.bat`** to open the
-> admin app (http://localhost:4444) and manage jobs and the shared resource
-> library. There is no sign-in, Firestore, or publishing: jobs/resources are
-> JSON files in [`data/`](data/README.md) (committed, so every computer that
-> pulls the repo gets them) and results stay in `local-data/` on the computer
-> that ran them. Needs Python 3 and Node.js; the launchers set up the rest on
-> first run. The sections below describe the older GitHub Actions →
-> entirelysafe.com pipeline, which is currently switched off.
+> to run a job and review what it found, or **`open-admin.bat`** to open the
+> admin app (http://localhost:4444). The menu is **Jobs · Databases ·
+> Settings**:
+>
+> - A **job** is its own scraping project: what it collects (its record name
+>   and fields — vacancies, car listings, product prices, anything), its
+>   sources (careers pages, classifieds sites, shops, any website, databases
+>   it reads from), optional modules (Discover websites, Follow-up pages,
+>   Compare), relevance rules and AI on/off. Templates only pre-fill a new
+>   job. A job's **Results** show everything its sources found, marked new /
+>   changed / gone since the last run.
+> - **Databases** are shared collections jobs save into and read from (the
+>   Companies database is what Find websites grows). They're committed to
+>   git (`db/<id>.jsonl`) with a SQLite working copy in `local-data/`.
+>
+> No sign-in, Firestore or publishing: config is JSON in
+> [`data/`](data/README.md) (committed), run data stays in `local-data/`.
+> Needs Python 3 and Node.js 22.13+; the launchers set up the rest on first
+> run. The sections below describe the older GitHub Actions →
+> entirelysafe.com pipeline, which is switched off.
 
 Daily scraper that finds Health, Safety, Environment (HSE) job postings on a
 configurable list of employer career sites and publishes each new one to the

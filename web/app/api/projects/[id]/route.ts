@@ -10,6 +10,7 @@ import {
   projectDoc,
 } from "@/lib/firestore/collections";
 import { invalidResourceIds } from "@/lib/firestore/resources";
+import { dropStore } from "@/lib/recordstore";
 
 /**
  * GET /api/projects/[id]
@@ -132,6 +133,10 @@ export async function DELETE(
       if (d.data().project_id === id) await col.doc(d.id).delete();
     }
   }
+
+  // The job's results and its AI relevance answers (local SQLite stores).
+  dropStore(`job:${id}`);
+  dropStore(`relevance-ai:${id}`);
 
   // recursiveDelete walks all subcollections + their docs in batches.
   // For the scale we expect (≤50 sources, modest runs/lessons), this

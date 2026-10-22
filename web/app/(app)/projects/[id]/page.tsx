@@ -46,7 +46,11 @@ export default async function JobResultsPage({ params }: PageProps) {
     mine(sites);
 
   const records = allRecords(`job:${id}`);
-  const live = records.filter((r) => r.status !== "gone" && !r.hidden);
+  // What Results shows by default: not gone, not hidden, not below the cutoff.
+  const belowCutoff = (r: Record<string, unknown>) =>
+    s.relevance.cutoff > 0 && typeof r.relevance === "number" && r.relevance < s.relevance.cutoff;
+  const live = records.filter((r) => r.status !== "gone" && !r.hidden && !belowCutoff(r));
+  const irrelevant = records.filter((r) => r.status !== "gone" && !r.hidden && belowCutoff(r)).length;
   const fresh = live.filter((r) => r.status === "new").length;
   const changed = live.filter((r) => r.status === "changed").length;
 
@@ -67,6 +71,7 @@ export default async function JobResultsPage({ params }: PageProps) {
               </>
             ) : null}
             From {sourceCount} source{sourceCount === 1 ? "" : "s"}
+            {irrelevant > 0 && <> · {irrelevant} below the relevance cutoff (Show hidden)</>}
             {s.saves_to.length > 0 && <> · saved into {s.saves_to.map((t) => t.database).join(", ")}</>}
           </p>
         </div>

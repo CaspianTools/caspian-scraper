@@ -81,7 +81,12 @@ export function ProjectSettingsForm({ projectId, initial, databases }: Props) {
         }
         return;
       }
-      setSuccess("Saved.");
+      // Rules may have changed: score the results again (quick without AI).
+      const rel = await apiFetch(`/api/projects/${projectId}/relevance`, { method: "POST" });
+      const rb = await rel.json().catch(() => ({}));
+      setSuccess(
+        rel.ok && rb.scored ? `Saved. Relevance scored for ${rb.scored} results${rb.ai_checked ? ` (${rb.ai_checked} checked by AI)` : ""}.` : "Saved."
+      );
       router.refresh();
     } catch (e) {
       setErrors([{ message: e instanceof Error ? e.message : String(e) }]);
