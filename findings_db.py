@@ -163,24 +163,28 @@ def retag(ids: list[str], add: list[str] = (), remove: list[str] = (),
     skipped). Tags match case-insensitively, and a new tag takes the spelling
     already used elsewhere in the file, so "priority" and "Priority" stay one
     tag. Returns each updated company's tags, sorted."""
+    return retag_each({cid: (add, remove) for cid in ids}, name)
+
+
+def retag_each(changes: dict[str, tuple[list[str], list[str]]],
+               name: str = COMPANIES_FILE) -> dict[str, list[str]]:
+    """retag() with different tags per company — {id: (add, remove)} — in one
+    load and save (AI tagging gives every company its own)."""
     records = load(name)
     spelling: dict[str, str] = {}
     for rec in records.values():
         for t in rec.get("tags") or []:
             spelling.setdefault(t.casefold(), t)
-    adds = []
-    for t in map(clean_tag, add):
-        if t:
-            adds.append(spelling.setdefault(t.casefold(), t))
-    drop = {clean_tag(t).casefold() for t in remove}
     out: dict[str, list[str]] = {}
-    for cid in dict.fromkeys(ids):
+    for cid, (add, remove) in changes.items():
         rec = records.get(cid)
         if rec is None:
             continue
+        drop = {clean_tag(t).casefold() for t in remove}
         tags = {t.casefold(): t for t in rec.get("tags") or [] if t.casefold() not in drop}
-        for t in adds:
-            tags.setdefault(t.casefold(), t)
+        for t in map(clean_tag, add):
+            if t:
+                tags.setdefault(t.casefold(), spelling.setdefault(t.casefold(), t))
         new = sorted(tags.values(), key=str.casefold)
         if new:
             rec["tags"] = new

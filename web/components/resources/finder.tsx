@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CountrySelect } from "@/components/CountrySelect";
 import { authedFetch } from "@/lib/firebase/clientFetch";
 import type { ResourceRow } from "@/lib/firestore/resources";
+import {
+  AiTagDialog, AutoTagSettings, SparkIcon,
+  applyTags, loadAutoTag, planTags, rulesFor, saveAutoTag, summarize,
+} from "./AiTag";
 
 /**
  * "Find websites" building blocks. find_websites.py searches Google Maps,
@@ -12,7 +16,7 @@ import type { ResourceRow } from "@/lib/firestore/resources";
  * the search, then returns one list of companies.
  *
  *   useFinder()      search state + actions (search, browse, bulk actions
- *                    incl. tags);
+ *                    incl. tags; AI auto-tag after a search — see AiTag.tsx);
  *                    the last results are kept in this browser (persist)
  *   <FinderForm>     the search controls (fits a sidebar)
  *   <FinderResults>  the findings — filters, sort, bulk actions, cards / rows
@@ -121,7 +125,7 @@ export function useFinder({
   const [query, setQuery] = useState(defaultQuery);
   const [countries, setCountries] = useState<string[]>([]);
   const [useWeb, setUseWeb] = useState(true);
-  const [busy, setBusy] = useState<"search" | "add" | "enrich" | "hide" | "tag" | null>(null);
+  const [busy, setBusy] = useState<"search" | "add" | "enrich" | "hide" | "tag" | "aitag" | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -170,6 +174,7 @@ export function useFinder({
     setBusy("search");
     setError(null);
     setNotice(null);
+    let found: DiscoverResult | null = null;
     try {
       const res = await authedFetch("/api/resources/discover", { method: "POST", body: JSON.stringify(body) });
       const b = await res.json().catch(() => ({}));
@@ -177,13 +182,49 @@ export function useFinder({
         setError(b.error || `Search failed (${res.status})`);
         return;
       }
-      const r = b as DiscoverResult;
-      setResult(r);
+      found = b as DiscoverResult;
+      setResult(found);
       setPicked(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
+    }
+    if (found && !found.browse) await autoTag(found);
+  }
+
+  /** New tags per company (from AI tagging) into the results. */
+  function applyTagMap(tags: Record<string, string[]>) {
+    patchFindings((f) => (f.id in tags ? { ...f, tags: tags[f.id] } : f));
+  }
+
+  /** "Tag results with AI" (set in the form): tag a new search's results by
+   *  the saved criteria. Saved (cached) results were tagged when first found. */
+  async function autoTag(r: DiscoverResult) {
+    const auto = loadAutoTag();
+    if (!auto.enabled || !auto.criteria.trim() || r.findings.length === 0) return;
+    if (r.cached) {
+      setNotice("Not AI-tagged: these are saved results. Use AI tag to tag them with your criteria.");
+      return;
+    }
+    setBusy("aitag");
+    try {
+      let rules = rulesFor(auto);
+      if (!rules) {
+        setProgress("AI is reading your tagging criteria…");
+        rules = (await planTags(auto.criteria.trim())).rules;
+        saveAutoTag({ ...auto, rules, rulesFor: auto.criteria.trim() });
+      }
+      const out = await applyTags(rules, r.findings.map((f) => f.id), {
+        onProgress: (d, t) => setProgress(`Tagging results with AI… ${d} of ${t}`),
+      });
+      applyTagMap(out.tags);
+      setNotice(summarize(out));
+    } catch (e) {
+      setError(`AI tagging: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+      setProgress("");
     }
   }
 
@@ -364,7 +405,7 @@ export function useFinder({
   return {
     query, setQuery, countries, setCountries, useWeb, setUseWeb,
     busy, progress, error, notice, setNotice, result, all, picked, setPicked, toggle,
-    search, browse, addPicked, findCareersPages, setHidden, retag, selected,
+    search, browse, addPicked, findCareersPages, setHidden, retag, applyTagMap, selected,
   };
 }
 
@@ -417,6 +458,7 @@ export function FinderForm({ finder, onSearch }: { finder: Finder; onSearch?: ()
         />
         Search Google Maps and the web too (slower, finds the most)
       </label>
+      <AutoTagSettings />
       <button type="button" onClick={go(() => f.search())} disabled={f.busy !== null} className={primaryBtn + " w-full"}>
         {f.busy === "search" ? "Searching…" : "Search"}
       </button>
@@ -517,6 +559,7 @@ export function FinderResults({
   const [sort, setSort] = useState<Sort>("relevance");
   const [showHidden, setShowHidden] = useState(false);
   const [tagMode, setTagMode] = useState<TagMode>("any");
+  const [aiOpen, setAiOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
   const visibleBase = useMemo(() => f.all.filter((x) => showHidden || !x.hidden), [f.all, showHidden]);
@@ -737,6 +780,16 @@ export function FinderResults({
         <button type="button" className={chipBtn} onClick={() => f.setPicked(new Set(filtered.filter((x) => x.scrapable).map((x) => x.id)))}>
           Select scrapable
         </button>
+        <button
+          type="button"
+          disabled={f.busy !== null || visibleBase.length === 0}
+          onClick={() => setAiOpen(true)}
+          title={f.picked.size > 0 ? "Tag the selected companies with AI" : "Tag the companies shown with AI"}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-400/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+        >
+          <SparkIcon className="w-3.5 h-3.5" />
+          {f.busy === "aitag" ? "AI tagging…" : "AI tag"}
+        </button>
         {f.picked.size > 0 && (
           <>
             <span className="mx-1 h-5 w-px bg-zinc-300 dark:bg-zinc-700" />
@@ -827,6 +880,28 @@ export function FinderResults({
         </div>
       )}
       {f.error && <p className="text-sm text-red-600">{f.error}</p>}
+      {aiOpen && (
+        <AiTagDialog
+          counts={{
+            selected: f.all.filter((x) => f.picked.has(x.id)).length,
+            shown: filtered.length,
+            all: visibleBase.length,
+          }}
+          idsFor={(scope) =>
+            (scope === "selected" ? f.all.filter((x) => f.picked.has(x.id)) : scope === "shown" ? filtered : visibleBase).map(
+              (x) => x.id
+            )
+          }
+          onTagged={f.applyTagMap}
+          onShowTags={(tags) => {
+            setText("");
+            setFilters({ ...emptyFilters(), tag: new Set(tags) });
+            setTagMode("any");
+            setShown(PAGE);
+          }}
+          onClose={() => setAiOpen(false)}
+        />
+      )}
     </div>
   );
 }

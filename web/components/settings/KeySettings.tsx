@@ -259,7 +259,8 @@ function KeyForm() {
         <h3 className="text-sm font-semibold tracking-tight">AI provider &amp; key</h3>
         <p className="text-xs text-zinc-500 mt-1 max-w-xl">
           The model used by scrapes that have <strong>Use AI</strong>{" "}on (it&apos;s
-          off by default, and nothing else in the app needs a key). The key is stored{" "}
+          off by default) and by <strong>AI tag</strong>{" "}on findings. Nothing else in the
+          app needs a key. The key is stored{" "}
           <strong>write-only</strong>{" "}in <code>local-data/</code>{" "}on this computer (never
           committed) and never returned to the browser, so it can&apos;t be shown again
           after you save it.
