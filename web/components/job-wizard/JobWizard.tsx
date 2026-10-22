@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/firebase/clientFetch";
@@ -8,6 +8,7 @@ import type { ResourceRow } from "@/lib/firestore/resources";
 import { ResourcePicker } from "@/components/resources/ResourcePicker";
 import { FinderForm, FinderResults, useFinder } from "@/components/resources/finder";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
+import { clearDraft, loadDraft, saveDraft } from "./draft";
 
 interface Props {
   resources: ResourceRow[];
@@ -45,7 +46,8 @@ const secondaryBtn =
  * Step-by-step job creation in a SidebarLayout: the sidebar holds the steps
  * (and, on the Resources step, the Find websites search); the main area holds
  * the step — on Resources, the search results (list or cards) and the shared
- * library, as tabs.
+ * library, as tabs. The unfinished draft is kept in this browser (./draft.ts),
+ * so leaving and coming back continues where you were.
  */
 export function JobWizard({ resources: initialResources }: Props) {
   const router = useRouter();
@@ -61,6 +63,27 @@ export function JobWizard({ resources: initialResources }: Props) {
   const [errors, setErrors] = useState<Partial<Record<Step, string>>>({});
 
   const finder = useFinder({ defaultQuery: "" });
+
+  // Restore the unfinished draft, then keep it saved as it changes (not
+  // before the restore has landed, and not once the job is created/cancelled).
+  const [ready, setReady] = useState(false);
+  const leaving = useRef(false);
+  useEffect(() => {
+    const d = loadDraft();
+    if (d) {
+      /* eslint-disable react-hooks/set-state-in-effect -- one-time restore of the saved draft */
+      setName(d.name);
+      setDescription(d.description);
+      setResourceIds(d.resourceIds);
+      setTab(d.tab);
+      setStep(d.name.trim() ? d.step : 0);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+    setReady(true);
+  }, []);
+  useEffect(() => {
+    if (ready && !leaving.current) saveDraft({ step, name, description, resourceIds, tab });
+  }, [ready, step, name, description, resourceIds, tab]);
   const chosen = library.filter((r) => resourceIds.includes(r.id));
 
   /** Blocking problem on a step, or null when it's OK to continue. */
@@ -123,6 +146,8 @@ export function JobWizard({ resources: initialResources }: Props) {
         }
         return;
       }
+      leaving.current = true; // don't re-save the draft on the way out
+      clearDraft();
       router.push(`/projects/${b.id}`);
       router.refresh();
     } catch (e) {
@@ -309,7 +334,14 @@ export function JobWizard({ resources: initialResources }: Props) {
 
       <div className="flex items-center justify-between border-t border-zinc-200 dark:border-zinc-800 pt-4">
         {step === 0 ? (
-          <Link href="/" className={secondaryBtn}>
+          <Link
+            href="/"
+            onClick={() => {
+              leaving.current = true;
+              clearDraft();
+            }}
+            className={secondaryBtn}
+          >
             Cancel
           </Link>
         ) : (

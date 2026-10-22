@@ -4,6 +4,7 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import { projectsCol } from "@/lib/firestore/collections";
 import { humanizeCron } from "@/lib/cron/humanize";
 import { SidebarHeader, SidebarLayout } from "@/components/shell/SidebarLayout";
+import { DraftJobCard } from "@/components/job-wizard/DraftJobCard";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,7 @@ export default async function Home() {
         </>
       }
     >
+      <DraftJobCard />
       {projects.length === 0 ? (
         <EmptyState />
       ) : (
