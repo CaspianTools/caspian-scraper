@@ -30,6 +30,7 @@ export function QuickAddDialog() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- render the portal only after mount (no document on the server)
     setMounted(true);
   }, []);
 

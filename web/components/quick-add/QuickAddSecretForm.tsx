@@ -113,6 +113,7 @@ export function QuickAddSecretForm({ projectId, onSuccess, onCancel }: Props) {
   // Once the load resolves, pick a sensible default for the dropdown.
   useEffect(() => {
     if (existingSecrets === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time default once the secrets list has loaded
     setNameSelection(useDropdown ? initialNameSelection : CUSTOM_NAME_SENTINEL);
   }, [existingSecrets, useDropdown, initialNameSelection]);
 
