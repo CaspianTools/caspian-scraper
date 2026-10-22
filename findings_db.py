@@ -4,10 +4,14 @@ the repo so it grows with every search and travels with every pull.
     db/companies.jsonl   one company per line, sorted by id   (committed)
     db/people.jsonl      reserved for people                   (committed)
 
-Plain JSON Lines, not a binary database, on purpose: several computers add to
-it, and git merges line-based text cleanly (two searches adding different
-companies don't conflict; the same company edited on both sides conflicts on
-that one line only).
+It is the "companies" database (data/databases/companies.json): the working
+copy lives in the SQLite record store (recordstore.py, local-data/scraper.db)
+and every write is exported to the JSON Lines file, which is what git shares —
+several computers add to it, and git merges line-based text cleanly (two
+searches adding different companies don't conflict; the same company edited
+on both sides conflicts on that one line only). After a pull, the store
+re-imports the file. Other databases use the same functions with their own
+file (`name="<database-id>.jsonl"`).
 
 A company record (missing fields are simply absent):
 
@@ -34,13 +38,13 @@ remove — so a plain merge only ever unions them.
 
 from __future__ import annotations
 
-import json
 import os
 import re
-import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
+
+import recordstore
 
 REPO_ROOT = Path(__file__).resolve().parent
 DB_DIR = Path(os.environ.get("CASPIAN_FINDINGS_DB") or REPO_ROOT / "db")
@@ -76,32 +80,35 @@ def _path(name: str) -> Path:
     return DB_DIR / name
 
 
+DATABASE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
+
+def file_of(database: str | None) -> str:
+    """A database id's file name ("companies" → "companies.jsonl"); rejects
+    anything that isn't a plain database id."""
+    db = (database or "companies").strip()
+    if not DATABASE_ID.match(db):
+        raise ValueError(f"not a database id: {db!r}")
+    return f"{db}.jsonl"
+
+
+def store_of(name: str) -> str:
+    """The record-store name of a database file: "companies.jsonl" → "db:companies"."""
+    return "db:" + name.removesuffix(".jsonl")
+
+
 def load(name: str = COMPANIES_FILE) -> dict[str, dict]:
-    out: dict[str, dict] = {}
-    p = _path(name)
-    if not p.exists():
-        return out
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except ValueError:
-            continue  # a half-merged line shouldn't sink the whole file
-        if rec.get("id"):
-            out[rec["id"]] = rec
-    return out
+    return recordstore.load(store_of(name), _path(name))
 
 
 def save(records: dict[str, dict], name: str = COMPANIES_FILE) -> None:
-    p = _path(name)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(f".{p.name}.{secrets.token_hex(4)}.tmp")
-    lines = [json.dumps(records[k], ensure_ascii=False, sort_keys=True) for k in sorted(records)]
-    # newline="\n": LF on every OS, matching .gitattributes (no CRLF churn).
-    tmp.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8", newline="\n")
-    os.replace(tmp, p)
+    """Make the database exactly `records` (and export it)."""
+    recordstore.write(store_of(name), records, file=_path(name), replace=True)
+
+
+def put(records: dict[str, dict], name: str = COMPANIES_FILE, deletes: list[str] = ()) -> None:
+    """Write just these records (and deletions), then export."""
+    recordstore.write(store_of(name), records, deletes, file=_path(name))
 
 
 def merge(old: dict | None, new: dict) -> dict:
@@ -148,7 +155,7 @@ def upsert(items: list[dict], name: str = COMPANIES_FILE) -> dict[str, dict]:
         records[cid] = merge(records.get(cid), item)
         touched[cid] = records[cid]
     if touched:
-        save(records, name)
+        put(touched, name)
     return touched
 
 
@@ -192,5 +199,5 @@ def retag_each(changes: dict[str, tuple[list[str], list[str]]],
             rec.pop("tags", None)
         out[cid] = new
     if out:
-        save(records, name)
+        put({cid: records[cid] for cid in out}, name)
     return out

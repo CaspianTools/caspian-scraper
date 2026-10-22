@@ -5,6 +5,12 @@ import { CountrySelect } from "@/components/CountrySelect";
 import { apiFetch } from "@/lib/api";
 import type { ResourceRow } from "@/lib/firestore/resources";
 import {
+  ATS_LABEL, SOURCE_LABEL, STATUS_LABEL, FACET_KEYS, FACET_LABEL,
+  allTagsOf, emptyFilters, facetCounts as countFacets, matches as passes, optionLabel, sameTag,
+  sortFindings, statusOf, tagsOf,
+  type FacetKey, type Filters, type Finding, type Sort, type TagMode,
+} from "@/lib/findings";
+import {
   AiTagDialog, AutoTagSettings, SparkIcon,
   applyTags, loadAutoTag, planTags, rulesFor, saveAutoTag, summarize,
 } from "./AiTag";
@@ -22,29 +28,8 @@ import {
  *   <FinderResults>  the findings — filters, sort, bulk actions, cards / rows
  */
 
-/** One company from find_websites.py (to_finding). */
-export interface Finding {
-  id: string;
-  name: string;
-  website: string;
-  careers_url: string;
-  description: string;
-  countries: string[];
-  industries: string[];
-  types: string[];
-  sources: string[];
-  known: boolean;
-  ats: "successfactors" | "jibe" | "unknown";
-  checked: boolean;
-  reachable: boolean | null;
-  scrapable: boolean;
-  hidden: boolean;
-  /** Labels people gave it (absent in results saved before tags existed). */
-  tags?: string[];
-}
 
-const tagsOf = (f: Finding): string[] => f.tags ?? [];
-const sameTag = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+export type { Finding } from "@/lib/findings";
 
 export interface DiscoverResult {
   findings: Finding[];
@@ -58,31 +43,6 @@ export interface DiscoverResult {
   browse?: boolean;
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  google_maps: "Google Maps",
-  google: "Google",
-  duckduckgo: "DuckDuckGo",
-  wikidata: "Wikidata",
-  osm: "OpenStreetMap",
-  web: "Web",
-  db: "In database",
-};
-const ATS_LABEL: Record<string, string> = { successfactors: "SuccessFactors", jibe: "Jibe / iCIMS" };
-
-type StatusKey = "scrapable" | "careers" | "unchecked" | "none" | "broken";
-const STATUS_LABEL: Record<StatusKey, string> = {
-  scrapable: "Will be scraped",
-  careers: "Careers page found",
-  unchecked: "Not checked yet",
-  none: "No careers page found",
-  broken: "Careers page didn't open",
-};
-function statusOf(f: Finding): StatusKey {
-  if (f.scrapable) return "scrapable";
-  if (!f.checked) return "unchecked";
-  if (f.reachable === false) return "broken";
-  return f.careers_url ? "careers" : "none";
-}
 
 const PAGE = 60;
 /** Companies per careers-page request: small, so each is quick and saved. */
@@ -91,9 +51,9 @@ const LAST_KEY = "caspian.finder.last";
 
 const inputCls =
   "w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-500 shadow-xs";
-const primaryBtn =
+export const primaryBtn =
   "inline-flex items-center justify-center h-9 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-500 disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 shadow-sm shadow-brand-600/20";
-const chipBtn =
+export const chipBtn =
   "h-8 px-3 rounded-md text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-50";
 
 function fmtAgo(iso?: string): string {
@@ -502,11 +462,10 @@ export function FinderForm({ finder, onSearch }: { finder: Finder; onSearch?: ()
 
 // ---- results -----------------------------------------------------------------
 
-type View = "list" | "cards";
-type Sort = "relevance" | "name" | "sources";
+export type View = "list" | "cards";
 const VIEW_KEY = "caspian.finder.view";
 
-function useView(): [View, (v: View) => void] {
+export function useView(): [View, (v: View) => void] {
   const [view, setView] = useState<View>("cards");
   useEffect(() => {
     try {
@@ -530,36 +489,6 @@ function useView(): [View, (v: View) => void] {
   ];
 }
 
-type FacetKey = "tag" | "country" | "category" | "source" | "status";
-type Filters = Record<FacetKey, Set<string>>;
-const emptyFilters = (): Filters => ({
-  tag: new Set(), country: new Set(), category: new Set(), source: new Set(), status: new Set(),
-});
-/** Several tags picked: a company needs any one of them, or all of them. */
-type TagMode = "any" | "all";
-const UNTAGGED = "(untagged)";
-
-function facetValues(f: Finding, key: FacetKey): string[] {
-  switch (key) {
-    case "tag":
-      return tagsOf(f).length ? tagsOf(f) : [UNTAGGED];
-    case "country":
-      return f.countries.length ? f.countries : ["(no country)"];
-    case "category": {
-      const v = [...f.types, ...f.industries].map((x) => x.trim()).filter(Boolean);
-      return v.length ? Array.from(new Set(v.map((x) => x.charAt(0).toUpperCase() + x.slice(1)))) : ["(none)"];
-    }
-    case "source":
-      return [...f.sources, ...(f.known ? ["db"] : [])];
-    case "status":
-      return [statusOf(f)];
-  }
-}
-const FACET_LABEL: Record<FacetKey, string> = {
-  tag: "Tags", country: "Country", category: "Category", source: "Source", status: "Status",
-};
-const optionLabel = (key: FacetKey, v: string) =>
-  key === "source" ? (SOURCE_LABEL[v] ?? v) : key === "status" ? STATUS_LABEL[v as StatusKey] : v;
 
 export function FinderResults({
   finder,
@@ -585,53 +514,18 @@ export function FinderResults({
 
   const visibleBase = useMemo(() => f.all.filter((x) => showHidden || !x.hidden), [f.all, showHidden]);
 
-  const matches = (x: Finding, skip?: FacetKey) => {
-    for (const key of Object.keys(filters) as FacetKey[]) {
-      if (key === skip || filters[key].size === 0) continue;
-      const vals = facetValues(x, key);
-      if (key === "tag" && tagMode === "all") {
-        if (![...filters.tag].every((v) => vals.includes(v))) return false;
-      } else if (!vals.some((v) => filters[key].has(v))) return false;
-    }
-    const needle = text.trim().toLowerCase();
-    if (!needle) return true;
-    return [x.name, x.website, x.description, ...x.countries, ...x.types, ...x.industries, ...tagsOf(x)]
-      .join(" ")
-      .toLowerCase()
-      .includes(needle);
-  };
-
-  const filtered = useMemo(() => {
-    const out = visibleBase.filter((x) => matches(x));
-    if (sort === "name") out.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sort === "sources") out.sort((a, b) => b.sources.length - a.sources.length);
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- matches() reads filters/text
-  }, [visibleBase, filters, tagMode, text, sort]);
-
+  const filterState = useMemo(() => ({ filters, tagMode, text }), [filters, tagMode, text]);
+  const filtered = useMemo(
+    () => sortFindings(visibleBase.filter((x) => passes(x, filterState)), sort),
+    [visibleBase, filterState, sort]
+  );
   // Facet counts: for each facet, count within the other filters.
-  const facetCounts = useMemo(() => {
-    const out = {} as Record<FacetKey, [string, number][]>;
-    for (const key of Object.keys(FACET_LABEL) as FacetKey[]) {
-      const counts = new Map<string, number>();
-      for (const x of visibleBase) {
-        if (!matches(x, key)) continue;
-        for (const v of facetValues(x, key)) counts.set(v, (counts.get(v) ?? 0) + 1);
-      }
-      out[key] = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- matches() reads filters/text
-  }, [visibleBase, filters, tagMode, text]);
+  const facetCounts = useMemo(() => countFacets(visibleBase, filterState), [visibleBase, filterState]);
 
   const hiddenCount = f.all.filter((x) => x.hidden).length;
   // Every tag in use (one spelling each), for the Tags menu.
-  const allTags = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const x of f.all) for (const t of tagsOf(x)) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), t);
-    return [...m.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [f.all]);
-  const activeFilters = (Object.keys(filters) as FacetKey[]).flatMap((k) =>
+  const allTags = useMemo(() => allTagsOf(f.all), [f.all]);
+  const activeFilters = FACET_KEYS.flatMap((k) =>
     [...filters[k]].map((v) => [k, v] as const)
   );
 
@@ -711,7 +605,7 @@ export function FinderResults({
           placeholder="Filter by name, site, text…"
           className="h-8 w-56 px-2.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
         />
-        {(Object.keys(FACET_LABEL) as FacetKey[]).map((key) => (
+        {FACET_KEYS.map((key) => (
           <FacetMenu
             key={key}
             label={FACET_LABEL[key]}
@@ -932,7 +826,7 @@ export function FinderResults({
   );
 }
 
-function exportCsv(items: Finding[]) {
+export function exportCsv(items: Finding[]) {
   const cols = ["name", "website", "careers_url", "countries", "category", "sources", "status", "tags"] as const;
   const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const rows = items.map((x) =>
@@ -956,7 +850,7 @@ function exportCsv(items: Finding[]) {
 }
 
 /** Dismisses a popover when clicking outside it. */
-function useOutside(open: boolean, close: () => void) {
+export function useOutside(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -974,7 +868,7 @@ function useOutside(open: boolean, close: () => void) {
   return ref;
 }
 
-function FacetMenu({
+export function FacetMenu({
   label,
   options,
   selected,
@@ -1077,7 +971,7 @@ function FacetMenu({
   );
 }
 
-function AddToJobMenu({ disabled, onPick }: { disabled: boolean; onPick: (job: Job) => void }) {
+export function AddToJobMenu({ disabled, onPick }: { disabled: boolean; onPick: (job: Job) => void }) {
   const [open, setOpen] = useState(false);
   const [jobs, setJobs] = useState<Job[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1135,14 +1029,15 @@ function AddToJobMenu({ disabled, onPick }: { disabled: boolean; onPick: (job: J
  * of them, untick to take it off (a dash means only some have it); type to
  * find a tag or create a new one.
  */
-function TagMenu({
+export function TagMenu({
   tags,
   chosen,
   disabled,
   onChange,
 }: {
   tags: string[];
-  chosen: Finding[];
+  /** The selected records (only their tags are read). */
+  chosen: { tags?: string[] }[];
   disabled: boolean;
   onChange: (add: string[], remove: string[]) => void;
 }) {
@@ -1256,7 +1151,7 @@ function TagMenu({
   );
 }
 
-function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+export function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
   const btn = (v: View, label: string, icon: React.ReactNode) => (
     <button
       type="button"
@@ -1297,7 +1192,7 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
   );
 }
 
-function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: string; title?: string }) {
+export function Chip({ children, tone = "plain", title }: { children: React.ReactNode; tone?: string; title?: string }) {
   const cls: Record<string, string> = {
     plain: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
     source: "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
@@ -1313,7 +1208,7 @@ function Chip({ children, tone = "plain", title }: { children: React.ReactNode; 
   );
 }
 
-function TagIcon({ className = "w-3 h-3" }: { className?: string }) {
+export function TagIcon({ className = "w-3 h-3" }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden>
       <path d="M2 2.5v5l6.5 6.5 5-5L7 2.5z" />
@@ -1323,7 +1218,7 @@ function TagIcon({ className = "w-3 h-3" }: { className?: string }) {
 }
 
 /** A finding's tags; clicking one filters by it. */
-function TagChips({ tags, onTag }: { tags: string[]; onTag?: (t: string) => void }) {
+export function TagChips({ tags, onTag }: { tags: string[]; onTag?: (t: string) => void }) {
   if (tags.length === 0) return null;
   return (
     <span className="flex flex-wrap gap-1">
@@ -1348,7 +1243,7 @@ function TagChips({ tags, onTag }: { tags: string[]; onTag?: (t: string) => void
 }
 
 /** Status, sources, place and kind — the chips every finding shows. */
-function Chips({ f }: { f: Finding }) {
+export function Chips({ f }: { f: Finding }) {
   const st = statusOf(f);
   const tone = { scrapable: "good", careers: "warn", unchecked: "plain", none: "warn", broken: "bad" }[st];
   const text =
@@ -1377,7 +1272,7 @@ function Chips({ f }: { f: Finding }) {
   );
 }
 
-function UrlLink({ url }: { url: string }) {
+export function UrlLink({ url }: { url: string }) {
   if (!url) return null;
   return (
     <a
@@ -1393,7 +1288,7 @@ function UrlLink({ url }: { url: string }) {
   );
 }
 
-interface ResultProps {
+export interface ResultProps {
   f: Finding;
   picked: boolean;
   onToggle: (id: string) => void;
@@ -1401,7 +1296,7 @@ interface ResultProps {
   onTag?: (t: string) => void;
 }
 
-function ResultRow({ f, picked, onToggle, onTag }: ResultProps) {
+export function ResultRow({ f, picked, onToggle, onTag }: ResultProps) {
   return (
     <li className={f.hidden ? "opacity-60" : ""}>
       <label className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
@@ -1420,7 +1315,7 @@ function ResultRow({ f, picked, onToggle, onTag }: ResultProps) {
   );
 }
 
-function ResultCard({ f, picked, onToggle, onTag }: ResultProps) {
+export function ResultCard({ f, picked, onToggle, onTag }: ResultProps) {
   return (
     <label
       className={
@@ -1452,7 +1347,7 @@ function ResultCard({ f, picked, onToggle, onTag }: ResultProps) {
   );
 }
 
-function LoadingGrid({ view }: { view: View }) {
+export function LoadingGrid({ view }: { view: View }) {
   const n = view === "cards" ? 8 : 6;
   return (
     <div className={view === "cards" ? "grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "space-y-2"}>

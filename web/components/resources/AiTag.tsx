@@ -40,8 +40,11 @@ async function post(body: Record<string, unknown>) {
 }
 
 /** Criteria in plain words → the tag rules the AI reads from them. */
-export async function planTags(criteria: string): Promise<{ rules: TagRule[]; note: string; cost_usd: number }> {
-  return post({ mode: "plan", criteria });
+export async function planTags(
+  criteria: string,
+  database = "companies"
+): Promise<{ rules: TagRule[]; note: string; cost_usd: number }> {
+  return post({ mode: "plan", criteria, database });
 }
 
 /** Tag the companies by the rules, CHUNK at a time; `shouldStop` is checked
@@ -53,7 +56,14 @@ export async function applyTags(
     replace = false,
     onProgress,
     shouldStop,
-  }: { replace?: boolean; onProgress?: (done: number, total: number) => void; shouldStop?: () => boolean } = {}
+    database = "companies",
+  }: {
+    replace?: boolean;
+    onProgress?: (done: number, total: number) => void;
+    shouldStop?: () => boolean;
+    /** Which database the records are in (db/<id>.jsonl). */
+    database?: string;
+  } = {}
 ): Promise<AiTagResult & { stopped: boolean }> {
   const total: AiTagResult = { tags: {}, counts: {}, tagged: 0, checked: 0, skipped: 0, errors: [], cost_usd: 0 };
   let stopped = false;
@@ -63,7 +73,7 @@ export async function applyTags(
       stopped = true;
       break;
     }
-    const r: AiTagResult = await post({ mode: "apply", rules, ids: ids.slice(i, i + CHUNK), replace });
+    const r: AiTagResult = await post({ mode: "apply", rules, ids: ids.slice(i, i + CHUNK), replace, database });
     Object.assign(total.tags, r.tags);
     for (const [t, n] of Object.entries(r.counts)) total.counts[t] = (total.counts[t] ?? 0) + n;
     total.tagged += r.tagged;
@@ -286,15 +296,22 @@ type Stage = "write" | "planning" | "review" | "tagging" | "done";
  * them (editable) → tag the chosen companies, with progress → summary.
  */
 export function AiTagDialog({
+  database = "companies",
+  noun = "companies",
   counts,
   idsFor,
   onTagged,
   onShowTags,
   onClose,
 }: {
-  /** How many companies each scope covers (selected may be 0). */
+  /** The database the records are in. */
+  database?: string;
+  /** What the records are called, plural ("companies", "vacancies"). */
+  noun?: string;
+  /** How many records each scope covers (selected may be 0). */
   counts: Record<Scope, number>;
-  idsFor: (scope: Scope) => string[];
+  /** The ids a scope covers (may ask the server). */
+  idsFor: (scope: Scope) => string[] | Promise<string[]>;
   /** New tags per company, to update the list. */
   onTagged: (tags: Record<string, string[]>) => void;
   /** "Show tagged": filter the list by these tags. */
@@ -326,7 +343,7 @@ export function AiTagDialog({
     setStage("planning");
     setError(null);
     try {
-      const p = await planTags(criteria.trim());
+      const p = await planTags(criteria.trim(), database);
       setRules(p.rules);
       setNote(p.note);
       setPlanCost(p.cost_usd);
@@ -339,7 +356,7 @@ export function AiTagDialog({
 
   async function tag() {
     const use = validRules(rules);
-    const ids = idsFor(scope);
+    const ids = await idsFor(scope);
     if (use.length === 0 || ids.length === 0) return;
     if (useForSearches) saveAutoTag({ enabled: true, criteria: criteria.trim(), rules: use, rulesFor: criteria.trim() });
     else if (saved.enabled && saved.criteria.trim() === criteria.trim()) saveAutoTag({ ...saved, enabled: false });
@@ -348,6 +365,7 @@ export function AiTagDialog({
     setError(null);
     try {
       const r = await applyTags(use, ids, {
+        database,
         replace,
         onProgress: (d, t) => setProgress([d, t]),
         shouldStop: () => stop.current,
@@ -399,10 +417,10 @@ export function AiTagDialog({
           {(stage === "write" || stage === "planning") && (
             <>
               <label className="block text-sm">
-                <span className="block font-medium mb-1">How should companies be tagged?</span>
+                <span className="block font-medium mb-1">How should {noun} be tagged?</span>
                 <span className="block text-xs text-zinc-500 mb-2">
-                  In plain words. Name the tags you want and when each applies; the AI tags each company by
-                  its name, website, description, country and category.
+                  In plain words. Name the tags you want and when each applies; the AI judges each one
+                  by its own details (for a company: name, website, description, country, category).
                 </span>
                 <textarea
                   autoFocus
@@ -440,7 +458,7 @@ export function AiTagDialog({
               </div>
 
               <fieldset className="space-y-1.5 text-sm" disabled={busy}>
-                <legend className="font-medium mb-1">Which companies?</legend>
+                <legend className="font-medium mb-1">Which {noun}?</legend>
                 {(["selected", "shown", "all"] as Scope[])
                   .filter((s) => counts[s] > 0 && !(s === "all" && counts.all === counts.shown))
                   .map((s) => (
@@ -455,7 +473,7 @@ export function AiTagDialog({
                 <label className="flex items-start gap-2">
                   <input type="checkbox" className="mt-0.5" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
                   <span>
-                    Also take these tags off companies that don&apos;t match
+                    Also take these tags off {noun} that don&apos;t match
                     <span className="block text-xs text-zinc-500">Off: tags are only added. Other tags are never touched.</span>
                   </span>
                 </label>
@@ -495,7 +513,7 @@ export function AiTagDialog({
                     onClick={tag}
                   >
                     <SparkIcon />
-                    Tag {counts[scope]} compan{counts[scope] === 1 ? "y" : "ies"}
+                    Tag {counts[scope]} {noun}
                   </button>
                 )}
               </div>
@@ -506,7 +524,7 @@ export function AiTagDialog({
             <>
               <div className="space-y-3">
                 <p className="text-sm font-medium">
-                  Tagged {result.tagged} of {result.checked} companies
+                  Tagged {result.tagged} of {result.checked} {noun}
                   {result.stopped && <span className="text-zinc-500 font-normal"> (stopped early)</span>}
                 </p>
                 <ul className="flex flex-wrap gap-2">

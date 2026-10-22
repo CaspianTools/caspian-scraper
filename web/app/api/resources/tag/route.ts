@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { runPythonJson } from "@/lib/localRunner";
+import { DatabaseIdSchema } from "@/lib/firestore/schema";
 
 const tag = z.string().trim().min(1).max(40);
 const TagSchema = z
   .object({
+    database: DatabaseIdSchema.default("companies"),
     ids: z.array(z.string().min(1).max(253)).min(1).max(2000),
     add: z.array(tag).max(20).default([]),
     remove: z.array(tag).max(200).default([]),
@@ -15,8 +17,8 @@ const TagSchema = z
 /**
  * POST /api/resources/tag
  *
- * Add and/or remove tags on companies in the findings database
- * (db/companies.jsonl): `find_websites.py --tag`. Tags match
+ * Add and/or remove tags on records of a database (`database`, default
+ * "companies" — db/<id>.jsonl): `find_websites.py --tag`. Tags match
  * case-insensitively. Returns {updated, tags: {id: [tags]}}.
  */
 export async function POST(req: NextRequest) {

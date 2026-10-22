@@ -66,11 +66,11 @@ PLAN_TOOL = {
 }
 
 PLAN_SYSTEM = """You turn a person's tagging criteria, written in plain words, into tag rules \
-for a database of companies. Each company has a name, website, description, countries and \
-categories (e.g. "Training center", "oil company").
+for a database of records: companies (name, website, description, countries, categories), \
+vacancies, listings, products or anything else, each with its own fields.
 
 Write one rule per tag: a short tag name (1-3 words) and a precise criterion that someone \
-could check for a single company. Use the tag names the person gave, spelled as they wrote \
+could check for a single record. Use the tag names the person gave, spelled as they wrote \
 them. If they gave none, choose short clear names; when an existing tag means the same \
 thing, use it exactly. At most {max_rules} rules. Do not add rules the person didn't ask for.
 
@@ -78,15 +78,15 @@ Existing tags in the database: {existing}
 
 Call save_rules once."""
 
-APPLY_SYSTEM = """You tag companies by rules. The rules:
+APPLY_SYSTEM = """You tag records (companies, vacancies, listings, ...) by rules. The rules:
 
 {rules}
 
 For every company you are given, list each tag whose rule it clearly meets, judging from \
-its details and what you reliably know about the company. When unsure, leave the tag off. \
-A company may get several tags or none. Use only the tag names above, exactly.
+its details and what you reliably know about it. When unsure, leave the tag off. \
+A record may get several tags or none. Use only the tag names above, exactly.
 
-Call assign_tags once, with one entry for every company id you were given."""
+Call assign_tags once, with one entry for every record id you were given."""
 
 
 # ---- provider -------------------------------------------------------------------
@@ -135,13 +135,13 @@ def _call(provider, system: str, user: str, tool: dict) -> tuple[dict, float]:
 
 # ---- plan ------------------------------------------------------------------------
 
-def plan(criteria: str, provider=None) -> dict:
+def plan(criteria: str, provider=None, *, name: str = fdb.COMPANIES_FILE) -> dict:
     """Criteria in plain words → {"rules": [{tag, criteria}], "note", "cost_usd"}."""
     criteria = criteria.strip()
     if not criteria:
         raise ValueError("describe how to tag first")
     provider = provider or get_provider()
-    existing = sorted({t for r in fdb.load().values() for t in r.get("tags") or []}, key=str.casefold)
+    existing = sorted({t for r in fdb.load(name).values() for t in r.get("tags") or []}, key=str.casefold)
     system = PLAN_SYSTEM.format(max_rules=MAX_RULES, existing=", ".join(existing[:200]) or "(none)")
     out, cost = _call(provider, system, criteria, PLAN_TOOL)
     rules, seen = [], set()
@@ -159,15 +159,25 @@ def plan(criteria: str, provider=None) -> dict:
 
 # ---- apply -----------------------------------------------------------------------
 
+# Bookkeeping fields the model doesn't need to judge a record.
+_NOT_SHOWN = {"id", "tags", "hidden", "first_seen", "last_seen", "found_by", "checked_at",
+              "updated_at", "relevance", "status", "raw", "reachable"}
+
+
 def _company_line(rec: dict) -> dict:
-    """What the model sees about one company — compact."""
-    out = {"id": rec["id"], "name": rec.get("name") or rec["id"]}
-    for k in ("website", "description"):
-        if rec.get(k):
-            out[k] = str(rec[k])[:300]
-    for k in ("countries", "types", "industries"):
-        if rec.get(k):
-            out[k] = rec[k][:6]
+    """What the model sees about one record — its own fields, compact (a
+    company: name, website, description, countries, categories; a vacancy:
+    title, company, location…)."""
+    out: dict = {"id": rec["id"]}
+    for k, v in rec.items():
+        if k in _NOT_SHOWN or v in (None, "", [], {}):
+            continue
+        if isinstance(v, str):
+            out[k] = v[:300]
+        elif isinstance(v, list):
+            out[k] = [str(x)[:80] for x in v[:6]]
+        elif isinstance(v, (int, float, bool)):
+            out[k] = v
     return out
 
 
@@ -203,7 +213,7 @@ def _tag_batch(provider, system: str, tool: dict, recs: list[dict],
     cost = 0.0
     todo = recs
     for _ in range(2):
-        user = "Companies (one JSON object per line):\n" + "\n".join(
+        user = "Records (one JSON object per line):\n" + "\n".join(
             json.dumps(_company_line(r), ensure_ascii=False) for r in todo)
         out, c = _call(provider, system, user, tool)
         cost += c
@@ -220,7 +230,8 @@ def _tag_batch(provider, system: str, tool: dict, recs: list[dict],
     return got, cost
 
 
-def apply(rules: list[dict], ids: list[str], *, replace: bool = False, provider=None) -> dict:
+def apply(rules: list[dict], ids: list[str], *, replace: bool = False, provider=None,
+          name: str = fdb.COMPANIES_FILE) -> dict:
     """Tag the given companies by the rules and save. Returns {"tags": {id:
     [all its tags]}, "counts": {tag: n}, "tagged", "skipped", "errors",
     "cost_usd"}."""
@@ -230,7 +241,7 @@ def apply(rules: list[dict], ids: list[str], *, replace: bool = False, provider=
     if not rules:
         raise ValueError("no tag rules to apply")
     provider = provider or get_provider()
-    records = fdb.load()
+    records = fdb.load(name)
     recs = [records[i] for i in dict.fromkeys(ids) if i in records]
     allowed = {r["tag"].casefold(): r["tag"] for r in rules}
     system = APPLY_SYSTEM.format(rules="\n".join(f"- {r['tag']}: {r['criteria']}" for r in rules))
@@ -257,7 +268,7 @@ def apply(rules: list[dict], ids: list[str], *, replace: bool = False, provider=
     rule_tags = [r["tag"] for r in rules]
     changes = {cid: (tags, [t for t in rule_tags if t not in tags] if replace else [])
                for cid, tags in results.items()}
-    saved = fdb.retag_each(changes) if changes else {}
+    saved = fdb.retag_each(changes, name) if changes else {}
     counts = {t: sum(t in tags for tags in results.values()) for t in rule_tags}
     return {
         "tags": saved,
@@ -281,11 +292,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     req = json.loads(sys.stdin.read() or "{}")
     try:
+        name = fdb.file_of(req.get("database"))
         if args.plan:
-            out = plan(str(req.get("criteria") or ""))
+            out = plan(str(req.get("criteria") or ""), name=name)
         else:
             out = apply(req.get("rules") or [], [str(i) for i in req.get("ids") or []],
-                        replace=bool(req.get("replace")))
+                        replace=bool(req.get("replace")), name=name)
     except (ProviderError, ValueError) as e:
         # A clear message for the app (exit 0 so it isn't shown as a crash).
         out = {"error": str(e)}

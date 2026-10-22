@@ -1,0 +1,16 @@
+{
+  "created_at": {
+    "__ts": "2026-10-20T19:36:56Z"
+  },
+  "description": "Companies found by Find websites: their websites, careers pages, countries and categories.",
+  "key": "domain",
+  "name": "Companies",
+  "owner_uid": "local",
+  "record_label": {
+    "plural": "companies",
+    "singular": "company"
+  },
+  "updated_at": {
+    "__ts": "2026-10-23T00:00:00Z"
+  }
+}

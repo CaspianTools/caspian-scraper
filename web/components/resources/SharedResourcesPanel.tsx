@@ -105,11 +105,8 @@ export function SharedResourcesPanel({
             <span className="text-zinc-500 font-normal">({attachedIds.length})</span>
           </h3>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-            Websites from the{" "}
-            <Link href="/resources" className="underline">
-              shared library
-            </Link>{" "}
-            that this job scrapes alongside its own sources.
+            Websites from the shared library that this job scrapes alongside
+            its own sources.
           </p>
         </div>
         {!editing && (

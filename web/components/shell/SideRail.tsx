@@ -28,7 +28,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       {
         href: "/",
         label: "Jobs",
-        match: ["/projects"],
+        match: ["/projects", "/resources"],
         icon: icon(
           <>
             <rect x="3" y="7" width="18" height="13" rx="2" />
@@ -37,20 +37,9 @@ const GROUPS: { label: string; items: Item[] }[] = [
         ),
       },
       {
-        href: "/resources",
-        label: "Resources",
-        match: ["/resources"],
-        icon: icon(
-          <>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-          </>,
-        ),
-      },
-      {
-        href: "/db",
-        label: "Findings DB",
-        match: ["/db"],
+        href: "/databases",
+        label: "Databases",
+        match: ["/databases", "/db"],
         icon: icon(
           <>
             <ellipse cx="12" cy="5.5" rx="8" ry="2.5" />

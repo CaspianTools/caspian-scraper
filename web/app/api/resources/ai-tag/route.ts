@@ -2,18 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { runPythonJson } from "@/lib/localRunner";
+import { DatabaseIdSchema } from "@/lib/firestore/schema";
 
 const Rule = z.object({
   tag: z.string().trim().min(1).max(40),
   criteria: z.string().trim().min(1).max(500),
 });
 const AiTagSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("plan"), criteria: z.string().trim().min(1).max(4000) }),
+  z.object({
+    mode: z.literal("plan"),
+    criteria: z.string().trim().min(1).max(4000),
+    database: DatabaseIdSchema.default("companies"),
+  }),
   z.object({
     mode: z.literal("apply"),
     rules: z.array(Rule).min(1).max(12),
     ids: z.array(z.string().min(1).max(253)).min(1).max(200),
     replace: z.boolean().default(false),
+    database: DatabaseIdSchema.default("companies"),
   }),
 ]);
 

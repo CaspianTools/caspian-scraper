@@ -17,6 +17,12 @@ where npm >nul 2>&1 || (
   pause
   exit /b 1
 )
+rem The databases use Node's built-in SQLite (Node 22.13 or newer).
+node -e "require('node:sqlite')" >nul 2>&1 || (
+  echo Node.js is too old for this app - install the current LTS from https://nodejs.org and try again.
+  pause
+  exit /b 1
+)
 if not exist "node_modules" (
   echo First run: installing packages, this takes a minute...
   call npm ci --no-audit --no-fund || (pause & exit /b 1)

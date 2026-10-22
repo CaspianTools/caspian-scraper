@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromBearer } from "@/lib/auth/session";
 import { runPythonJson } from "@/lib/localRunner";
+import { DatabaseIdSchema } from "@/lib/firestore/schema";
 
 const EnrichSchema = z.object({
+  database: DatabaseIdSchema.default("companies"),
   ids: z.array(z.string().min(1).max(253)).min(1).max(200),
 });
 

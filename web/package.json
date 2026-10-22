@@ -2,6 +2,9 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "next dev -p 4444",
     "build": "next build",
@@ -19,7 +22,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/libsodium-wrappers": "^0.7.14",
-    "@types/node": "^20",
+    "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

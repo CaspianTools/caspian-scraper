@@ -928,3 +928,26 @@ export const RunRequestDocSchema = z.object({
   run_id: z.string().default(""),
 });
 export type RunRequestDoc = z.infer<typeof RunRequestDocSchema>;
+
+// ----- /databases/{id} -------------------------------------------------------
+// A named record database. Records live in db/<id>.jsonl (committed) through
+// the SQLite record store; jobs save into and read from databases.
+
+/** A database id: lowercase letters, digits, "-" and "_" (its file is db/<id>.jsonl). */
+export const DatabaseIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/, "not a database id");
+
+export const DatabaseKeySchema = z.enum(["domain", "url", "id"]);
+
+export const DatabaseCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().max(500).default(""),
+  /** What a record is called: "company" / "companies", "vacancy" / … */
+  record_label: z
+    .object({ singular: z.string().trim().min(1).max(40), plural: z.string().trim().min(1).max(40) })
+    .default({ singular: "record", plural: "records" }),
+  /** How records are identified: a website domain (companies), a URL, or an id. */
+  key: DatabaseKeySchema.default("id"),
+});
+export type DatabaseCreate = z.infer<typeof DatabaseCreateSchema>;
+
+export const DatabasePatchSchema = DatabaseCreateSchema.omit({ key: true }).partial();

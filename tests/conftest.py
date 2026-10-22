@@ -29,3 +29,14 @@ def page(playwright_browser):
 
 def fixture_url(name: str) -> str:
     return (FIXTURES_DIR / name).resolve().as_uri()
+
+
+# ---- the SQLite record store ------------------------------------------------
+
+import recordstore  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _tmp_record_store(tmp_path, monkeypatch):
+    """Never touch the real SQLite working database (local-data/scraper.db)."""
+    monkeypatch.setattr(recordstore, "DB_PATH", tmp_path / "scraper.db")

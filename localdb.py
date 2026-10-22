@@ -61,6 +61,7 @@ CONFIG_COLLECTIONS = {
     ("comparison_sources",),
     ("car_sources",),
     ("generic_sources",),
+    ("databases",),
 }
 # Run-derived fields the scraper writes onto config docs.
 VOLATILE_FIELDS = {"last_run_at", "last_run_summary"}

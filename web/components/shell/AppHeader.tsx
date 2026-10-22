@@ -7,8 +7,8 @@ import { useQuickAdd } from "@/components/quick-add/QuickAddProvider";
 /** Section names by path prefix, most specific first. */
 const SECTIONS: [string, string][] = [
   ["/projects", "Jobs"],
-  ["/resources", "Resources"],
-  ["/db", "Findings database"],
+  ["/resources", "Jobs"],
+  ["/databases", "Databases"],
   ["/settings", "Settings"],
 ];
 

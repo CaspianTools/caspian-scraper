@@ -198,6 +198,18 @@ export function aiconfigKeyDoc(uid: string) {
   return aiconfigKeysCol().doc(uid);
 }
 
+// ----- /databases/{id} -------------------------------------------------------
+// Named record databases (committed config; records in db/<id>.jsonl through
+// the SQLite record store — lib/recordstore.ts, recordstore.py).
+
+export function databasesCol(): CollectionReference {
+  return db().collection("databases");
+}
+
+export function databaseDoc(id: string) {
+  return databasesCol().doc(id);
+}
+
 // ---- slug generator -------------------------------------------------------
 
 /**

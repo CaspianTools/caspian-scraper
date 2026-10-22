@@ -32,6 +32,7 @@ const CONFIG_COLLECTIONS = new Set([
   "comparison_sources",
   "car_sources",
   "generic_sources",
+  "databases",
 ]);
 /** Run-derived fields the scraper writes onto config docs. */
 const VOLATILE_FIELDS = new Set(["last_run_at", "last_run_summary"]);

@@ -368,9 +368,9 @@ def check_page(url: str) -> dict:
     return {**base, "reachable": True, "ats": detect_ats(r.text[:500_000])}
 
 
-def enrich(ids: list[str]) -> list[dict]:
+def enrich(ids: list[str], name: str = fdb.COMPANIES_FILE) -> list[dict]:
     """Find + check careers pages for these database companies; save; return them."""
-    records = fdb.load()
+    records = fdb.load(name)
 
     def one(cid: str) -> dict | None:
         rec = records.get(cid)
@@ -390,7 +390,7 @@ def enrich(ids: list[str]) -> list[dict]:
 
     with ThreadPoolExecutor(max_workers=12) as pool:
         updates = [u for u in pool.map(one, ids) if u]
-    saved = fdb.upsert(updates)
+    saved = fdb.upsert(updates, name)
     return [to_finding(saved[u["id"]], known=True) for u in updates if u["id"] in saved]
 
 
@@ -960,27 +960,34 @@ def main(argv: list[str] | None = None) -> int:
                     help='hide / unhide: read {"ids": [...], "hidden": true|false} on stdin')
     ap.add_argument("--tag", action="store_true",
                     help='add / remove tags: read {"ids": [...], "add": [...], "remove": [...]} on stdin')
+    ap.add_argument("--delete", action="store_true",
+                    help='delete records: read {"ids": [...]} on stdin')
     ap.add_argument("--enrich", action="store_true",
                     help='find careers pages: read {"ids": [...]} on stdin, print the updated companies')
     args = ap.parse_args(argv)
 
-    if args.mark:
+    # The record actions work on any database: {"database": "<id>"} (default
+    # "companies") picks db/<id>.jsonl.
+    if args.mark or args.tag or args.enrich or args.delete:
         req = json.loads(sys.stdin.read() or "{}")
-        records = fdb.load()
-        ids = [str(i) for i in req.get("ids") or [] if str(i) in records]
-        fdb.upsert([{"id": i, "hidden": bool(req.get("hidden", True))} for i in ids])
-        print(json.dumps({"updated": len(ids)}))
-        return 0
-    if args.tag:
-        req = json.loads(sys.stdin.read() or "{}")
-        tags = fdb.retag([str(i) for i in req.get("ids") or []],
-                         add=[str(t) for t in req.get("add") or []],
-                         remove=[str(t) for t in req.get("remove") or []])
-        print(json.dumps({"updated": len(tags), "tags": tags}))
-        return 0
-    if args.enrich:
-        req = json.loads(sys.stdin.read() or "{}")
-        print(json.dumps({"findings": enrich([str(i) for i in req.get("ids") or []])}))
+        name = fdb.file_of(req.get("database"))
+        ids = [str(i) for i in req.get("ids") or []]
+        if args.mark:
+            records = fdb.load(name)
+            ids = [i for i in ids if i in records]
+            fdb.upsert([{"id": i, "hidden": bool(req.get("hidden", True))} for i in ids], name)
+            print(json.dumps({"updated": len(ids)}))
+        elif args.tag:
+            tags = fdb.retag(ids, add=[str(t) for t in req.get("add") or []],
+                             remove=[str(t) for t in req.get("remove") or []], name=name)
+            print(json.dumps({"updated": len(tags), "tags": tags}))
+        elif args.delete:
+            records = fdb.load(name)
+            gone = [i for i in ids if i in records]
+            fdb.put({}, name, deletes=gone)
+            print(json.dumps({"deleted": len(gone)}))
+        else:
+            print(json.dumps({"findings": enrich(ids, name)}))
         return 0
     if args.json and not args.query:
         req = json.loads(sys.stdin.read() or "{}")
