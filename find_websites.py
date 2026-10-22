@@ -19,17 +19,30 @@ findings_db.py): everything it finds is saved there, and earlier finds that
 match come back too, so results get richer over time. No built-in list.
 
 Sources, merged into one list by website domain:
-  * db           earlier finds that match the query and countries
+  * db           earlier finds that match the query and countries (not the
+                 ones only Wikidata ever knew of)
   * google_maps  Google Maps places for "<topic> in <country>" (name,
                  category, website) — the richest source for local firms
   * google       Google Search results
   * duckduckgo   DuckDuckGo, for any search Google blocks or leaves empty
-  * wikidata     every organisation with a website registered in the chosen
-                 countries (free SPARQL endpoint), ranked by the query
   * osm          OpenStreetMap places whose name matches and that list a
-                 website (free Overpass API)
+                 website (free Overpass API). Searched around each country's
+                 largest cities (OSM_CITIES; a whole country times out), or a
+                 city given as the country; else the whole country. 180 s
+                 query timeout, retries with growing pauses, and backup
+                 Overpass servers when the main one fails or is busy.
+  * wikidata     details only: organisations with a website in the chosen
+                 countries (free SPARQL endpoint) add their description,
+                 industries and Wikidata id to companies the other sources
+                 found (same domain, else same name). A company only
+                 Wikidata knows is left out — it filled results with
+                 universities and research institutes.
 The three browser sources run one after another in one off-screen Chrome
 window; Wikidata and OpenStreetMap run alongside.
+
+Ranking: the query's own specific words in a company's name / category /
+description first (relevance.score, also returned as each finding's
+"relevance" 0-100), then companies found by several sources.
 
 Query words are matched with typo tolerance ("trainign" → "training"), simple
 plurals and synonyms (training ≈ education / academy / institute …); generic
@@ -47,8 +60,9 @@ searches in a row): DuckDuckGo 4/4 headed vs 0/4 headless, Google 4/4 in
 real Chrome; plain HTTP got blocks or junk everywhere. So the window is
 headed but placed off-screen, uses installed Chrome when present, hides
 navigator.webdriver and pauses between searches. Google's terms don't allow
-automated searching and it may answer with a captcha; when it does, that
-source is skipped for the rest of the run and the others carry on.
+automated searching and it may answer with a captcha; when it (or
+DuckDuckGo's robot check) does, that source is skipped for the rest of the
+run — never retried in a loop — the others carry on, and `errors` says so.
 FIND_WEBSITES_HEADLESS=1 forces headless.
 """
 
@@ -75,6 +89,10 @@ SUPPORTED_ATS = ("successfactors", "jibe")
 RESULT_LIMIT = 400
 WIKIDATA_ROWS_PER_COUNTRY = 3000
 OSM_MAX_COUNTRIES = 4
+OSM_AREAS_PER_COUNTRY = 3      # cities searched per country (see OSM_CITIES)
+OSM_TIMEOUT_S = 180            # Overpass query timeout
+OSM_RETRY_WAITS_S = (5, 15, 30)  # pauses before the 2nd, 3rd, 4th try
+OSM_DEADLINE_S = 480           # give up on one area after this long
 BROWSER_MAX_COUNTRIES = 4      # Google Maps / Search countries per run
 MAPS_MAX_SCROLLS = 12
 VERIFY_LIMIT = 40              # known careers pages re-checked per search
@@ -88,8 +106,9 @@ CACHE_DAYS = 7
 CACHE_DIR = fdb.REPO_ROOT / "local-data" / "search-cache"
 
 WIKIDATA_URL = "https://query.wikidata.org/sparql"
-OVERPASS_URLS = ("https://overpass-api.de/api/interpreter",
-                 "https://overpass.kumi.systems/api/interpreter")
+OVERPASS_URLS = ("https://overpass-api.de/api/interpreter",       # main
+                 "https://overpass.kumi.systems/api/interpreter",  # backups, tried in turn
+                 "https://overpass.private.coffee/api/interpreter")
 TOOL_UA = "CaspianScraper/1.0 (careers discovery; local tool)"
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/130.0 Safari/537.36")
@@ -445,6 +464,10 @@ SELECT ?co ?coLabel ?coDescription ?site ?links
 
 
 def wikidata_matches(intent: dict, countries: list[str], errors: list) -> list[dict]:
+    """Organisations with a website in these countries. Used only to add
+    details (description, industries, Wikidata id) to companies the other
+    sources found — see _search; a company only Wikidata knows is dropped
+    (it filled results with universities and research institutes)."""
     with ThreadPoolExecutor(max_workers=6) as pool:
         batches = list(pool.map(lambda c: _safe(_wikidata_country, c, errors, "wikidata"), countries))
     out = []
@@ -453,14 +476,119 @@ def wikidata_matches(intent: dict, countries: list[str], errors: list) -> list[d
             continue  # buildings, events, websites, …
         score = relevance(intent, name=rec["name"], description=rec["description"],
                           types=rec["types"], industries=rec["industries"])
-        if score:
-            out.append({**rec, "sources": ["wikidata"], "_score": score})
+        out.append({**rec, "sources": ["wikidata"], "_score": score})
     return out
+
+
+def _name_key(name: str) -> str:
+    """'Acme Training L.L.C.' and 'ACME TRAINING LLC' → the same key."""
+    from relevance import fold
+
+    return re.sub(r"\W+", "", fold(name or ""))
+
+
+WIKIDATA_DETAILS = ("description", "website", "wikidata_id", "industries")
 
 
 # ---- source: OpenStreetMap ------------------------------------------------------------
 
 _OSM_KIND_KEYS = ("office", "amenity", "shop", "craft", "industrial", "healthcare")
+
+# A whole-country Overpass query times out on the public servers, so a
+# country is searched around its largest business cities instead:
+# (city, lat, lon, radius km). A country not listed falls back to the
+# whole-country query; a city name given as the "country" searches that city.
+OSM_CITIES: dict[str, list[tuple[str, float, float, int]]] = {
+    "United Arab Emirates": [("Dubai", 25.2048, 55.2708, 30), ("Abu Dhabi", 24.4539, 54.3773, 30),
+                             ("Sharjah", 25.3463, 55.4209, 20)],
+    "Saudi Arabia": [("Riyadh", 24.7136, 46.6753, 35), ("Jeddah", 21.4858, 39.1925, 30),
+                     ("Dammam", 26.3500, 50.1500, 35), ("Jubail", 27.0046, 49.6460, 25)],
+    "Qatar": [("Doha", 25.2854, 51.5310, 50)],
+    "Bahrain": [("Manama", 26.2285, 50.5860, 30)],
+    "Kuwait": [("Kuwait City", 29.3759, 47.9774, 45)],
+    "Oman": [("Muscat", 23.5880, 58.3829, 40), ("Sohar", 24.3460, 56.7075, 25),
+             ("Salalah", 17.0151, 54.0924, 25)],
+    "Iraq": [("Baghdad", 33.3152, 44.3661, 30), ("Basra", 30.5085, 47.7804, 30),
+             ("Erbil", 36.1911, 44.0092, 25)],
+    "Iran": [("Tehran", 35.6892, 51.3890, 35), ("Isfahan", 32.6546, 51.6680, 25),
+             ("Mashhad", 36.2605, 59.6168, 25)],
+    "Jordan": [("Amman", 31.9454, 35.9284, 30)],
+    "Egypt": [("Cairo", 30.0444, 31.2357, 35), ("Alexandria", 31.2001, 29.9187, 25)],
+    "Lebanon": [("Beirut", 33.8938, 35.5018, 25)],
+    "Azerbaijan": [("Baku", 40.4093, 49.8671, 35), ("Sumgait", 40.5897, 49.6686, 15),
+                   ("Ganja", 40.6828, 46.3606, 20)],
+    "Georgia": [("Tbilisi", 41.7151, 44.8271, 25), ("Batumi", 41.6168, 41.6367, 15)],
+    "Kazakhstan": [("Almaty", 43.2220, 76.8512, 30), ("Astana", 51.1694, 71.4491, 25),
+                   ("Atyrau", 47.0945, 51.9238, 20)],
+    "Uzbekistan": [("Tashkent", 41.2995, 69.2401, 30)],
+    "Turkmenistan": [("Ashgabat", 37.9601, 58.3261, 25)],
+    "Türkiye": [("Istanbul", 41.0082, 28.9784, 40), ("Ankara", 39.9334, 32.8597, 30),
+                ("Izmir", 38.4237, 27.1428, 30)],
+    "Pakistan": [("Karachi", 24.8607, 67.0011, 35), ("Lahore", 31.5204, 74.3587, 30),
+                 ("Islamabad", 33.6844, 73.0479, 25)],
+    "India": [("Mumbai", 19.0760, 72.8777, 35), ("Delhi", 28.6139, 77.2090, 35),
+              ("Bengaluru", 12.9716, 77.5946, 30)],
+    "United Kingdom": [("London", 51.5074, -0.1278, 35), ("Manchester", 53.4808, -2.2426, 25),
+                       ("Aberdeen", 57.1497, -2.0943, 20), ("Birmingham", 52.4862, -1.8904, 25)],
+    "United States": [("Houston", 29.7604, -95.3698, 40), ("New York", 40.7128, -74.0060, 35),
+                      ("Los Angeles", 34.0522, -118.2437, 40)],
+}
+OSM_CITY_INDEX = {city.casefold(): (country, (city, lat, lon, km))
+                  for country, cities in OSM_CITIES.items() for city, lat, lon, km in cities}
+
+
+def osm_areas(country: str) -> list[tuple[str, str, str]]:
+    """(country, label, Overpass set) for each area to search: the country's
+    largest cities, the city itself, or else the whole country."""
+    def around(c, lat, lon, km):
+        return f"nwr(around:{km * 1000},{lat},{lon})"
+
+    if country in OSM_CITIES:
+        return [(country, f"{c[0]}, {country}", around(*c)) for c in OSM_CITIES[country][:OSM_AREAS_PER_COUNTRY]]
+    hit = OSM_CITY_INDEX.get(country.casefold())
+    if hit:
+        return [(hit[0], hit[1][0], around(*hit[1]))]
+    return [(country, country,
+             f'area["name:en"={json.dumps(country)}]["admin_level"="2"]->.a;nwr(area.a)')]
+
+
+def overpass(query: str) -> tuple[list | None, str]:
+    """Run an Overpass query: the main server, then the backups in turn, with
+    growing pauses between tries, until one answers or OSM_DEADLINE_S passes.
+    Returns (elements, "") or (None, what went wrong)."""
+    start, failures = time.monotonic(), []
+    for attempt in range(len(OSM_RETRY_WAITS_S) + 1):
+        if attempt:
+            if time.monotonic() - start + OSM_RETRY_WAITS_S[attempt - 1] > OSM_DEADLINE_S:
+                break
+            _pause(OSM_RETRY_WAITS_S[attempt - 1])
+        ep = OVERPASS_URLS[attempt % len(OVERPASS_URLS)]
+        server = urlparse(ep).hostname
+        try:
+            r = requests.post(ep, data={"data": query}, headers={"User-Agent": TOOL_UA},
+                              timeout=OSM_TIMEOUT_S + 15)
+            if r.status_code != 200:
+                failures.append(f"{server}: HTTP {r.status_code}" + (" (busy)" if r.status_code in (429, 504) else ""))
+                continue
+            data = r.json()
+        except requests.Timeout:
+            failures.append(f"{server}: timed out")
+            continue
+        except (requests.RequestException, ValueError) as e:
+            failures.append(f"{server}: {type(e).__name__}")
+            continue
+        elements = data.get("elements") or []
+        remark = str(data.get("remark") or "")
+        if not elements and re.search(r"timed out|out of memory|error", remark, re.I):
+            failures.append(f"{server}: {remark[:120]}")
+            continue  # the server gave up on it; another may not
+        return elements, ""
+    # Every server's last answer, so the message shows what each one did.
+    last_by_server = {f.split(":", 1)[0]: f for f in failures}
+    return None, "; ".join(last_by_server.values()) or "no Overpass server answered"
+
+
+_pause = time.sleep  # (tests replace it)
 
 
 def osm_matches(intent: dict, countries: list[str], errors: list) -> list[dict]:
@@ -470,21 +598,13 @@ def osm_matches(intent: dict, countries: list[str], errors: list) -> list[dict]:
         words = ["oil", "gas", "petroleum", "energy", "engineering", "contracting", "construction",
                  "industrial", "chemical", "drilling", "marine", "safety"]
     pattern = "|".join(re.escape(w) for w in words[:20])
-    def one(country: str) -> list[dict]:
-        q = (f'[out:json][timeout:55];area["name:en"={json.dumps(country)}]["admin_level"="2"]->.a;'
-             f'nwr(area.a)["website"]["name"~{json.dumps(pattern)},i];out tags center 400;')
-        elements, last = None, None
-        for ep in OVERPASS_URLS:
-            try:
-                r = requests.post(ep, data={"data": q}, headers={"User-Agent": TOOL_UA}, timeout=60)
-                if r.status_code == 200:
-                    elements = r.json().get("elements", [])
-                    break
-                last = f"Overpass HTTP {r.status_code}"
-            except (requests.RequestException, ValueError) as e:
-                last = type(e).__name__
+    def one(area: tuple[str, str, str]) -> list[dict]:
+        country, label, where = area
+        q = (f'[out:json][timeout:{OSM_TIMEOUT_S}];'
+             f'{where}["website"]["name"~{json.dumps(pattern)},i];out tags center 400;')
+        elements, last = overpass(q)
         if elements is None:
-            errors.append(("osm", f"{country}: {last or 'no Overpass server answered'}"))
+            errors.append(("osm", f"{label}: {last}"))
             return []
         rows = []
         for e in elements:
@@ -498,15 +618,20 @@ def osm_matches(intent: dict, countries: list[str], errors: list) -> list[dict]:
             kinds = [tags[k].replace("_", " ") for k in _OSM_KIND_KEYS if tags.get(k) and tags[k] != "yes"]
             score = relevance(intent, name=name, types=kinds)
             if score or not intent["terms"]:
+                street = " ".join(x for x in (tags.get("addr:street"), tags.get("addr:housenumber")) if x)
                 rows.append({"name": name, "website": site, "types": kinds, "countries": [country],
+                             "city": tags.get("addr:city") or "", "address": street,
                              "osm_id": f"{e.get('type')}/{e.get('id')}", "sources": ["osm"],
                              "_score": max(score, 1)})
         return rows
 
-    # One country per query (a multi-area query times out); two at a time
-    # to stay within the public servers' fair use.
+    # One city (or country) per query — a whole country times out; two at a
+    # time to stay within the public servers' fair use.
+    areas = [a for c in countries[:OSM_MAX_COUNTRIES] for a in osm_areas(c)]
     with ThreadPoolExecutor(max_workers=2) as pool:
-        return [r for rows in pool.map(one, countries[:OSM_MAX_COUNTRIES]) for r in rows]
+        found = [r for rows in pool.map(one, areas) for r in rows]
+    seen: set[str] = set()  # neighbouring cities' circles can overlap
+    return [r for r in found if not (r["osm_id"] in seen or seen.add(r["osm_id"]))]
 
 
 # ---- browser sources: Google Maps, Google Search, DuckDuckGo -----------------------
@@ -580,6 +705,24 @@ def _maps_category(lines: list[str], name: str = "") -> str:
             if (part and not re.search(r"\d", part) and len(part) < 50
                     and part.lower() != name.lower() and not part.startswith(("Open", "Closed"))):
                 return part
+    return ""
+
+
+def _maps_address(lines: list[str], name: str = "") -> str:
+    """'4.6(120) · Training centre · Al Quoz' → 'Al Quoz': what follows the
+    category on its line (the branch's address); never hours or a phone."""
+    cat = _maps_category(lines, name)
+    for line in lines:
+        parts = [p.strip() for p in line.split("·")]
+        cleaned = [re.sub(r"[^\w &/'-]", "", p).strip() for p in parts]
+        if not cat or cat not in cleaned:
+            continue
+        for p in reversed(parts[cleaned.index(cat) + 1:]):
+            p = p.strip(" ​")
+            if (re.search(r"[^\W\d_]", p) and len(p) < 120 and not re.match(r"(?i)(open|closed|closes|opens)\b", p)
+                    and p.lower() != name.lower()):
+                return p
+        return ""
     return ""
 
 
@@ -667,8 +810,22 @@ class Browser:
                 rows = self._links("#search a:has(h3)", _google_href)
                 if rows:
                     return rows, "google"
+        if "duckduckgo" in self.blocked:
+            return [], "duckduckgo"
         self.goto(f"https://html.duckduckgo.com/html/?q={quote_plus(query)}")
+        if self.ddg_blocked():
+            self.blocked.add("duckduckgo")  # no retrying: it only gets stricter
+            return [], "duckduckgo"
         return self._links("a.result__a", _ddg_href), "duckduckgo"
+
+    def ddg_blocked(self) -> bool:
+        """DuckDuckGo's "bots use DuckDuckGo too" challenge page."""
+        try:
+            if self.page.query_selector("form#challenge-form, .anomaly-modal__title"):
+                return True
+            return "bots use DuckDuckGo too" in (self.page.content() or "")[:200_000]
+        except Exception:  # noqa: BLE001 — can't tell: treat as not blocked
+            return False
 
     def _links(self, selector: str, unwrap) -> list[tuple[str, str]]:
         try:
@@ -734,10 +891,12 @@ def browser_matches(intent: dict, countries: list[str], errors: list,
                             continue
                         engines.add("google_maps")
                         cat = _maps_category(lines, name)
+                        addr = _maps_address(lines, name)  # becomes the branch's address
                         # Google already matched these to the words: rank them high.
                         out.append({"name": name, "website": _strip_tracking(site),
                                     "types": [cat] if cat else [],
                                     "countries": [country] if country else [],
+                                    **({"address": addr} if addr else {}),
                                     "sources": ["google_maps"], "_score": 4})
             for q, country in web_queries(intent, countries):
                 rows, engine = b.web(q)
@@ -753,8 +912,13 @@ def browser_matches(intent: dict, countries: list[str], errors: list,
                         rec["careers_url"] = _clean_url(url)
                     out.append(rec)
             if "google" in b.blocked:
-                errors.append(("google", "Google asked for a captcha, so its searches were skipped "
-                                         "this time - try again later"))
+                errors.append(("google", "Google showed a captcha (robot check), so Google Maps and "
+                                         "Google Search were skipped for the rest of this search"
+                                         + ("" if "duckduckgo" in b.blocked else " - DuckDuckGo was used instead")
+                                         + "; try again later"))
+            if "duckduckgo" in b.blocked:
+                errors.append(("duckduckgo", "DuckDuckGo showed a robot check, so its searches were "
+                                             "skipped for the rest of this search; try again later"))
     except Exception as e:  # noqa: BLE001
         errors.append(("web", f"{type(e).__name__}: {e}"[:200]))
     if not out and not errors:
@@ -797,6 +961,36 @@ def to_finding(rec: dict, *, known: bool) -> dict:
     }
 
 
+def query_words(intent: dict) -> list[str]:
+    """The query's specific words ("training agencies jobs" → ["training"]);
+    none for a plain "HSE jobs" (its industries do the ranking)."""
+    if not intent["terms"]:
+        return []
+    return list(dict.fromkeys(
+        w for w in intent["corrected"].split()
+        if not (w in WEAK_WORDS or _singular(w) in WEAK_WORDS or len(_singular(w)) < 3)))
+
+
+def _query_relevance(intent: dict, rec: dict) -> int | None:
+    """0-100: the query's own words in the company's name / category /
+    description (relevance.score), or None with no specific words."""
+    import relevance as keyword_rules
+
+    words = query_words(intent)
+    if not words:
+        return None
+    text = {k: rec.get(k) for k in ("name", "description", "types", "industries") if rec.get(k)}
+    got = keyword_rules.score(text, {"include": words})
+    return got[0] if got else None
+
+
+def _add_relevance(findings: list[dict], intent: dict) -> None:
+    for f in findings:
+        r = _query_relevance(intent, f)
+        if r is not None:
+            f["relevance"] = r
+
+
 def _iso_ts(s: str | None) -> float:
     try:
         return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp() if s else 0.0
@@ -827,6 +1021,7 @@ def discover(query: str, countries: list[str], *, use_web: bool = True,
             known = set(cached.get("known", []))
             findings = [to_finding(records[c], known=c in known)
                         for c in cached["ids"] if c in records and c not in exclude]
+            _add_relevance(findings, intent)
             return {**{k: v for k, v in cached.items() if k not in ("ids", "known")},
                     "findings": findings, "cached": True, "database_size": len(records)}
 
@@ -877,11 +1072,18 @@ def _search(query: str, countries: list[str], *, use_web: bool = True,
     exclude = {fdb.company_id(u) for u in exclude_urls}
     merged: dict[str, dict] = {}
     meta: dict[str, dict] = {}
-    for key in ("db", "browser", "wikidata", "osm"):
+    # A domain merged into another company (findings_db.merge_duplicates) is
+    # shown as that company.
+    aliases = fdb.alias_map(fdb.load())
+    for key in ("db", "browser", "osm"):
         for rec in found.get(key, []):
             cid = fdb.company_id(rec.get("website") or rec.get("careers_url") or "")
+            cid = aliases.get(cid, cid)
             if not cid or cid in exclude or not rec.get("name"):
                 continue
+            srcs = set(rec.get("sources") or [])
+            if key == "db" and srcs and srcs <= {"wikidata"}:
+                continue  # an earlier find only Wikidata knew of
             m = meta.setdefault(cid, {"score": 0, "links": 0, "known": False, "hits": 0})
             m["score"] = max(m["score"], rec.get("_score", 0))
             m["links"] = max(m["links"], rec.get("_links", 0))
@@ -891,8 +1093,24 @@ def _search(query: str, countries: list[str], *, use_web: bool = True,
             clean["id"] = cid
             merged[cid] = fdb.merge(merged.get(cid), clean)
 
-    # Found by several sources = more likely what you want.
-    ranked = sorted(merged, key=lambda c: (-(meta[c]["score"] + len(merged[c].get("sources", []))),
+    # Wikidata only adds details to companies found above (same website
+    # domain, else the same name); it doesn't add companies of its own.
+    by_name = {_name_key(r.get("name", "")): c for c, r in merged.items() if len(_name_key(r.get("name", ""))) >= 4}
+    for rec in found.get("wikidata", []):
+        cid = fdb.company_id(rec.get("website") or "")
+        if cid not in merged:
+            cid = by_name.get(_name_key(rec.get("name", "")))
+        if not cid or cid not in merged:
+            continue
+        meta[cid]["links"] = max(meta[cid]["links"], rec.get("_links", 0))
+        merged[cid] = fdb.merge(merged[cid], {"id": cid, **{k: rec.get(k) for k in WIKIDATA_DETAILS}})
+
+    # Ranked: the search words in the name / category / description first
+    # (relevance.score, include = the query's specific words), then found by
+    # several sources = more likely what you want.
+    rel = {c: _query_relevance(intent, merged[c]) for c in merged}
+    ranked = sorted(merged, key=lambda c: (-(rel[c] or 0),
+                                           -(meta[c]["score"] + len(merged[c].get("sources", []))),
                                            -meta[c]["links"], merged[c].get("name", "").lower()))
     ranked = ranked[:RESULT_LIMIT]
 
@@ -909,6 +1127,7 @@ def _search(query: str, countries: list[str], *, use_web: bool = True,
     saved = fdb.upsert([{**merged[c], "found_by": [q] if q else [], "last_seen": fdb.now_iso()}
                         for c in ranked])
     findings = [to_finding(saved.get(c, merged[c]), known=meta[c]["known"]) for c in ranked]
+    _add_relevance(findings, intent)
 
     by_source: dict[str, int] = {}
     for f in findings:

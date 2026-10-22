@@ -124,18 +124,128 @@ def test_web_candidates_drop_boards_and_aggregators():
     assert fw.is_candidate("Careers | Acme Energy", "https://acme.example/careers")
 
 
-def test_wikidata_keeps_organisations_ranked_by_query(monkeypatch):
+def test_wikidata_keeps_organisations_scored_by_query(monkeypatch):
     rows = [
         {"co": {"value": "x/Q1"}, "coLabel": {"value": "Gulf Training Institute"}, "site": {"value": "https://gti.example"},
          "links": {"value": "3"}, "types": {"value": "educational institution"}, "coDescription": {"value": ""}},
         {"co": {"value": "x/Q2"}, "coLabel": {"value": "Training Tower"}, "site": {"value": "https://tower.example"},
          "links": {"value": "9"}, "types": {"value": "skyscraper"}},                       # not an organisation
         {"co": {"value": "x/Q3"}, "coLabel": {"value": "PetroCo"}, "site": {"value": "https://petro.example"},
-         "links": {"value": "30"}, "inds": {"value": "petroleum industry"}},              # off-topic
+         "links": {"value": "30"}, "inds": {"value": "petroleum industry"}},              # off-topic, kept for details
     ]
     monkeypatch.setattr(fw.requests, "get", lambda *a, **k: _Resp("x", payload={"results": {"bindings": rows}}))
-    got = fw.wikidata_matches(fw.understand("training"), ["Qatar"], [])
-    assert [g["name"] for g in got] == ["Gulf Training Institute"]
+    got = {g["name"]: g for g in fw.wikidata_matches(fw.understand("training"), ["Qatar"], [])}
+    assert set(got) == {"Gulf Training Institute", "PetroCo"}
+    assert got["Gulf Training Institute"]["_score"] > 0 and got["PetroCo"]["_score"] == 0
+    assert got["PetroCo"]["wikidata_id"] == "Q3"
+
+
+# ---- OpenStreetMap -------------------------------------------------------------
+
+def test_osm_searches_a_countrys_cities_or_a_city_or_the_whole_country():
+    areas = fw.osm_areas("Azerbaijan")
+    assert [a[1] for a in areas] == ["Baku, Azerbaijan", "Sumgait, Azerbaijan", "Ganja, Azerbaijan"]
+    assert areas[0][0] == "Azerbaijan" and areas[0][2] == "nwr(around:35000,40.4093,49.8671)"
+    assert len(fw.osm_areas("Saudi Arabia")) == fw.OSM_AREAS_PER_COUNTRY
+    assert fw.osm_areas("dubai") == [("United Arab Emirates", "Dubai", "nwr(around:30000,25.2048,55.2708)")]
+    ((country, label, where),) = fw.osm_areas("Narnia")
+    assert label == "Narnia" and 'area["name:en"="Narnia"]["admin_level"="2"]' in where
+
+
+def test_overpass_falls_back_to_backup_servers_with_growing_waits(monkeypatch):
+    calls, waits = [], []
+    answers = iter([
+        fw.requests.Timeout("slow"),                                                 # main: timeout
+        _Resp("k", status=429),                                                      # backup 1: busy
+        _Resp("c", payload={"elements": [], "remark": "runtime error: Query timed out"}),  # backup 2: gave up
+        _Resp("m", payload={"elements": [{"id": 1}]}),                               # main again: ok
+    ])
+
+    def post(url, data=None, headers=None, timeout=None):
+        calls.append((url, timeout))
+        a = next(answers)
+        if isinstance(a, Exception):
+            raise a
+        return a
+
+    monkeypatch.setattr(fw.requests, "post", post)
+    monkeypatch.setattr(fw, "_pause", waits.append)
+    elements, err = fw.overpass("[out:json];")
+    assert elements == [{"id": 1}] and err == ""
+    assert [c[0] for c in calls] == [*fw.OVERPASS_URLS, fw.OVERPASS_URLS[0]]
+    assert all(t >= fw.OSM_TIMEOUT_S for _, t in calls)
+    assert waits == list(fw.OSM_RETRY_WAITS_S) and waits == sorted(waits)
+
+
+def test_overpass_gives_up_with_a_clear_message(monkeypatch):
+    monkeypatch.setattr(fw.requests, "post", lambda *a, **k: _Resp("x", status=504))
+    monkeypatch.setattr(fw, "_pause", lambda s: None)
+    elements, err = fw.overpass("q")
+    assert elements is None and "HTTP 504" in err
+
+
+def test_osm_matches_queries_each_city_and_dedupes(monkeypatch):
+    queries = []
+
+    def fake_overpass(q):
+        queries.append(q)
+        if "40.6828" in q:                      # Ganja fails
+            return None, "overpass-api.de: timed out"
+        return [{"type": "node", "id": 7, "tags": {"name": "Baku Training Centre", "website": "btc.example"}},
+                {"type": "node", "id": 8, "tags": {"name": "No Site Training"}}], ""
+
+    monkeypatch.setattr(fw, "overpass", fake_overpass)
+    errors = []
+    rows = fw.osm_matches(fw.understand("training"), ["Azerbaijan"], errors)
+    assert len(queries) == 3 and all("around:" in q and "[timeout:180]" in q for q in queries)
+    assert [(r["name"], r["website"], r["countries"]) for r in rows] == \
+        [("Baku Training Centre", "https://btc.example", ["Azerbaijan"])]      # same place twice → once
+    assert errors == [("osm", "Ganja, Azerbaijan: overpass-api.de: timed out")]
+
+
+# ---- browser captchas --------------------------------------------------------
+
+class _FakePage:
+    def __init__(self, html="", selectors=()):
+        self.url, self.html, self.selectors = "https://html.duckduckgo.com/html/", html, set(selectors)
+
+    def query_selector(self, sel):
+        return any(s in sel for s in self.selectors) or None
+
+    def content(self):
+        return self.html
+
+
+def test_duckduckgo_robot_check_is_reported_once_not_retried(monkeypatch):
+    b = object.__new__(fw.Browser)
+    b.page, b.blocked, b._loads = _FakePage("Unfortunately, bots use DuckDuckGo too."), {"google"}, 0
+    loads = []
+    monkeypatch.setattr(b, "goto", lambda url: loads.append(url), raising=False)
+    assert b.web("training Qatar") == ([], "duckduckgo")
+    assert b.web("training Oman") == ([], "duckduckgo")
+    assert len(loads) == 1 and b.blocked == {"google", "duckduckgo"}
+
+
+def test_captchas_end_up_in_errors(monkeypatch):
+    class FakeBrowser:
+        def __enter__(self):
+            self.blocked = {"google", "duckduckgo"}
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def maps(self, q):
+            return []
+
+        def web(self, q):
+            return [], "duckduckgo"
+
+    monkeypatch.setattr(fw, "Browser", FakeBrowser)
+    errors = []
+    assert fw.browser_matches(fw.understand("training"), ["Qatar"], errors) == []
+    assert {s for s, _ in errors} == {"google", "duckduckgo"}
+    assert "captcha" in dict(errors)["google"]
 
 
 # ---- discover: merge, save, rank ---------------------------------------------
@@ -143,7 +253,10 @@ def test_wikidata_keeps_organisations_ranked_by_query(monkeypatch):
 def test_discover_merges_sources_by_domain_and_saves_everything(monkeypatch):
     monkeypatch.setattr(fw, "wikidata_matches", lambda i, c, e: [
         {"name": "Acme Training", "website": "https://www.acme.example/", "countries": ["Qatar"],
-         "types": ["company"], "sources": ["wikidata"], "_score": 3, "_links": 5}])
+         "description": "training company in Qatar", "wikidata_id": "Q1", "industries": ["education"],
+         "types": ["company"], "sources": ["wikidata"], "_score": 3, "_links": 5},
+        {"name": "Qatar University", "website": "https://qu.example/", "countries": ["Qatar"],
+         "types": ["university"], "sources": ["wikidata"], "_score": 1, "_links": 50}])  # Wikidata only
     monkeypatch.setattr(fw, "osm_matches", lambda i, c, e: [
         {"name": "Acme Training Centre", "website": "https://acme.example/en", "countries": ["Qatar"],
          "sources": ["osm"], "_score": 3}])
@@ -152,14 +265,58 @@ def test_discover_merges_sources_by_domain_and_saves_everything(monkeypatch):
          "types": ["Training centre"], "sources": ["google_maps"], "_score": 4}])
     out = fw.discover("training", ["Qatar"])
     by_id = {f["id"]: f for f in out["findings"]}
-    assert set(by_id) == {"acme.example", "beta.example"}
-    assert by_id["acme.example"]["sources"] == ["wikidata", "osm"]   # one finding, two chips
+    assert set(by_id) == {"acme.example", "beta.example"}               # no Wikidata-only company
+    assert by_id["acme.example"]["sources"] == ["osm"]
+    assert by_id["acme.example"]["description"] == "training company in Qatar"  # details from Wikidata
     assert out["database_size"] == 2 and set(fdb.load()) == {"acme.example", "beta.example"}
+    assert fdb.load()["acme.example"]["wikidata_id"] == "Q1"
     assert fdb.load()["beta.example"]["found_by"] == ["training"]
 
     # A second search finds them in the database too.
     out2 = fw.discover("training", ["Qatar"], use_web=False)
     assert all(f["known"] for f in out2["findings"] if f["id"] == "beta.example")
+
+
+def test_wikidata_matches_a_company_by_name_when_the_domain_differs(monkeypatch):
+    monkeypatch.setattr(fw, "wikidata_matches", lambda i, c, e: [
+        {"name": "ACME Training L.L.C.", "website": "https://acme-group.example/", "wikidata_id": "Q9",
+         "description": "vocational training", "sources": ["wikidata"], "_score": 3}])
+    monkeypatch.setattr(fw, "osm_matches", lambda i, c, e: [])
+    monkeypatch.setattr(fw, "browser_matches", lambda i, c, e: [
+        {"name": "Acme Training LLC", "website": "https://acme.example/", "sources": ["google_maps"], "_score": 4}])
+    (f,) = fw.discover("training", ["Qatar"])["findings"]
+    assert f["id"] == "acme.example" and f["website"] == "https://acme.example/"
+    assert fdb.load()["acme.example"]["wikidata_id"] == "Q9"
+
+
+def test_earlier_wikidata_only_finds_are_left_out(monkeypatch):
+    fdb.upsert([{"id": "uni.example", "name": "Training University", "countries": ["Qatar"],
+                 "website": "https://uni.example/", "sources": ["wikidata"]},
+                {"id": "both.example", "name": "Both Training", "countries": ["Qatar"],
+                 "website": "https://both.example/", "sources": ["wikidata", "osm"]}])
+    for name in ("wikidata_matches", "osm_matches", "browser_matches"):
+        monkeypatch.setattr(fw, name, lambda i, c, e: [])
+    out = fw.discover("training", ["Qatar"])
+    assert [f["id"] for f in out["findings"]] == ["both.example"]
+    assert "uni.example" in fdb.load()                                   # still in the database
+
+
+def test_results_put_the_search_words_first(monkeypatch):
+    monkeypatch.setattr(fw, "wikidata_matches", lambda i, c, e: [])
+    monkeypatch.setattr(fw, "osm_matches", lambda i, c, e: [
+        {"name": "Gulf Training Centre", "website": "https://gtc.example/", "sources": ["osm"], "_score": 3}])
+    monkeypatch.setattr(fw, "browser_matches", lambda i, c, e: [
+        {"name": "Sky Flight Academy", "website": "https://sky.example/", "types": ["Flight school"],
+         "sources": ["google_maps"], "_score": 4},
+        {"name": "Acme", "website": "https://acme.example/", "description": "Safety training courses",
+         "sources": ["google"], "_score": 1}])
+    out = fw.discover("training agencies", ["Qatar"])
+    assert [(f["id"], f["relevance"]) for f in out["findings"]] == \
+        [("gtc.example", 85), ("acme.example", 70), ("sky.example", 40)]
+    assert fw.query_words(fw.understand("trainign agencies jobs")) == ["training"]
+    assert fw.query_words(fw.understand("HSE jobs")) == []
+    again = fw.discover("training agencies", ["Qatar"])                  # the cached replay too
+    assert again["cached"] and [f["relevance"] for f in again["findings"]] == [85, 70, 40]
 
 
 def test_json_mode_reads_stdin(monkeypatch, capsys):

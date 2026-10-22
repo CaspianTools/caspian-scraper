@@ -36,7 +36,12 @@ def fixture_url(name: str) -> str:
 import recordstore  # noqa: E402
 
 
+import findings_db  # noqa: E402
+
+
 @pytest.fixture(autouse=True)
 def _tmp_record_store(tmp_path, monkeypatch):
-    """Never touch the real SQLite working database (local-data/scraper.db)."""
+    """Never touch the real SQLite working database (local-data/scraper.db)
+    or the committed databases (db/*.jsonl): every test gets its own."""
     monkeypatch.setattr(recordstore, "DB_PATH", tmp_path / "scraper.db")
+    monkeypatch.setattr(findings_db, "DB_DIR", tmp_path / "db")
