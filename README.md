@@ -1,5 +1,13 @@
 # Caspian Scraper
 
+> **Quickest start: double-click `Collect.bat`.** Type what you're looking
+> for and where; a Chrome window opens, searches Google Maps and Google, opens
+> every business and saves its public details (name, category, address,
+> phone, website, rating, hours, coordinates) to a spreadsheet in
+> `local-data/collected/`, and into the Places / Companies databases in the
+> app. If Google asks "are you a robot", solve it in that window.
+> (`python collect.py "training centres" --where "Baku, Azerbaijan"`)
+>
 > **Current setup — runs locally, no accounts.** Double-click **`Start.bat`**
 > to run a job and review what it found, or **`open-admin.bat`** to open the
 > admin app (http://localhost:4444). The menu is **Jobs · Databases ·
